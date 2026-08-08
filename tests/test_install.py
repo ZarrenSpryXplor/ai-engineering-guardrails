@@ -208,13 +208,45 @@ class InstallTests(unittest.TestCase):
                 onerror(unlink_readonly, str(policy), sys.exc_info())
             path.rmdir()
 
-        with mock.patch.object(state.shutil, "rmtree", side_effect=simulate_windows_rmtree):
+        windows_os = mock.Mock(wraps=os)
+        windows_os.name = "nt"
+        with (
+            mock.patch.object(state, "os", windows_os),
+            mock.patch.object(state.shutil, "rmtree", side_effect=simulate_windows_rmtree),
+        ):
             state.remove_owned_tree(root)
 
         self.assertFalse(root.exists())
         self.assertEqual(2, len(attempts))
         self.assertFalse(attempts[0] & stat.S_IWUSR)
         self.assertTrue(attempts[1] & stat.S_IWUSR)
+
+    def test_remove_owned_tree_does_not_change_read_only_files_outside_windows(self) -> None:
+        root = self.home / "managed-runtime"
+        root.mkdir()
+        policy = root / "command-policy.json"
+        policy.write_text("{}\n", encoding="utf-8")
+        policy.chmod(0o444)
+
+        def simulate_permission_error(path: Path, *, onerror: Callable[..., None]) -> None:
+            def reject_unlink(candidate: str) -> None:
+                raise PermissionError(f"synthetic parent permission error: {candidate}")
+
+            try:
+                reject_unlink(str(policy))
+            except PermissionError:
+                onerror(reject_unlink, str(policy), sys.exc_info())
+
+        posix_os = mock.Mock(wraps=os)
+        posix_os.name = "posix"
+        with (
+            mock.patch.object(state, "os", posix_os),
+            mock.patch.object(state.shutil, "rmtree", side_effect=simulate_permission_error),
+        ):
+            with self.assertRaisesRegex(PermissionError, "synthetic parent permission error"):
+                state.remove_owned_tree(root)
+
+        self.assertEqual(0o444, stat.S_IMODE(policy.stat().st_mode))
 
     def test_remove_owned_tree_does_not_suppress_directory_permission_errors(self) -> None:
         root = self.home / "managed-runtime"

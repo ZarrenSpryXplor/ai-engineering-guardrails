@@ -52,9 +52,9 @@ def _retry_readonly_file(
         mode = os.lstat(path).st_mode
     except OSError:
         raise error
-    if not isinstance(error, PermissionError) or not stat.S_ISREG(mode):
+    if os.name != "nt" or not isinstance(error, PermissionError) or not stat.S_ISREG(mode):
         raise error
-    os.chmod(path, stat.S_IWRITE)
+    os.chmod(path, mode | stat.S_IWUSR)
     function(path)
 
 
