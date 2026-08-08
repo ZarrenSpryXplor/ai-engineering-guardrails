@@ -57,7 +57,9 @@ Paste the first command's output in **Settings > Tools > AI Assistant > Prompt L
 
 ## Day-to-day use
 
-Work normally. Relevant skills are loaded on demand for the repository's detected stack.
+Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install ships six core workstation skills plus 22 capability-pack skills. See the [skills catalogue](skills.md) for the exact names and use cases.
+
+Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
 Default behavior:
 

@@ -25,7 +25,9 @@ Optional `.ai-guardrails.json` can explicitly enable/disable packs, resolve pack
 
 A pack uses only the files it needs: `pack.json`, concise `policy.md` or references, command/structured-tool policy, verification/routing data, a distinct portable skill, and synthetic fixtures. `pack.json` declares stable ID/type, description, detectors/exclusions, dependencies/conflicts, and referenced files.
 
-Fresh default installation includes every current stable pack without asking the consumer to choose. Skills remain progressively discoverable; only selected task guidance is loaded by the product, enforcement compiles into the content-addressed runtime, and pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not limit future workstation guidance.
+Fresh default installation includes every current stable pack without asking the consumer to choose. Skills remain progressively discoverable through the product's own mechanisms, enforcement compiles into the content-addressed runtime, and pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not limit future workstation guidance.
+
+Each current pack contributes a distinct `workstation-…` skill. The [skills catalogue](skills.md) is the authoritative reader-friendly index for all language, infrastructure, delivery, operations, and shared skills, including their use boundaries. Product discovery controls whether and when an installed skill is available to an agent; a detected pack or copied directory is not a permission grant or proof of activation.
 
 Explicit `--pack` and `--all-packs` options remain for advanced distribution authoring or deliberately reduced installations. Selected dependencies close deterministically. Collision and uninstallation rules are the same as base skills and agents.
 

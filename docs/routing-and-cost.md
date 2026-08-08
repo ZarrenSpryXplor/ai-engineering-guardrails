@@ -2,6 +2,8 @@
 
 Routing is optional execution guidance for native product subagents. It is separate from behavioural policy, deterministic enforcement, safety profiles, and trust modes. A lower tier never grants authority or reduces required review.
 
+Routing roles are not skills. A [skill](skills.md) describes an evidence-driven procedure for a type of work; a routing role describes a bounded delegated worker. Routing remains off by default, does not alter the primary model, and does not make a product load a skill automatically.
+
 ## Portable abstraction
 
 Capability tiers are `economy`, `balanced`, and `deep`. Reasoning levels are independently `low`, `medium`, and `high`; concurrency and write capability are separate again. Vendor IDs live only in `routing/model-maps/`.

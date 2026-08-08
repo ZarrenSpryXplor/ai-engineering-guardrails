@@ -18,6 +18,12 @@ In other words, this is a local policy and enforcement kit for AI engineering wo
 
 The default installation is intentionally conservative: normal development and local validation remain available, while production changes, remote infrastructure mutation, package publication, credential reads, and unknown targets stay protected. Think of it as a seatbelt for agent-assisted engineering—not a replacement for operating-system permissions, product approvals, cloud IAM, Kubernetes RBAC, branch protection, or human release decisions.
 
+## Skills: the useful bits, not a mystery box
+
+Skills are short, on-demand workflows for a specific kind of engineering task. They are deliberately separate from the concise global policy: a Java build, Kubernetes review, incident investigation, or code review gets the relevant procedure without loading every other stack guide into the conversation.
+
+The default installation provides 28 portable skills: six core workstation skills plus 22 language, infrastructure, delivery, operations, and cross-stack pack skills. Start with the [skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md) to see every exact `workstation-…` name, when to use it, where it is installed, and product-specific activation limits. A copied skill is available for discovery by products that support it; it is not proof that a particular product or session loaded it.
+
 ## Coverage at a glance
 
 | Product | What the installer can configure | Important boundary |

@@ -26,6 +26,8 @@ ai-guardrails status --show-routing
 ai-guardrails doctor --product all
 ```
 
+The [skills catalogue](skills.md) lists every installed core and pack skill, its purpose, personal-directory location, and product-specific activation caveat. Copying a skill is installation evidence only; discovery and invocation are controlled by the relevant product.
+
 The installer creates `~/.ai-guardrails/runtime/<content-digest>/` before registering it. Runtime directories contain the standalone hook, merged selected policy, redaction data, and metadata. Hook commands use the absolute `sys.executable` discovered during installation, not a shell launcher and not the repository clone. Existing JSON is merged structurally, Codex Markdown uses one delimited block, and product configuration is backed up before its first mutation. Codex honours `CODEX_HOME` only when it resolves beneath the selected `--home`; otherwise installation fails before writing.
 
 `update` preserves each product's selected packs, routing profile, model overrides, safety profile, and trust mode. It creates a new immutable runtime first and never silently changes the main model, approval policy, sandbox, network access, or permissions. Old unreferenced runtime versions are pruned only after safe path validation; a small retained history supports recovery.
