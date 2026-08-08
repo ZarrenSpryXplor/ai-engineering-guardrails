@@ -311,7 +311,13 @@ def remove_empty_parents(home: Path, candidates: Sequence[Path]) -> None:
                 break
             if not current.is_dir() or any(current.iterdir()):
                 break
-            current.rmdir()
+            # Parent pruning is best-effort after all state-owned content has
+            # already been removed. Windows can retain a transient directory
+            # handle, which must not turn a safe uninstall into a failure.
+            try:
+                current.rmdir()
+            except OSError:
+                break
             current = current.parent
 
 

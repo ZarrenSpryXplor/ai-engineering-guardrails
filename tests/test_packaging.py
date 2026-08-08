@@ -139,6 +139,24 @@ class PackagingTests(unittest.TestCase):
             # Do not accidentally use optional validators or AI-product commands
             # from the developer's PATH while proving the isolated wheel.
             environment["PATH"] = str(scripts)
+
+            def run_installed(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+                result = subprocess.run(
+                    [str(command), *arguments],
+                    cwd=outside,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    self.fail(
+                        "installed command failed: "
+                        + " ".join(arguments)
+                        + f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+                    )
+                return result
+
             package_dir = Path(
                 subprocess.run(
                     [str(interpreter), "-c", "import ai_engineering_guardrails as p; print(p.__path__[0])"],
@@ -189,12 +207,10 @@ class PackagingTests(unittest.TestCase):
                 ["jetbrains", "print-chat-instructions"],
                 ["explain", "--command", "git reset --hard"],
             ):
-                subprocess.run([str(command), *arguments], cwd=outside, env=environment, check=True, capture_output=True, text=True)
+                run_installed(arguments)
             after = _tree_hashes(package_dir)
             self.assertEqual(before, after)
-            version = subprocess.run(
-                [str(command), "--version"], cwd=outside, env=environment, check=True, capture_output=True, text=True
-            ).stdout.strip()
+            version = run_installed(["--version"]).stdout.strip()
             self.assertEqual(f"ai-engineering-guardrails {__version__}", version)
 
 

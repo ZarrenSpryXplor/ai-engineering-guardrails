@@ -168,6 +168,22 @@ class InstallTests(unittest.TestCase):
             installer.uninstall(("codex",), spaced_home, force=False, dry_run=False)
         self.assertFalse((spaced_home / ".codex/hooks.json").exists())
 
+    def test_uninstall_tolerates_locked_empty_parent_cleanup(self) -> None:
+        self.install(("codex",))
+        skills_root = self.home / ".agents/skills"
+        original_rmdir = type(skills_root).rmdir
+
+        def reject_only_skills(path: Path) -> None:
+            if path == skills_root:
+                raise PermissionError("synthetic Windows directory lock")
+            original_rmdir(path)
+
+        with mock.patch.object(type(skills_root), "rmdir", new=reject_only_skills):
+            self.uninstall(("codex",))
+
+        self.assertTrue(skills_root.is_dir())
+        self.assertNotIn("codex", self.read_state()["products"])
+
     def test_preexisting_codex_content_is_preserved_and_idempotent(self) -> None:
         target = self.home / ".codex/AGENTS.md"
         target.parent.mkdir(parents=True)
