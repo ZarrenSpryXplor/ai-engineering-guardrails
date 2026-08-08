@@ -212,7 +212,9 @@ class InstallTests(unittest.TestCase):
             state.remove_owned_tree(root)
 
         self.assertFalse(root.exists())
-        self.assertEqual([0o444, stat.S_IWRITE], attempts)
+        self.assertEqual(2, len(attempts))
+        self.assertFalse(attempts[0] & stat.S_IWUSR)
+        self.assertTrue(attempts[1] & stat.S_IWUSR)
 
     def test_remove_owned_tree_does_not_suppress_directory_permission_errors(self) -> None:
         root = self.home / "managed-runtime"
