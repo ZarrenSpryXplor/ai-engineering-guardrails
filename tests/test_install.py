@@ -4,10 +4,12 @@ import contextlib
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
@@ -183,6 +185,51 @@ class InstallTests(unittest.TestCase):
 
         self.assertTrue(skills_root.is_dir())
         self.assertNotIn("codex", self.read_state()["products"])
+
+    def test_remove_owned_tree_retries_a_read_only_regular_file(self) -> None:
+        root = self.home / "managed-runtime"
+        root.mkdir()
+        policy = root / "command-policy.json"
+        policy.write_text("{}\n", encoding="utf-8")
+        policy.chmod(0o444)
+        attempts: list[int] = []
+
+        def simulate_windows_rmtree(path: Path, *, onerror: Callable[..., None]) -> None:
+            def unlink_readonly(candidate: str) -> None:
+                mode = stat.S_IMODE(Path(candidate).stat().st_mode)
+                attempts.append(mode)
+                if not mode & stat.S_IWUSR:
+                    raise PermissionError("synthetic Windows read-only file")
+                Path(candidate).unlink()
+
+            try:
+                unlink_readonly(str(policy))
+            except PermissionError:
+                onerror(unlink_readonly, str(policy), sys.exc_info())
+            path.rmdir()
+
+        with mock.patch.object(state.shutil, "rmtree", side_effect=simulate_windows_rmtree):
+            state.remove_owned_tree(root)
+
+        self.assertFalse(root.exists())
+        self.assertEqual([0o444, stat.S_IWRITE], attempts)
+
+    def test_remove_owned_tree_does_not_suppress_directory_permission_errors(self) -> None:
+        root = self.home / "managed-runtime"
+        root.mkdir()
+
+        def simulate_locked_directory(path: Path, *, onerror: Callable[..., None]) -> None:
+            def remove_directory(candidate: str) -> None:
+                raise PermissionError(f"synthetic locked directory: {candidate}")
+
+            try:
+                remove_directory(str(path))
+            except PermissionError:
+                onerror(remove_directory, str(path), sys.exc_info())
+
+        with mock.patch.object(state.shutil, "rmtree", side_effect=simulate_locked_directory):
+            with self.assertRaisesRegex(PermissionError, "synthetic locked directory"):
+                state.remove_owned_tree(root)
 
     def test_preexisting_codex_content_is_preserved_and_idempotent(self) -> None:
         target = self.home / ".codex/AGENTS.md"

@@ -1026,7 +1026,7 @@ def _cleanup_runtimes(home: Path, installed_state: Mapping[str, Any]) -> None:
             retained += 1
             continue
         if path_within(path, runtime_root):
-            shutil.rmtree(path)
+            state.remove_owned_tree(path)
 
 
 def _selected_installation_is_current(

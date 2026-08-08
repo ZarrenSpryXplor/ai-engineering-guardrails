@@ -8,10 +8,12 @@ import getpass
 import os
 import re
 import shutil
+import stat
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from types import TracebackType
+from typing import Any, Callable, Mapping, Sequence
 
 from . import __version__
 from .resources import PACKAGE_ROOT, RESOURCE_ROOT
@@ -38,6 +40,27 @@ WAIVERS_RELATIVE = Path(".ai-guardrails/waivers")
 MAX_WAIVER_MINUTES = 24 * 60
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 LEGACY_FORMAT_KEY = "_legacy_state_format"
+
+
+def _retry_readonly_file(
+    function: Callable[[str], object],
+    path: str,
+    error_info: tuple[type[BaseException], BaseException, TracebackType | None],
+) -> None:
+    error = error_info[1]
+    try:
+        mode = os.lstat(path).st_mode
+    except OSError:
+        raise error
+    if not isinstance(error, PermissionError) or not stat.S_ISREG(mode):
+        raise error
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def remove_owned_tree(path: Path) -> None:
+    """Remove a validated managed tree, including read-only files on Windows."""
+    shutil.rmtree(path, onerror=_retry_readonly_file)
 
 
 def empty_state() -> dict[str, Any]:
@@ -250,7 +273,7 @@ def install_directory(
                 if not path_within(target, home):
                     raise GuardrailsError(f"refusing to replace directory outside selected home: {target}")
                 if target.is_dir() and not target.is_symlink():
-                    shutil.rmtree(target)
+                    remove_owned_tree(target)
                 else:
                     target.unlink()
             os.replace(staged, target)
@@ -297,7 +320,7 @@ def remove_record(
     print(f"{'would remove' if dry_run else 'remove'} {target}")
     if not dry_run:
         if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target)
+            remove_owned_tree(target)
         else:
             target.unlink()
     return True
