@@ -7,6 +7,9 @@ Verified against current official documentation on **2026-08-08**. The linked ve
 | OpenAI Codex | One effective non-empty global `AGENTS` file under `CODEX_HOME`; project `AGENTS.md` files layer by directory. | Personal skills from `~/.agents/skills/`. | User `~/.codex/hooks.json` `PreToolUse` covers shell, MCP, and most local function tools; experimental `.rules` remain defence in depth. | Standalone TOML under `~/.codex/agents/`; explicit model, effort, and read-only sandbox fields are supported. |
 | Anthropic Claude Code | Personal modular rules from `~/.claude/rules/`; project `CLAUDE.md` supports `@` imports. | Personal skills from `~/.claude/skills/`. | Catch-all `PreToolUse` command hook structurally merged into `~/.claude/settings.json`. | Markdown with YAML frontmatter under `~/.claude/agents/`; model, effort, tool, and permission restrictions are supported. |
 | Cursor | Project `AGENTS.md` is Git-backed; global User Rules are edited in Customize and apply to Agent Chat. | Personal skills from `~/.agents/skills/` (Cursor also documents compatibility locations). | Native catch-all user `~/.cursor/hooks.json`; separate CLI permission recommendation only. | Markdown with YAML frontmatter under `~/.cursor/agents/`; explicit model IDs and `readonly` are supported, subject to fallback. |
+| GitHub Copilot in Visual Studio Code | User `.instructions.md` files under `~/.copilot/instructions/`; repository `AGENTS.md` also applies to Chat/Agent. | Shared personal skills from `~/.agents/skills/`. | `~/.copilot/hooks/` `PreToolUse` hooks are Preview and can be disabled by an organisation. | Personal `.agent.md` files under `~/.copilot/agents/`; model is inherited when omitted. |
+| GitHub Copilot in Visual Studio | `%USERPROFILE%/copilot-instructions.md`; repository `.github/copilot-instructions.md` and `.github/instructions/**/*.instructions.md`. | `~/.agents/skills/` from Visual Studio 18.5+. | Unsupported. | Personal `.agent.md` files at `%USERPROFILE%\.github\agents` from Visual Studio 18.4+; user-selectable only, not subagents. |
+| JetBrains AI Assistant and GitHub Copilot for JetBrains | Native Chat Instructions are a Prompt Library UI setting; project rules are `.aiassistant/rules/*.md`; hosted coding agents use their documented repository files. | `~/.agents/skills/` requires manual AI Assistant directory registration; support varies by agent. | Unsupported as a native JetBrains integration. | Copilot custom agents/subagents are Preview; this project emits a reviewable manual bundle rather than writing an undocumented path. |
 
 ## OpenAI Codex
 
@@ -67,6 +70,46 @@ Structured-enforcement limitation: the catch-all native hook allows the shared e
 
 Routing decision: all Cursor tiers default to `inherit`, preserving the main session when availability is unknown. `--model-override cursor:TIER=ID` supports explicit provider or family IDs and encodes portable reasoning as a supported model parameter when the ID has no parameters already. Status reports configuration and fallback caveats without claiming availability.
 
+## GitHub Copilot in Visual Studio Code
+
+Documented stable behaviour:
+
+- [Custom instructions](https://code.visualstudio.com/docs/agent-customization/custom-instructions) document user instruction files under `~/.copilot/instructions/`, `.instructions.md` frontmatter including `name`, `description`, and `applyTo`, and `applyTo: "**"` for always-applied instructions. The same page documents repository `AGENTS.md` and makes clear that custom instructions do not govern inline suggestions.
+- [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) document shared personal discovery from `~/.agents/skills/`.
+- [Custom agents](https://code.visualstudio.com/docs/agent-customization/custom-agents) document personal `~/.copilot/agents/*.agent.md`, tool declarations, and model inheritance when `model` is omitted.
+- [Hooks](https://code.visualstudio.com/docs/agent-customization/hooks) document `~/.copilot/hooks/`, Claude-compatible `~/.claude/settings.json` discovery, `PreToolUse`, `runTerminalCommand`, and nested deterministic denial responses.
+
+Preview/version-gated behaviour: hooks are Preview and an organisation can disable them. A configured hook file proves only that it exists; runtime activation is reported as unverified.
+
+Repository decisions: this project writes one generated `workstation-guardrails.instructions.md` with documented frontmatter and no VS Code `settings.json` change. It writes one native hook only when no project-managed Claude hook exists. When Claude is managed, VS Code records `shared-claude`; when Claude is later removed, the installer creates the VS Code native hook before removing the shared registration. This avoids duplicate project-owned enforcement and duplicate one-use-waiver consumption. Routing emits native agents only after an explicit non-`none` profile, omits `model`, and uses read-only tool subsets for read-only roles. No selected model, extension configuration, or organisation setting is changed.
+
+## GitHub Copilot in Visual Studio
+
+Documented stable behaviour:
+
+- [Copilot Chat context](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-chat-context?view=visualstudio) documents `%USERPROFILE%/copilot-instructions.md`, repository `.github/copilot-instructions.md`, and path-specific `.github/instructions/**/*.instructions.md`.
+- [Specialized agents](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-specialized-agents?view=visualstudio) documents personal `%USERPROFILE%\.github\agents` files and requires Visual Studio 18.4+.
+- [Agent Skills](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-agent-skills?view=visualstudio) documents Agent Skills from Visual Studio 18.5+ and shared personal `~/.agents/skills/` discovery.
+- [Agent mode](https://learn.microsoft.com/en-us/visualstudio/ide/copilot-agent-mode?view=visualstudio) documents native approval/permission controls, which are deliberately not managed here.
+
+Product limitations: Visual Studio does not support Copilot hooks or subagents. Its custom agents are user-selectable roles, not automatic routing workers. Version discovery can be unavailable, so status distinguishes files installed from actual IDE compatibility and reports `version-unverified` rather than inventing a result.
+
+Repository decisions: the installer manages only a delimited block in the documented user instruction file, copies shared skills, and writes agents only when routing is explicit. It does not touch registry data, private settings storage, authentication, extension state, model selection, terminal profiles, or native tool approvals. An explicit real installation is rejected by the CLI outside Windows; build and validation remain cross-platform.
+
+## JetBrains AI Assistant and GitHub Copilot for JetBrains
+
+Documented stable behaviour:
+
+- [Prompt Library](https://www.jetbrains.com/help/ai-assistant/prompt-library.html) documents the manual **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions** surface; no documented global file is generated for native Chat.
+- [Project rules](https://www.jetbrains.com/help/ai-assistant/configure-project-rules.html) document `.aiassistant/rules/*.md` and UI-selected rule type; this project therefore requires manual confirmation that an exported rule is `Always`.
+- [Agent behaviour](https://www.jetbrains.com/help/ai-assistant/configure-agent-behavior.html) and [agents](https://www.jetbrains.com/help/ai-assistant/agents.html) document Junie/Codex use of `AGENTS.md`, Claude Agent use of `CLAUDE.md`, and different behaviour for hosted agents.
+- [Agent Skills](https://www.jetbrains.com/help/ai-assistant/agent-skills.html) documents **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**. Current tables list Codex and Claude Agent support, but not Junie or Copilot.
+- GitHub's [customization cheat sheet](https://docs.github.com/en/copilot/reference/customization-cheat-sheet) marks Copilot custom instructions, custom agents, subagents, and skills in JetBrains as Preview and hooks as unsupported. [JetBrains Copilot instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions-in-your-ide/add-repository-instructions-in-your-ide) document `~/.config/github-copilot/intellij/global-copilot-instructions.md` on macOS and `%LOCALAPPDATA%\github-copilot\intellij\global-copilot-instructions.md` on Windows; no Linux global path is documented.
+
+Product limitations: native Chat rules, hosted agents, and the Copilot plugin are separate surfaces. A repository instruction file does not prove a selected agent loaded it. Global Codex/Claude hooks must not be assumed active inside JetBrains-hosted agents. `.aiignore`, operation modes, approvals, and MCP/brave-mode behaviour vary by agent and remain user or administrator controls.
+
+Repository decisions: installation records manual Chat Instructions and global skill-directory registration as outstanding steps. It never edits `.idea`, settings databases, launchers, operation modes, MCP configuration, or a plugin. A project rule is exported only by the explicit `jetbrains export-project-rules --repo` command and refuses a repository containing `.noai`. On macOS/Windows, Copilot global instructions are installed only beneath the selected home; Linux reports a manual Customizations step. Routing produces a manual Preview bundle rather than claiming activation. No JetBrains hook is generated.
+
 ## Usage and cost interpretation
 
 The products expose different accounting models. API-token billing, included subscription use, product credits, third-party provider pools, and an estimate based on public list prices are not equivalent. Lower latency is not the same as lower cost, and extra subagent contexts can increase both tokens and elapsed time.
@@ -113,4 +156,4 @@ The v1.1 packs use stable command categories verified from official project/vend
 
 ## Cross-product hook contract
 
-Codex, Claude Code, and Cursor currently accept the nested `hookSpecificOutput` `PreToolUse` denial structure used by the engine. Allowed and unrecognised operations produce no approval object and exit successfully. Malformed or unsupported payloads fail open with a redacted stderr diagnostic; a recognised dangerous command or structured call returns a deterministic deny containing a stable identifier and operation class. Arguments are not echoed. Product updates may change these formats, so run validation after upgrades and re-verify this dated document.
+Codex, Claude Code, Cursor, and VS Code currently accept the nested `hookSpecificOutput` `PreToolUse` denial structure used by the engine (VS Code support is Preview). Allowed and unrecognised operations produce no approval object and exit successfully. Malformed or unsupported payloads fail open with a redacted stderr diagnostic; a recognised dangerous command or structured call returns a deterministic deny containing a stable identifier and operation class. Arguments are not echoed. Visual Studio and JetBrains have no hook output here because the documented integrations are unsupported. Product updates may change these formats, so run validation after upgrades and re-verify this dated document.

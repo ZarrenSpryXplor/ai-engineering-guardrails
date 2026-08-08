@@ -98,10 +98,50 @@ class ScanTests(unittest.TestCase):
         self.write("AGENTS.md", "# Changed governance\n")
         self.write(
             ".ai-guardrails-verification.json",
-            json.dumps({"verification_outcomes": [{"name": "unit tests", "outcome": "passed"}]}) + "\n",
+            json.dumps(
+                {
+                    "verification_outcomes": [
+                        {
+                            "requirement_id": "high-risk-change",
+                            "reviews": {
+                                "independent correctness review": "passed",
+                                "security and compatibility review": "passed",
+                            },
+                            "verification": {
+                                "affected narrow tests": "passed",
+                                "repository static checks": "passed",
+                                "applicable native semantic validator": "not-applicable",
+                                "final diff review": "passed",
+                            },
+                        }
+                    ]
+                }
+            )
+            + "\n",
         )
         identifiers = {item.rule_id for item in scan.scan_repository(self.repo)}
         self.assertNotIn("high-risk-change-verification-unavailable", identifiers)
+
+    def test_partial_or_unmatched_metadata_does_not_satisfy_high_risk_check(self) -> None:
+        self.write("AGENTS.md", "# Changed governance\n")
+        self.write(
+            ".ai-guardrails-verification.json",
+            json.dumps(
+                {
+                    "verification_outcomes": [
+                        {
+                            "requirement_id": "ordinary-source-change",
+                            "reviews": {"self-review": "passed"},
+                            "verification": {"affected narrow tests": "passed"},
+                        }
+                    ]
+                }
+            )
+            + "\n",
+        )
+        findings = scan.scan_repository(self.repo)
+        finding = next(item for item in findings if item.rule_id == "high-risk-change-verification-unavailable")
+        self.assertIn("high-risk-change: missing outcome", finding.message)
 
     def test_session_receipt_reports_changed_risk_classes(self) -> None:
         self.write("AGENTS.md", "# Changed governance\n")
@@ -109,6 +149,12 @@ class ScanTests(unittest.TestCase):
         receipt = scan.session_receipt(self.repo, self.repo, ("codex",))
         self.assertIn("guardrail-governance", receipt["risk_classes"])
         self.assertIn("security-and-identity", receipt["risk_classes"])
+
+    def test_packaged_guardrail_engine_and_resource_paths_are_governance_paths(self) -> None:
+        self.write("ai_engineering_guardrails/_resources/policy/manifest.json", "{}\n")
+        self.write("ai_engineering_guardrails/enforcement.py", "# Synthetic enforcement change\n")
+        receipt = scan.session_receipt(self.repo, self.repo, ("codex",))
+        self.assertIn("guardrail-governance", receipt["risk_classes"])
 
     def test_session_receipt_does_not_follow_audit_symlink(self) -> None:
         external = self.repo.parent / f"{self.repo.name}-external-audit.jsonl"

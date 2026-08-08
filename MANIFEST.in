@@ -1,2 +1,3 @@
 include README.md LICENSE
+include assets/ai_comic_screen_only_corrected.png
 recursive-include ai_engineering_guardrails/_resources *

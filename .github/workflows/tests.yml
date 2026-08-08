@@ -24,7 +24,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install package build tooling
-        run: python -m pip install --upgrade pip build wheel
+        run: python -m pip install --upgrade pip setuptools build wheel twine
 
       - name: Build generated output
         run: python tools/guardrails.py build
@@ -44,11 +44,39 @@ jobs:
       - name: Build source distribution and wheel
         run: python -m build --outdir release
 
+      - name: Check distribution metadata and README rendering
+        run: python -m twine check release/*
+
       - name: Check whitespace errors
         run: git diff --check
 
       - name: Scan repository
         run: python tools/guardrails.py scan --repo . --format human
+
+  newest-python:
+    name: Compatibility (Python 3.14)
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up newest supported Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14"
+
+      - name: Install test tooling
+        run: python -m pip install --upgrade pip setuptools build wheel
+
+      - name: Validate and test current Python support
+        run: |
+          python tools/guardrails.py validate
+          python -m unittest discover -s tests -v
 
   wheel-smoke:
     name: Wheel smoke (${{ matrix.os }})
@@ -72,7 +100,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install package build tooling
-        run: python -m pip install --upgrade pip build wheel
+        run: python -m pip install --upgrade pip setuptools build wheel
 
       - name: Build and smoke-test the installed wheel
         run: python -m unittest tests.test_packaging.PackagingTests.test_wheel_and_sdist_work_outside_source_checkout -v
+
+      - name: Exercise IDE adapter path simulations
+        run: python -m unittest tests.test_ide_adapters -v

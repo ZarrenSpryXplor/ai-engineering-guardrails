@@ -20,7 +20,7 @@ Create a concise vendor-neutral Markdown file under `policy/fragments/`, for exa
 }
 ```
 
-Numeric `order` followed by identifier is output order. Identifiers and orders must be unique, paths must remain under `policy/`, selected products must be known, association IDs must resolve to canonical enforcement or risk data, and the generated aggregate must remain within its configured byte limit. Use `load: on-demand` when material belongs in a skill or pack rather than the always-loaded policy.
+Numeric `order` followed by identifier is output order. Identifiers and orders must be unique, paths must remain under `policy/`, selected products must be known, association IDs must resolve to canonical enforcement or risk data, and the generated aggregate must remain within its configured per-product limit and `always_loaded_budget_bytes` (currently 8 KiB). Use `load: on-demand` when material belongs in a skill or pack rather than the always-loaded policy.
 
 For a product-specific fragment, narrow `products`, for example:
 
@@ -109,7 +109,7 @@ Add pack command rules with an `operation_class` and both dangerous and nearby-s
 
 Structured-tool rules additionally declare provider/tool patterns, target fields, fields that must never be logged, denial reason, and complete positive/negative payload fixtures. Inspect structured fields rather than serialising the whole argument object. A GraphQL rule should distinguish a real `mutation` definition from a `query` or documentation string.
 
-Validate and explain detection before installation:
+Validate and explain detection before installation. These pack-authoring commands intentionally use the checkout shim so they operate on the source currently being edited; installed workstation users should use the `ai-guardrails` examples in the user guide and capability-pack guide:
 
 ```sh
 python tools/guardrails.py packs validate

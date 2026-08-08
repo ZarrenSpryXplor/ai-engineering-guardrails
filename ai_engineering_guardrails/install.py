@@ -18,6 +18,8 @@ from .resources import RESOURCE_ROOT
 from .util import (
     LIFECYCLES,
     PRODUCTS,
+    PRODUCT_LABELS,
+    PRODUCT_CAPABILITIES,
     SAFETY_PROFILES,
     TRUST_MODES,
     GuardrailsError,
@@ -41,18 +43,14 @@ WAIVERS_RELATIVE = Path(".ai-guardrails/waivers")
 TARGETS_RELATIVE = Path(".ai-guardrails/targets.json")
 RUNTIME_RETENTION = 3
 MANAGED_HOOK_RE = re.compile(
-    r"(?:^|[/\\])hook_runtime\.py[\"']?\s+--product\s+(codex|claude|cursor)\b",
+    r"(?:^|[/\\])hook_runtime\.py[\"']?\s+--product\s+(codex|claude|cursor|vscode)\b",
     re.IGNORECASE,
 )
-PRODUCT_LABELS = {
-    "codex": "OpenAI Codex",
-    "claude": "Claude Code",
-    "cursor": "Cursor",
-}
 PRODUCT_EXECUTABLES = {
     "codex": "codex",
     "claude": "claude",
     "cursor": "cursor",
+    "vscode": "code",
 }
 PRODUCT_CONFIG_ROOTS = {
     "codex": ".codex",
@@ -63,6 +61,39 @@ CODEX_AGENTS_ARTIFACT = Path("dist/codex/AGENTS.md")
 CODEX_RULES_ARTIFACT = Path("dist/codex/rules/workstation-guardrails.rules")
 CLAUDE_RULES_ARTIFACT = Path("dist/claude/rules")
 CURSOR_RULES_ARTIFACT = Path("dist/cursor/user-rules.md")
+VSCODE_INSTRUCTIONS_ARTIFACT = Path("dist/vscode/instructions/workstation-guardrails.instructions.md")
+VISUALSTUDIO_INSTRUCTIONS_ARTIFACT = Path("dist/visualstudio/copilot-instructions.md")
+JETBRAINS_CHAT_ARTIFACT = Path("dist/jetbrains/ai-assistant/chat-instructions.md")
+JETBRAINS_PROJECT_RULE_ARTIFACT = Path("dist/jetbrains/ai-assistant/project-rules/workstation-guardrails.md")
+JETBRAINS_COPILOT_ARTIFACT = Path("dist/jetbrains/copilot/global-copilot-instructions.md")
+
+
+def visualstudio_capabilities(version: str | None) -> dict[str, str]:
+    """Return documented feature availability without pretending version discovery succeeded."""
+    if version is None:
+        return {"skills": "version-unverified", "agents": "version-unverified"}
+    try:
+        major, minor = (int(part) for part in version.split(".", 1))
+    except ValueError:
+        return {"skills": "version-unverified", "agents": "version-unverified"}
+    release = (major, minor)
+    return {
+        "skills": "compatible" if release >= (18, 5) else "too-old",
+        "agents": "compatible" if release >= (18, 4) else "too-old",
+    }
+
+
+def _jetbrains_evidence(home: Path) -> list[str]:
+    launchers = ("idea", "pycharm", "webstorm", "rider", "goland", "clion", "datagrip", "rubymine", "rustrover")
+    evidence = ["launcher" for launcher in launchers if shutil.which(launcher)]
+    roots = (
+        home / ".config" / "JetBrains",
+        home / ".local" / "share" / "JetBrains",
+        home / "Library" / "Application Support" / "JetBrains",
+    )
+    if any(root.is_dir() and not root.is_symlink() for root in roots):
+        evidence.append("configuration-root")
+    return evidence
 
 
 def detect_products(home: Path) -> dict[str, tuple[str, ...]]:
@@ -72,16 +103,28 @@ def detect_products(home: Path) -> dict[str, tuple[str, ...]]:
     detected: dict[str, tuple[str, ...]] = {}
     for product in PRODUCTS:
         evidence: list[str] = []
-        if shutil.which(PRODUCT_EXECUTABLES[product]):
+        if product in PRODUCT_EXECUTABLES and shutil.which(PRODUCT_EXECUTABLES[product]):
             evidence.append("executable")
-        config_root = home_path(home, PRODUCT_CONFIG_ROOTS[product])
+        if product == "vscode" and shutil.which("code-insiders"):
+            evidence.append("code-insiders")
+        if product == "jetbrains":
+            evidence.extend(_jetbrains_evidence(home))
+        if product == "visualstudio":
+            if sys.platform == "win32" and shutil.which("devenv.exe"):
+                evidence.append("devenv.exe")
+            if sys.platform == "win32" and shutil.which("vswhere.exe"):
+                evidence.append("vswhere.exe")
+            standard_root = Path(os.environ.get("ProgramFiles", r"C:\\Program Files")) / "Microsoft Visual Studio"
+            if sys.platform == "win32" and standard_root.is_dir() and not standard_root.is_symlink():
+                evidence.append("standard-installation-root")
+        config_root = home_path(home, PRODUCT_CONFIG_ROOTS.get(product, ".ai-guardrails/unavailable"))
         if product == "codex" and os.environ.get("CODEX_HOME"):
             configured = Path(os.environ["CODEX_HOME"]).expanduser()
             candidate = configured if configured.is_absolute() else home / configured
             candidate = candidate.resolve(strict=False)
             if path_within(candidate, home):
                 config_root = candidate
-        if config_root.is_dir() and not config_root.is_symlink():
+        if product in PRODUCT_CONFIG_ROOTS and config_root.is_dir() and not config_root.is_symlink():
             evidence.append("configuration")
         if product in installed_state.get("products", {}):
             evidence.append("managed-state")
@@ -345,8 +388,17 @@ def _managed_paths_for_product(
             and source.name.startswith("workstation-guardrails-")
             and source.suffix == ".md"
         )
-    else:
+    elif product == "cursor":
         paths = [home_path(home, ".cursor/hooks.json")]
+    elif product == "vscode":
+        paths = [home_path(home, ".copilot/instructions/workstation-guardrails.instructions.md")]
+        paths.append(home_path(home, ".copilot/hooks/workstation-guardrails.json"))
+    elif product == "visualstudio":
+        paths = [home_path(home, "copilot-instructions.md")]
+    else:
+        paths = []
+        if _jetbrains_copilot_target(home) is not None:
+            paths.append(_jetbrains_copilot_target(home))
 
     skill_sources = [source.parent for source in policy.discover_skills()]
     available = packs.load_packs()
@@ -472,8 +524,25 @@ def _skill_root(home: Path, product: str) -> Path:
 def _agent_root(home: Path, product: str) -> Path:
     if product == "codex":
         return codex_home(home) / "agents"
-    relative = {"claude": ".claude/agents", "cursor": ".cursor/agents"}[product]
+    relative = {
+        "claude": ".claude/agents",
+        "cursor": ".cursor/agents",
+        "vscode": ".copilot/agents",
+        "visualstudio": ".github/agents",
+        # GitHub marks JetBrains Copilot agent customisation Preview and does not
+        # document a personal import path.  This is a reviewable manual bundle.
+        "jetbrains": ".ai-guardrails/manual/jetbrains/agents",
+    }[product]
     return home_path(home, relative)
+
+
+def _jetbrains_copilot_target(home: Path) -> Path | None:
+    """Return only the documented platform destination, always below --home."""
+    if sys.platform == "darwin":
+        return home_path(home, ".config/github-copilot/intellij/global-copilot-instructions.md")
+    if sys.platform == "win32":
+        return home_path(home, "AppData/Local/github-copilot/intellij/global-copilot-instructions.md")
+    return None
 
 
 def _install_skills(
@@ -649,6 +718,84 @@ def _install_cursor(
     ]
 
 
+def _install_vscode(
+    home: Path,
+    runtime: Path | None,
+    current_state: Mapping[str, Any],
+    generated_artifacts: Mapping[Path, bytes],
+    *,
+    force: bool,
+    dry_run: bool,
+) -> list[dict[str, Any]]:
+    records = [
+        state.install_file_data(
+            generated_artifacts[VSCODE_INSTRUCTIONS_ARTIFACT],
+            home_path(home, ".copilot/instructions/workstation-guardrails.instructions.md"),
+            home,
+            current_state,
+            force=force,
+            dry_run=dry_run,
+        )
+    ]
+    if runtime is not None:
+        records.append(
+            _install_json_hook(
+                "vscode",
+                runtime,
+                home_path(home, ".copilot/hooks/workstation-guardrails.json"),
+                home,
+                current_state,
+                force=force,
+                dry_run=dry_run,
+            )
+        )
+    return records
+
+
+def _install_visualstudio(
+    home: Path,
+    current_state: Mapping[str, Any],
+    generated_artifacts: Mapping[Path, bytes],
+    *,
+    force: bool,
+    dry_run: bool,
+) -> list[dict[str, Any]]:
+    return [
+        _install_managed_block(
+            generated_artifacts[VISUALSTUDIO_INSTRUCTIONS_ARTIFACT].decode("utf-8"),
+            home_path(home, "copilot-instructions.md"),
+            home,
+            current_state,
+            force=force,
+            dry_run=dry_run,
+        )
+    ]
+
+
+def _install_jetbrains(
+    home: Path,
+    current_state: Mapping[str, Any],
+    generated_artifacts: Mapping[Path, bytes],
+    *,
+    install_copilot_instructions: bool,
+    force: bool,
+    dry_run: bool,
+) -> list[dict[str, Any]]:
+    target = _jetbrains_copilot_target(home)
+    if target is None or not install_copilot_instructions:
+        return []
+    return [
+        _install_managed_block(
+            generated_artifacts[JETBRAINS_COPILOT_ARTIFACT].decode("utf-8"),
+            target,
+            home,
+            current_state,
+            force=force,
+            dry_run=dry_run,
+        )
+    ]
+
+
 def _managed_enterprise_indicators() -> list[str]:
     indicators: list[str] = []
     candidates = {
@@ -703,6 +850,7 @@ def _preflight_collisions(
     generated_artifacts: Mapping[Path, bytes],
     *,
     force: bool,
+    vscode_hook_mode: str = "native-vscode",
 ) -> None:
     """Reject collisions and modified managed content before the first write."""
     for product in products:
@@ -723,7 +871,19 @@ def _preflight_collisions(
             ),
             "claude": (home_path(home, ".claude/settings.json"),),
             "cursor": (home_path(home, ".cursor/hooks.json"),),
+            "vscode": (
+                home_path(home, ".copilot/instructions/workstation-guardrails.instructions.md"),
+                home_path(home, ".copilot/hooks/workstation-guardrails.json"),
+            ),
+            "visualstudio": (home_path(home, "copilot-instructions.md"),),
+            "jetbrains": tuple(path for path in (_jetbrains_copilot_target(home),) if path is not None),
         }[product]
+        if product == "vscode" and vscode_hook_mode == "shared-claude":
+            configuration_files = tuple(
+                path
+                for path in configuration_files
+                if path.name != "workstation-guardrails.json"
+            )
         for target in configuration_files:
             if target.exists() and not target.is_file():
                 raise GuardrailsError(f"managed configuration collides with a non-file: {target}")
@@ -746,7 +906,12 @@ def _preflight_collisions(
             "codex": codex_home(home) / "hooks.json",
             "claude": home_path(home, ".claude/settings.json"),
             "cursor": home_path(home, ".cursor/hooks.json"),
-        }[product]
+            "vscode": home_path(home, ".copilot/hooks/workstation-guardrails.json"),
+        }.get(product)
+        if product == "vscode" and vscode_hook_mode == "shared-claude":
+            hook_target = None
+        if hook_target is None:
+            continue
         if hook_target.is_file():
             hook_data = read_json(hook_target, default={})
             if not isinstance(hook_data, dict):
@@ -921,6 +1086,8 @@ def install(
     safety_profile: str | None = None,
     trust_mode: str | None = None,
     model_overrides: Mapping[str, Mapping[str, str]] | None = None,
+    explicit_product: bool = True,
+    prefer_native_vscode: bool = False,
 ) -> dict[str, Any]:
     home = home.expanduser().resolve(strict=False)
     selected_products = tuple(dict.fromkeys(products))
@@ -969,6 +1136,13 @@ def install(
             "safety_profile": selected_safety,
             "trust_mode": selected_trust,
             "model_overrides": selected_overrides,
+            "hook_mode": (
+                "shared-claude"
+                if product == "vscode" and not prefer_native_vscode and (
+                    "claude" in current.get("products", {}) or "claude" in selected_products
+                )
+                else "native-vscode" if product == "vscode" else "not-applicable"
+            ),
         }
         # A local mode change may refer to a pack rule. Validate the policy for
         # the precise runtime pack set before any installation path is touched.
@@ -983,6 +1157,7 @@ def install(
             product_overrides,
             generated_artifacts,
             force=force,
+            vscode_hook_mode=str(product_settings[product]["hook_mode"]),
         )
     already_current = _selected_installation_is_current(
         current,
@@ -1006,6 +1181,9 @@ def install(
         selected_overrides = settings["model_overrides"]
         product_overrides = {product: selected_overrides} if selected_overrides else None
         product_state = new_state
+        needs_native_hook = product in {"codex", "claude", "cursor"} or (
+            product == "vscode" and settings["hook_mode"] == "native-vscode"
+        )
         digest, payloads = _runtime_payloads(
             home,
             product,
@@ -1016,8 +1194,10 @@ def install(
             product_overrides,
             generated_artifacts,
         )
-        runtime = _install_runtime(home, digest, payloads, dry_run=dry_run)
-        product_records: list[dict[str, Any]] = [_runtime_record(runtime, home, digest)]
+        runtime = _install_runtime(home, digest, payloads, dry_run=dry_run) if needs_native_hook else None
+        product_records: list[dict[str, Any]] = (
+            [_runtime_record(runtime, home, digest)] if runtime is not None else []
+        )
         if product == "codex":
             product_records.extend(
                 _install_codex(
@@ -1040,8 +1220,44 @@ def install(
                     dry_run=dry_run,
                 )
             )
-        else:
+        elif product == "cursor":
             product_records.extend(_install_cursor(home, runtime, product_state, force=force, dry_run=dry_run))
+        elif product == "vscode":
+            product_records.extend(
+                _install_vscode(
+                    home,
+                    runtime,
+                    product_state,
+                    generated_artifacts,
+                    force=force,
+                    dry_run=dry_run,
+                )
+            )
+        elif product == "visualstudio":
+            product_records.extend(
+                _install_visualstudio(
+                    home,
+                    product_state,
+                    generated_artifacts,
+                    force=force,
+                    dry_run=dry_run,
+                )
+            )
+        else:
+            copilot_target = _jetbrains_copilot_target(home)
+            product_records.extend(
+                _install_jetbrains(
+                    home,
+                    product_state,
+                    generated_artifacts,
+                    install_copilot_instructions=(
+                        copilot_target is not None
+                        and (explicit_product or copilot_target.parent.exists())
+                    ),
+                    force=force,
+                    dry_run=dry_run,
+                )
+            )
         product_records.extend(
             _install_skills(product, home, product_state, selected_packs, force=force, dry_run=dry_run)
         )
@@ -1067,7 +1283,7 @@ def install(
         new_state.setdefault("products", {})[product] = {
             "source_digest": source_digest,
             "policy_digest": json.loads(payloads["metadata.json"])["policy_digest"],
-            "runtime_digest": digest,
+            "runtime_digest": digest if runtime is not None else None,
             "routing_profile": profile,
             "safety_profile": selected_safety,
             "trust_mode": selected_trust,
@@ -1075,9 +1291,34 @@ def install(
             "model_overrides": selected_overrides,
             "managed": product_records,
             "model_availability": "unverified",
+            "hook_mode": settings["hook_mode"],
+            "capabilities": dict(PRODUCT_CAPABILITIES[product]),
+            "platform": sys.platform,
         }
         if product == "codex":
             new_state["products"][product]["product_home"] = relative_home(codex_home(home), home)
+    # VS Code loads Claude-compatible user hooks.  Once the managed Claude hook
+    # exists, remove an older project-owned VS Code registration only after the
+    # Claude registration has been written, so there is never a no-hook window.
+    if "claude" in selected_products and "vscode" in new_state.get("products", {}):
+        vscode_data = new_state["products"]["vscode"]
+        if isinstance(vscode_data, dict):
+            retained_records: list[dict[str, Any]] = []
+            for record in state.product_records(new_state, "vscode"):
+                if record.get("kind") == "json-hook":
+                    if not _remove_json_hook(record, "vscode", home, force=force, dry_run=dry_run):
+                        retained_records.append(record)
+                    continue
+                if record.get("kind") == "runtime-directory":
+                    continue
+                retained_records.append(record)
+            if any(record.get("kind") == "json-hook" for record in retained_records):
+                vscode_data["hook_mode"] = "native-vscode; possible-duplicate-unmanaged"
+            else:
+                vscode_data["managed"] = retained_records
+                vscode_data["hook_mode"] = "shared-claude"
+                vscode_data["runtime_digest"] = None
+                vscode_data["source_digest"] = source_digest
     new_state["format_version"] = state.FORMAT_VERSION
     new_state["source_digest"] = source_digest
     new_state["overlay_digest"] = overlay_digest
@@ -1091,13 +1332,20 @@ def install(
         ("trust_mode", "trusted-workspace"),
     ):
         new_state[field] = _uniform_product_setting(new_state["products"], field, default)
-    new_state["runtime_digest"] = new_state["products"][selected_products[-1]]["runtime_digest"]
-    new_state["runtime_path"] = next(
-        record["path"]
-        for record in new_state["products"][selected_products[-1]]["managed"]
-        if record["kind"] == "runtime-directory"
-    )
-    manual_steps = [step for step in new_state.get("manual_steps", []) if step.get("product") != "cursor"]
+    runtime_records = [
+        record
+        for product_data in new_state["products"].values()
+        if isinstance(product_data, Mapping)
+        for record in product_data.get("managed", [])
+        if isinstance(record, Mapping) and record.get("kind") == "runtime-directory"
+    ]
+    new_state["runtime_digest"] = runtime_records[-1].get("runtime_digest") if runtime_records else None
+    new_state["runtime_path"] = runtime_records[-1].get("path") if runtime_records else None
+    manual_steps = [
+        step
+        for step in new_state.get("manual_steps", [])
+        if step.get("product") not in {"cursor", "vscode", "visualstudio", "jetbrains"}
+    ]
     if "cursor" in new_state["products"]:
         manual_steps.append(
             {
@@ -1107,6 +1355,59 @@ def install(
                 "instruction": "Paste print-cursor-rules output into Cursor Settings / Customize / Rules / User Rules.",
             }
         )
+    if "vscode" in new_state["products"]:
+        manual_steps.append(
+            {
+                "product": "vscode",
+                "id": "vscode-hook-activation",
+                "status": "unverified",
+                "instruction": "VS Code Copilot hooks are Preview and may be disabled by an organisation; hook activation is not proven by the installed file.",
+            }
+        )
+    if "visualstudio" in new_state["products"]:
+        manual_steps.append(
+            {
+                "product": "visualstudio",
+                "id": "visualstudio-version-compatibility",
+                "status": "unverified",
+                "instruction": "Confirm Visual Studio 18.5+ for skills and 18.4+ for custom agents when routing is selected.",
+            }
+        )
+    if "jetbrains" in new_state["products"]:
+        manual_steps.extend(
+            [
+                {
+                    "product": "jetbrains",
+                    "id": "jetbrains-chat-instructions",
+                    "status": "outstanding",
+                    "instruction": "Paste ai-guardrails jetbrains print-chat-instructions output in Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions.",
+                },
+                {
+                    "product": "jetbrains",
+                    "id": "jetbrains-skills-directory",
+                    "status": "outstanding",
+                    "instruction": "Register ~/.agents/skills in Settings > Tools > AI Assistant > Skills > Manage Skill Directories.",
+                },
+            ]
+        )
+        if _jetbrains_copilot_target(home) is None:
+            manual_steps.append(
+                {
+                    "product": "jetbrains",
+                    "id": "jetbrains-copilot-instructions",
+                    "status": "manual",
+                    "instruction": "GitHub Copilot for JetBrains has no documented Linux global instruction path; use its Customizations UI.",
+                }
+            )
+        if product_settings.get("jetbrains", {}).get("routing_profile") != "none":
+            manual_steps.append(
+                {
+                    "product": "jetbrains",
+                    "id": "jetbrains-copilot-routing",
+                    "status": "manual-activation-required",
+                    "instruction": "JetBrains Copilot custom agents are Preview; import the generated manual bundle through the documented Customizations editor.",
+                }
+            )
     new_state["manual_steps"] = manual_steps
     if dry_run:
         print("dry run complete; no files were changed")
@@ -1286,7 +1587,14 @@ def print_consumer_install_summary(
             "Manual step after install: run `ai-guardrails print-cursor-rules`, then paste the "
             "complete output into Cursor Settings / Customize / Rules / User Rules"
         )
-    else:
+    if "vscode" in products:
+        print("VS Code: PreToolUse hooks are Preview, may be disabled by an organisation, and do not cover inline suggestions")
+    if "visualstudio" in products:
+        print("Visual Studio: hooks and subagents are unsupported; native tool approvals remain unchanged")
+    if "jetbrains" in products:
+        print("JetBrains manual step: run `ai-guardrails jetbrains print-chat-instructions`, then paste it in Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions")
+        print("JetBrains manual step: register ~/.agents/skills in Settings > Tools > AI Assistant > Skills > Manage Skill Directories")
+    if not {"cursor", "jetbrains"} & set(products):
         print("Manual steps after install: none")
     if report["dry_run"]:
         print("No changes were made")
@@ -1448,6 +1756,10 @@ def status(
             product_result["shell_enforcement"] = "configured" if any(
                 record.get("kind") == "json-hook" for record in state.product_records(installed_state, product)
             ) else "missing"
+            if product == "vscode" and product_data.get("hook_mode") == "shared-claude":
+                product_result["shell_enforcement"] = "shared-claude"
+            if product in {"visualstudio", "jetbrains"}:
+                product_result["shell_enforcement"] = "unsupported"
             product_result["structured_tool_enforcement"] = product_result["shell_enforcement"]
             product_result["spacelift_mcp_enforcement"] = (
                 "read-only tools allowed; mutate/intent denied"
@@ -1465,6 +1777,34 @@ def status(
         if product == "cursor":
             product_result["manual_user_rules"] = (
                 "outstanding" if isinstance(product_data, Mapping) else "not-applicable"
+            )
+        if product == "vscode":
+            product_result.update(
+                {
+                    "hook_maturity": "Preview",
+                    "hook_activation": "unverified",
+                    "organisation_may_disable_hooks": True,
+                    "inline_suggestions": "not covered",
+                }
+            )
+        if product == "visualstudio":
+            product_result.update(
+                {
+                    "skills_compatibility": visualstudio_capabilities(None)["skills"],
+                    "agents_compatibility": visualstudio_capabilities(None)["agents"],
+                    "subagents": "unsupported",
+                    "native_approvals": "unchanged",
+                }
+            )
+        if product == "jetbrains":
+            product_result.update(
+                {
+                    "chat_instructions": "manual outstanding" if isinstance(product_data, Mapping) else "not-applicable",
+                    "project_rules": "explicit repository export",
+                    "skills_registration": "manual directory registration required",
+                    "copilot_instructions": "platform/evidence dependent",
+                    "native_approvals": "unchanged",
+                }
             )
         result["products"][product] = product_result
     installed_products = {
@@ -1501,6 +1841,20 @@ def status(
         if product == "cursor":
             if product_result["manual_user_rules"] == "outstanding":
                 print("  manual step outstanding: paste generated User Rules in Cursor Settings / Customize / Rules / User Rules")
+        if product == "vscode":
+            hook_status = product_result.get("shell_enforcement", "missing")
+            suffix = " (shared Claude-compatible registration)" if hook_status == "shared-claude" else ""
+            print("  hook configuration: installed" + suffix if hook_status != "missing" else "  hook configuration: missing")
+            print("  hook maturity: Preview; runtime activation: unverified; organisation may disable hooks: yes")
+            print("  inline suggestions: not covered; main model: unchanged")
+        if product == "visualstudio":
+            print("  skills: installed; version compatibility unverified")
+            print("  custom agents: user-selectable; version-dependent")
+            print("  subagents: unsupported; deterministic hook: unsupported; native approvals: unchanged")
+        if product == "jetbrains":
+            print("  native AI Chat guidance: manual Chat Instructions step; project rules: explicit repository export")
+            print("  skills: installed; manual directory registration required; Copilot instructions: platform/evidence dependent")
+            print("  deterministic hook: unsupported; native approvals/operation modes: unchanged")
         if product_result.get("installed_packs") is not None:
             installed = product_result.get("installed_packs") or []
             print(f"  packs: {', '.join(installed) if installed else 'none'}")
@@ -1637,10 +1991,30 @@ def doctor(products: Sequence[str], home: Path) -> dict[str, Any]:
                 "warn" if supply_findings else "pass",
                 "; ".join(supply_findings) if supply_findings else "declared components are structurally valid and pinned",
             )
+            registry_data = read_json(registry, default={})
+            components = registry_data.get("components", []) if isinstance(registry_data, Mapping) else []
+            mcp_components = [
+                component
+                for component in components
+                if isinstance(component, Mapping) and component.get("kind") == "mcp-server"
+            ]
+            observed_tools = {
+                tool
+                for component in mcp_components
+                for tool in component.get("observed_tools", [])
+                if isinstance(tool, str)
+            }
+            add(
+                "mcp-tool-inventory",
+                "pass",
+                f"{len(mcp_components)} declared MCP server(s); {len(observed_tools)} observed tool name(s) in the local registry",
+            )
         except GuardrailsError as exc:
             add("supply-chain-registry", "fail", str(exc))
+            add("mcp-tool-inventory", "skip", "trusted component registry is invalid")
     else:
         add("supply-chain-registry", "skip", "no workstation-local trusted component registry")
+        add("mcp-tool-inventory", "skip", "no workstation-local trusted component registry")
     try:
         installed_state = state.load_state(home)
         add("installation-state", "pass", "valid")
@@ -1667,6 +2041,13 @@ def doctor(products: Sequence[str], home: Path) -> dict[str, Any]:
         add(f"optional-{executable}", "pass" if shutil.which(executable) else "skip", "available" if shutil.which(executable) else "not installed")
     if "cursor" in installed_state.get("products", {}):
         add("cursor-user-rules", "warn", "manual User Rules paste remains outstanding")
+    if "vscode" in installed_state.get("products", {}):
+        add("vscode-hook", "warn", "Preview hook configuration exists only when native mode is selected; activation and organisation policy are unverified")
+    if "visualstudio" in installed_state.get("products", {}):
+        add("visualstudio-hooks", "skip", "Visual Studio Copilot does not support hooks; native tool approvals remain unchanged")
+    if "jetbrains" in installed_state.get("products", {}):
+        add("jetbrains-hooks", "skip", "JetBrains AI Assistant and Copilot for JetBrains do not have a managed deterministic hook")
+        add("jetbrains-manual-chat", "warn", "Chat Instructions and Skills directory registration require manual confirmation")
     for check in checks:
         print(f"{check['outcome']}: {check['id']}: {check['detail']}")
     return {"checks": checks}
@@ -1747,6 +2128,32 @@ def _remove_json_hook(record: Mapping[str, Any], product: str, home: Path, *, fo
 def uninstall(products: Sequence[str], home: Path, *, force: bool, dry_run: bool) -> None:
     home = home.expanduser().resolve(strict=False)
     installed_state = state.load_state(home)
+    # A managed VS Code installation may intentionally rely on the compatible
+    # Claude hook. Install its native hook before removing Claude so the shared
+    # runtime is not lost. This remains a normal managed install path.
+    if (
+        "claude" in products
+        and "vscode" not in products
+        and isinstance(installed_state.get("products", {}).get("vscode"), Mapping)
+        and installed_state["products"]["vscode"].get("hook_mode") == "shared-claude"
+    ):
+        vscode_data = installed_state["products"]["vscode"]
+        print("reconciling VS Code to a native Preview hook before removing Claude")
+        install(
+            ("vscode",),
+            home,
+            force=force,
+            dry_run=dry_run,
+            pack_ids=tuple(vscode_data.get("installed_packs", [])),
+            routing_profile=str(vscode_data.get("routing_profile", "none")),
+            safety_profile=str(vscode_data.get("safety_profile", "infrastructure-observe")),
+            trust_mode=str(vscode_data.get("trust_mode", "trusted-workspace")),
+            model_overrides={"vscode": dict(vscode_data.get("model_overrides", {}))},
+            explicit_product=True,
+            prefer_native_vscode=True,
+        )
+        if not dry_run:
+            installed_state = state.load_state(home)
     new_state = json.loads(json.dumps(installed_state))
     retained_any = False
     selected = set(products)
@@ -1837,6 +2244,11 @@ def uninstall(products: Sequence[str], home: Path, *, force: bool, dry_run: bool
             home_path(home, ".claude/skills"),
             home_path(home, ".claude/agents"),
             home_path(home, ".cursor/agents"),
+            home_path(home, ".copilot/instructions"),
+            home_path(home, ".copilot/hooks"),
+            home_path(home, ".copilot/agents"),
+            home_path(home, ".github/agents"),
+            home_path(home, ".ai-guardrails/manual/jetbrains/agents"),
             home_path(home, ".agents/skills"),
         ],
     )
@@ -1882,8 +2294,11 @@ def set_routing(
 def print_cursor_rules(*, clipboard: bool, home: Path | None = None) -> None:
     content = build.build_artifacts(("cursor",), home=home)[CURSOR_RULES_ARTIFACT].decode("utf-8")
     print(content, end="")
-    if not clipboard:
-        return
+    if clipboard:
+        _copy_to_clipboard(content, "Cursor User Rules")
+
+
+def _copy_to_clipboard(content: str, label: str) -> None:
     candidates = [
         (["pbcopy"], "pbcopy"),
         (["wl-copy"], "wl-copy"),
@@ -1896,6 +2311,60 @@ def print_cursor_rules(*, clipboard: bool, home: Path | None = None) -> None:
             result = subprocess.run(command, input=content, text=True, check=False, capture_output=True)
             if result.returncode != 0:
                 raise GuardrailsError(f"clipboard command failed: {executable}")
-            print(f"\nCursor User Rules copied with {executable}; clipboard copy is not installation")
+            print(f"\n{label} copied with {executable}; clipboard copy is not installation")
             return
     raise GuardrailsError("no supported clipboard command is available")
+
+
+def print_jetbrains_chat_instructions(*, clipboard: bool, home: Path | None = None) -> None:
+    content = build.build_artifacts(("jetbrains",), home=home)[JETBRAINS_CHAT_ARTIFACT].decode("utf-8")
+    print(content, end="")
+    if clipboard:
+        _copy_to_clipboard(content, "JetBrains AI Assistant Chat Instructions")
+
+
+def _validate_repository_export_target(repo: Path, target: Path) -> None:
+    if not repo.is_dir() or repo.is_symlink():
+        raise GuardrailsError(f"repository must be a non-symbolic-link directory: {repo}")
+    if not path_within(target, repo):
+        raise GuardrailsError(f"refusing project-rule path outside the selected repository: {target}")
+    current = repo.resolve(strict=False)
+    for part in target.resolve(strict=False).relative_to(current).parts[:-1]:
+        current /= part
+        if current.is_symlink():
+            raise GuardrailsError(f"project-rule parent is a symbolic link: {current}")
+        if current.exists() and not current.is_dir():
+            raise GuardrailsError(f"project-rule parent is not a directory: {current}")
+
+
+def export_jetbrains_project_rules(repo: Path, *, dry_run: bool, force: bool, home: Path | None = None) -> Path:
+    """Explicitly export a native JetBrains project rule; workstation install never calls this."""
+    selected_repo = repo.expanduser().resolve(strict=False)
+    if (selected_repo / ".noai").exists():
+        raise GuardrailsError(".noai disables JetBrains AI Assistant for this repository; project rule was not exported")
+    target = selected_repo / ".aiassistant" / "rules" / "workstation-guardrails.md"
+    _validate_repository_export_target(selected_repo, target)
+    content = build.build_artifacts(("jetbrains",), home=home)[JETBRAINS_PROJECT_RULE_ARTIFACT]
+    if target.exists():
+        if target.is_symlink() or not target.is_file():
+            raise GuardrailsError(f"project-rule target is not a regular file: {target}")
+        if target.read_bytes() == content:
+            print(f"unchanged {target}")
+        elif not force:
+            raise GuardrailsError(f"unmanaged JetBrains project-rule collision; refusing to overwrite without --force: {target}")
+        else:
+            backup = target.with_name(target.name + ".ai-guardrails.bak")
+            if backup.exists() and backup.is_symlink():
+                raise GuardrailsError(f"project-rule backup path is a symbolic link: {backup}")
+            if dry_run:
+                print(f"would back up {target} to {backup}")
+            else:
+                atomic_write(backup, target.read_bytes())
+    if not target.exists() or target.read_bytes() != content:
+        print(f"{'would export' if dry_run else 'export'} JetBrains project rule to {target}")
+        if not dry_run:
+            atomic_write(target, content)
+    print("Manual verification: Settings > Tools > AI Assistant > Rules; open the generated rule and confirm it is active as an Always rule.")
+    if dry_run:
+        print("dry run complete; no files were changed")
+    return target

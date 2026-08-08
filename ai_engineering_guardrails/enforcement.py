@@ -56,9 +56,13 @@ SHELL_TOOLS = {
     "exec_command",
     "execute",
     "run_terminal_cmd",
+    "runterminalcommand",
     "terminal",
 }
-FILE_WRITE_TOOLS = {"write", "edit", "apply_patch", "write_file", "edit_file", "notebookedit"}
+FILE_WRITE_TOOLS = {
+    "write", "edit", "apply_patch", "write_file", "edit_file", "notebookedit",
+    "createfile", "editfiles", "replace_string_in_file", "create_file",
+}
 CHAIN_OPERATORS = {"&&", "||", ";", "&", "|"}
 ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", re.DOTALL)
 DRIVE_ROOT_RE = re.compile(r"^[A-Za-z]:[\\/]*$")
@@ -1342,7 +1346,14 @@ def _managed_path_rule(
         high_risk = any(
             candidate in {"AGENTS.md", "CLAUDE.md", ".ai-guardrails.json", "CODEOWNERS"}
             or candidate.startswith(
-                (".cursor/", ".codex/", ".claude/", ".github/workflows/", "platform-policies/spacelift/")
+                (
+                    ".cursor/",
+                    ".codex/",
+                    ".claude/",
+                    ".github/workflows/",
+                    "platform-policies/spacelift/",
+                    "ai_engineering_guardrails/_resources/",
+                )
             )
             for candidate in normalised
         )
@@ -1646,7 +1657,7 @@ def validate_policy_examples(policy_data: Mapping[str, Any]) -> int:
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--product", choices=("codex", "claude", "cursor"), default="codex")
+    parser.add_argument("--product", choices=("codex", "claude", "cursor", "vscode"), default="codex")
     parser.add_argument("--policy", type=Path, default=POLICY_PATH)
     parser.add_argument("--structured-policy", type=Path, default=STRUCTURED_POLICY_PATH)
     parser.add_argument("--redaction-policy", type=Path, default=_BUNDLED_ENFORCEMENT_ROOT / "redaction-policy.json")

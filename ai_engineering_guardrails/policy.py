@@ -72,6 +72,9 @@ def load_manifest(path: Path = MANIFEST_PATH) -> dict[str, Any]:
         not isinstance(limits.get(product), int) or limits[product] <= 0 for product in PRODUCTS
     ):
         raise GuardrailsError("policy manifest must define positive output limits for every product")
+    always_loaded_budget = manifest.get("always_loaded_budget_bytes")
+    if not isinstance(always_loaded_budget, int) or always_loaded_budget <= 0:
+        raise GuardrailsError("policy manifest must define a positive always-loaded budget")
     fragments = manifest.get("fragments")
     if not isinstance(fragments, list) or not fragments:
         raise GuardrailsError("policy manifest must define at least one fragment")
@@ -608,12 +611,43 @@ def validate_canonical_data() -> None:
     path_classes = documents["risk/path-classification.json"].get("classifications")
     if not isinstance(path_classes, list) or not path_classes:
         raise GuardrailsError("risk path classification must not be empty")
+    risk_classes: set[str] = set()
+    for path_class in path_classes:
+        if (
+            not isinstance(path_class, Mapping)
+            or not isinstance(path_class.get("id"), str)
+            or not NAME_RE.fullmatch(path_class["id"])
+            or not isinstance(path_class.get("risk_class"), str)
+            or not path_class["risk_class"]
+            or not isinstance(path_class.get("patterns"), list)
+            or not path_class["patterns"]
+            or not all(isinstance(pattern, str) and pattern for pattern in path_class["patterns"])
+        ):
+            raise GuardrailsError("risk path classification is invalid")
+        risk_classes.add(path_class["risk_class"])
     verification = documents["risk/verification-requirements.json"].get("requirements")
     if not isinstance(verification, list) or not verification:
         raise GuardrailsError("risk verification requirements must not be empty")
+    known_risk_classes = risk_classes | {"normal"}
+    requirement_ids: set[str] = set()
+    requirement_risk_classes: set[str] = set()
     for requirement in verification:
-        if not isinstance(requirement, Mapping) or requirement.get("minimum_model_tier") not in {"economy", "balanced", "deep"}:
-            raise GuardrailsError("risk verification requirement has an invalid model tier")
+        if (
+            not isinstance(requirement, Mapping)
+            or not isinstance(requirement.get("id"), str)
+            or not NAME_RE.fullmatch(requirement["id"])
+            or requirement["id"] in requirement_ids
+            or requirement.get("risk_class") not in known_risk_classes
+            or requirement["risk_class"] in requirement_risk_classes
+            or requirement.get("minimum_model_tier") not in {"economy", "balanced", "deep"}
+        ):
+            raise GuardrailsError("risk verification requirement has invalid identifiers, risk class, or model tier")
+        requirement_ids.add(requirement["id"])
+        requirement_risk_classes.add(requirement["risk_class"])
+        for field in ("required_reviews", "required_verification", "prohibited_autonomous_actions"):
+            values = requirement.get(field)
+            if not isinstance(values, list) or not values or not all(isinstance(value, str) and value for value in values):
+                raise GuardrailsError(f"risk verification requirement has invalid {field}")
 
     audit = documents["audit/redaction-policy.json"]
     allowed = audit.get("allow_fields")

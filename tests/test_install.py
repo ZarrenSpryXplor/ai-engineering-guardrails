@@ -62,7 +62,9 @@ class InstallTests(unittest.TestCase):
         data = self.read_state()
         self.assertEqual(set(PRODUCTS), set(data["products"]))
         self.assertRegex(data["policy_digest"], r"^[0-9a-f]{64}$")
-        for product in PRODUCTS:
+        # Visual Studio and JetBrains deliberately have no managed deterministic
+        # hook, so only hook-capable adapters own an immutable runtime.
+        for product in ("codex", "claude", "cursor"):
             digest = data["products"][product]["runtime_digest"]
             runtime = self.home / ".ai-guardrails/runtime" / digest
             self.assertEqual(
@@ -620,6 +622,38 @@ class InstallTests(unittest.TestCase):
         checks = {item["id"]: item["outcome"] for item in report["checks"]}
         self.assertEqual("fail", checks["installation-state"])
         self.assertEqual("fail", checks["target-mapping"])
+
+    def test_doctor_reports_local_mcp_inventory_counts_without_tool_names(self) -> None:
+        guardrails_root = self.home / ".ai-guardrails"
+        guardrails_root.mkdir()
+        (guardrails_root / "trusted-components.json").write_text(
+            json.dumps(
+                {
+                    "components": [
+                        {
+                            "id": "synthetic-read-mcp",
+                            "kind": "mcp-server",
+                            "source": "https://example.invalid/mcp",
+                            "version": "1.0.0",
+                            "digest": None,
+                            "allowed_tools": ["query"],
+                            "denied_tools": ["mutate"],
+                            "observed_tools": ["query"],
+                            "executable_files": [],
+                            "credential_class": "read-only",
+                            "expected_network_destinations": ["example.invalid"],
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = installer.doctor(("codex",), self.home)
+        checks = {item["id"]: item for item in report["checks"]}
+        self.assertEqual("pass", checks["mcp-tool-inventory"]["outcome"])
+        self.assertIn("1 declared MCP server(s); 1 observed tool name(s)", checks["mcp-tool-inventory"]["detail"])
+        self.assertNotIn("query", checks["mcp-tool-inventory"]["detail"])
 
     def test_status_does_not_claim_invalid_target_mapping_is_configured(self) -> None:
         guardrails_root = self.home / ".ai-guardrails"

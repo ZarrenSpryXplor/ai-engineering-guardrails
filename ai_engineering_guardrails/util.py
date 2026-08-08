@@ -10,7 +10,7 @@ import re
 import stat
 import tempfile
 from pathlib import Path, PureWindowsPath
-from typing import Any, Mapping
+from typing import Any
 
 
 from .resources import repository_output_root
@@ -19,7 +19,25 @@ from .resources import repository_output_root
 # Compatibility for contributor-only output checks. Runtime canonical data uses
 # ``resources.RESOURCE_ROOT`` and must never derive from a checkout root.
 ROOT = repository_output_root()
-PRODUCTS = ("codex", "claude", "cursor")
+PRODUCTS = ("codex", "claude", "cursor", "vscode", "visualstudio", "jetbrains")
+PRODUCT_LABELS = {
+    "codex": "OpenAI Codex",
+    "claude": "Claude Code",
+    "cursor": "Cursor",
+    "vscode": "GitHub Copilot in Visual Studio Code",
+    "visualstudio": "GitHub Copilot in Visual Studio",
+    "jetbrains": "JetBrains AI Assistant and GitHub Copilot for JetBrains",
+}
+# Product capabilities are deliberately declarative.  They describe documented
+# integration surfaces, not a promise that an IDE or organisation loaded a file.
+PRODUCT_CAPABILITIES = {
+    "codex": {"instructions": True, "repository_instructions": True, "skills": True, "agents": True, "subagents": True, "deterministic_hook": True, "hook_maturity": "stable", "version_requirement": "current Codex", "manual_steps": False, "platform_restriction": "none", "model_availability": "unverified"},
+    "claude": {"instructions": True, "repository_instructions": True, "skills": True, "agents": True, "subagents": True, "deterministic_hook": True, "hook_maturity": "stable", "version_requirement": "current Claude Code", "manual_steps": False, "platform_restriction": "none", "model_availability": "unverified"},
+    "cursor": {"instructions": "manual", "repository_instructions": True, "skills": True, "agents": True, "subagents": True, "deterministic_hook": True, "hook_maturity": "stable", "version_requirement": "current Cursor", "manual_steps": True, "platform_restriction": "none", "model_availability": "unverified"},
+    "vscode": {"instructions": True, "repository_instructions": True, "skills": True, "agents": True, "subagents": True, "deterministic_hook": True, "hook_maturity": "preview", "version_requirement": "current VS Code Copilot", "manual_steps": False, "platform_restriction": "none", "model_availability": "unverified", "inline_suggestions": False},
+    "visualstudio": {"instructions": True, "repository_instructions": True, "skills": "version-gated", "agents": "version-gated", "subagents": False, "deterministic_hook": False, "hook_maturity": "unsupported", "version_requirement": "skills 18.5+; agents 18.4+", "manual_steps": False, "platform_restriction": "Windows", "model_availability": "unverified"},
+    "jetbrains": {"instructions": "manual", "repository_instructions": True, "skills": "manual", "agents": "preview-manual", "subagents": "preview", "deterministic_hook": False, "hook_maturity": "unsupported", "version_requirement": "current JetBrains AI Assistant/Copilot", "manual_steps": True, "platform_restriction": "Copilot global path macOS/Windows only", "model_availability": "unverified"},
+}
 CAPABILITY_TIERS = ("economy", "balanced", "deep")
 REASONING_LEVELS = ("low", "medium", "high")
 ROUTING_PROFILES = ("none", "economy", "balanced", "quality")
@@ -193,21 +211,3 @@ def parse_simple_frontmatter(
     if not body:
         raise GuardrailsError(f"file body is empty: {path}")
     return fields, body
-
-
-def require_object(value: Any, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise GuardrailsError(f"{label} must be a JSON object")
-    return value
-
-
-def generated_header(source: str, comment: str = "#") -> str:
-    return f"{comment} GENERATED — DO NOT EDIT\n{comment} Canonical source: {source}\n"
-
-
-def redact_mapping(mapping: Mapping[str, Any], never_log: set[str]) -> dict[str, Any]:
-    """Return field names and harmless scalar types without argument values."""
-    return {
-        key: "<redacted>" if key.lower() in never_log else f"<{type(value).__name__}>"
-        for key, value in sorted(mapping.items())
-    }

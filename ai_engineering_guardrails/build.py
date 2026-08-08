@@ -12,7 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from . import packs, policy, routing
 from .resources import RESOURCE_ROOT, repository_output_root
-from .util import PRODUCTS, GuardrailsError, atomic_write, json_bytes, one_newline, path_within
+from .util import PRODUCT_CAPABILITIES, PRODUCT_LABELS, PRODUCTS, GuardrailsError, atomic_write, json_bytes, one_newline, path_within
 
 
 HOOK_PLACEHOLDER = "__WORKSTATION_GUARDRAILS_COMMAND__"
@@ -20,6 +20,9 @@ GENERATED_ROOTS = (
     Path("dist/codex"),
     Path("dist/claude"),
     Path("dist/cursor"),
+    Path("dist/vscode"),
+    Path("dist/visualstudio"),
+    Path("dist/jetbrains"),
     Path("dist/skills"),
     Path("dist/enterprise"),
 )
@@ -35,6 +38,14 @@ def adapter_json(source: str, payload: Mapping[str, Any]) -> bytes:
     }
     value.update(payload)
     return json_bytes(value)
+
+
+def _check_always_loaded_budget(product: str, size: int, manifest: Mapping[str, Any]) -> None:
+    budget = manifest["always_loaded_budget_bytes"]
+    if size > budget:
+        raise GuardrailsError(
+            f"generated {product} policy exceeds the configured {budget}-byte always-loaded budget"
+        )
 
 
 def render_policy(
@@ -63,6 +74,7 @@ def render_policy(
     limit = manifest["output_limits_bytes"][product]
     if len(output.encode("utf-8")) > limit:
         raise GuardrailsError(f"generated {product} policy exceeds configured {limit}-byte limit")
+    _check_always_loaded_budget(product, len(output.encode("utf-8")), manifest)
     return output
 
 
@@ -168,6 +180,20 @@ def _hook_payload(product: str) -> dict[str, Any]:
         "statusMessage": "Checking tool request against workstation guardrails",
     }
     return {"hooks": {event: [{"matcher": ".*", "hooks": [hook]}]}}
+
+
+def _vscode_instructions(manifest: Mapping[str, Any], manifest_path: Path, local_fragments: Sequence[Mapping[str, Any]]) -> bytes:
+    body = render_policy("vscode", manifest, manifest_path, local_fragments)
+    # VS Code reads the YAML frontmatter before the generated marker.
+    return one_newline(
+        "---\n"
+        "name: Workstation AI Guardrails\n"
+        "description: Workstation-wide engineering and safety guidance\n"
+        'applyTo: "**"\n'
+        "---\n\n"
+        + body
+        + "\nDeterministic command denials, when hooks are enabled, are separate from these behavioural instructions."
+    ).encode("utf-8")
 
 
 def _enterprise_artifacts(selected: set[str]) -> dict[Path, bytes]:
@@ -307,6 +333,7 @@ def build_artifacts(
             artifacts[Path("dist/claude/rules") / f"workstation-guardrails-{fragment['id']}.md"] = rendered
         if total == 0 or total > manifest["output_limits_bytes"]["claude"]:
             raise GuardrailsError("generated claude policy is empty or exceeds configured limit")
+        _check_always_loaded_budget("claude", total, manifest)
         settings = adapter_json("enforcement policies and adapters/claude/", _hook_payload("claude"))
         artifacts[Path("dist/claude/settings.fragment.json")] = settings
         artifacts[Path("adapters/claude/settings.fragment.json")] = settings
@@ -329,9 +356,30 @@ def build_artifacts(
         )
         artifacts[Path("dist/cursor/cli-permissions.recommended.json")] = permissions
         artifacts[Path("adapters/cursor/cli-permissions.recommended.json")] = permissions
+    if "vscode" in selected:
+        artifacts[Path("dist/vscode/instructions/workstation-guardrails.instructions.md")] = _vscode_instructions(
+            manifest, manifest_path, local_fragments
+        )
+        artifacts[Path("dist/vscode/hooks/workstation-guardrails.json")] = adapter_json(
+            "enforcement policies and official VS Code hooks documentation", _hook_payload("vscode")
+        )
+    if "visualstudio" in selected:
+        artifacts[Path("dist/visualstudio/copilot-instructions.md")] = render_policy(
+            "visualstudio", manifest, manifest_path, local_fragments
+        ).encode("utf-8")
+    if "jetbrains" in selected:
+        rendered = render_policy("jetbrains", manifest, manifest_path, local_fragments).encode("utf-8")
+        artifacts[Path("dist/jetbrains/ai-assistant/chat-instructions.md")] = rendered
+        artifacts[Path("dist/jetbrains/ai-assistant/project-rules/workstation-guardrails.md")] = rendered
+        artifacts[Path("dist/jetbrains/copilot/global-copilot-instructions.md")] = rendered
     for product_name in sorted(selected):
         for filename, data in routing.render_agents(product_name).items():
-            artifacts[Path("dist") / product_name / "agents" / filename] = data
+            agent_root = (
+                Path("dist/jetbrains/copilot/agents")
+                if product_name == "jetbrains"
+                else Path("dist") / product_name / "agents"
+            )
+            artifacts[agent_root / filename] = data
     for skill_file in skills:
         rendered = render_skill(skill_file).encode("utf-8")
         skill_name = skill_file.parent.name
@@ -455,6 +503,15 @@ def validate(
     output_root: Path | None = None,
     home: Path | None = None,
 ) -> None:
+    if set(PRODUCT_LABELS) != set(PRODUCTS) or set(PRODUCT_CAPABILITIES) != set(PRODUCTS):
+        raise GuardrailsError("product labels and capability mappings must cover every supported product exactly once")
+    required_capabilities = {
+        "instructions", "repository_instructions", "skills", "agents", "subagents",
+        "deterministic_hook", "hook_maturity", "version_requirement", "manual_steps",
+        "platform_restriction", "model_availability",
+    }
+    if any(required_capabilities - set(PRODUCT_CAPABILITIES[product]) for product in PRODUCTS):
+        raise GuardrailsError("product capability mapping is missing a required compatibility claim")
     artifacts = build_artifacts(products, home=home)
     root = output_root.expanduser().resolve(strict=False) if output_root is not None else None
     if require_current and root is None:
@@ -482,11 +539,15 @@ def validate(
             except tomllib.TOMLDecodeError as exc:
                 raise GuardrailsError(f"generated TOML is invalid: {path.as_posix()}: {exc}") from exc
         relative = path
-        if len(relative.parts) >= 4 and relative.parts[0] == "dist" and relative.parts[2] == "agents":
+        if relative.parts and relative.parts[0] == "dist" and "agents" in relative.parts:
             if path.suffix == ".md":
                 fields = routing.frontmatter_fields(text, relative.as_posix())
-                if {"name", "description", "model"} - fields.keys():
+                if {"name", "description"} - fields.keys():
                     raise GuardrailsError(f"generated agent lacks required frontmatter: {relative}")
+        if path == Path("dist/vscode/instructions/workstation-guardrails.instructions.md"):
+            fields = routing.frontmatter_fields(text, path.as_posix())
+            if fields.get("applyTo") != "**" or {"name", "description"} - fields.keys():
+                raise GuardrailsError("generated VS Code instructions have invalid frontmatter")
     pack_count, _ = packs.validate_packs()
     policy.validate_canonical_data()
     from . import enforcement

@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .resources import RESOURCE_ROOT
-from .util import LIFECYCLES, OPERATION_CLASSES, GuardrailsError, path_within
+from .util import (
+    CAPABILITY_TIERS,
+    LIFECYCLES,
+    OPERATION_CLASSES,
+    REASONING_LEVELS,
+    GuardrailsError,
+    path_within,
+)
 
 
 PACKS_ROOT = RESOURCE_ROOT / "packs"
@@ -483,6 +490,80 @@ def _validate_structured_rule(rule: Any, identifier: str) -> int:
     return len(rule["positive_fixtures"]) + len(rule["negative_fixtures"])
 
 
+def _validate_verification_definition(value: dict[str, Any], identifier: str) -> None:
+    checks = value.get("checks")
+    if value.get("schema_version") != 1 or not isinstance(checks, list) or not checks:
+        raise PackError(f"pack {identifier} has invalid verification definition")
+    identifiers: set[str] = set()
+    for check in checks:
+        if not isinstance(check, Mapping) or {"id", "class", "selection", "commands"} - check.keys():
+            raise PackError(f"pack {identifier} has invalid verification check")
+        check_id = check["id"]
+        if not isinstance(check_id, str) or not PACK_ID_RE.fullmatch(check_id) or check_id in identifiers:
+            raise PackError(f"pack {identifier} has duplicate or invalid verification check")
+        identifiers.add(check_id)
+        if not all(isinstance(check[field], str) and check[field] for field in ("class", "selection")):
+            raise PackError(f"pack {identifier} has invalid verification check metadata")
+        commands = check["commands"]
+        if (
+            not isinstance(commands, list)
+            or not commands
+            or not all(isinstance(command, str) and command.strip() for command in commands)
+        ):
+            raise PackError(f"pack {identifier} has invalid verification commands")
+
+
+def _validate_routing_addition(value: dict[str, Any], identifier: str) -> None:
+    task_classes = value.get("task_classes")
+    if value.get("schema_version") != 1 or not isinstance(task_classes, list) or not task_classes:
+        raise PackError(f"pack {identifier} has invalid routing addition")
+    identifiers: set[str] = set()
+    for task in task_classes:
+        if not isinstance(task, Mapping) or {"id", "tier", "reasoning", "write"} - task.keys():
+            raise PackError(f"pack {identifier} has invalid routing task")
+        task_id = task["id"]
+        if not isinstance(task_id, str) or not PACK_ID_RE.fullmatch(task_id) or task_id in identifiers:
+            raise PackError(f"pack {identifier} has duplicate or invalid routing task")
+        identifiers.add(task_id)
+        if (
+            task["tier"] not in CAPABILITY_TIERS
+            or task["reasoning"] not in REASONING_LEVELS
+            or not isinstance(task["write"], bool)
+        ):
+            raise PackError(f"pack {identifier} has invalid routing task metadata")
+
+
+def pack_guidance(pack: Mapping[str, Any]) -> dict[str, list[str]]:
+    """Return concise, data-derived details for the existing ``packs explain`` command."""
+    root = Path(str(pack["_root"]))
+    policies: list[str] = []
+    for relative in pack["policy_fragments"]:
+        source = root / relative
+        title = next(
+            (
+                line.removeprefix("# ").strip()
+                for line in source.read_text(encoding="utf-8").splitlines()
+                if line.startswith("# ")
+            ),
+            "policy guidance",
+        )
+        policies.append(f"{relative}: {title}")
+
+    verification: list[str] = []
+    for relative in pack["verification_definitions"]:
+        data = _load_json_object(root / relative, "verification definition")
+        for check in data["checks"]:
+            verification.append(f"{check['id']} ({check['class']}; {check['selection']})")
+
+    routing: list[str] = []
+    for relative in pack["routing_additions"]:
+        data = _load_json_object(root / relative, "routing addition")
+        for task in data["task_classes"]:
+            capability = "write" if task["write"] else "read-only"
+            routing.append(f"{task['id']} -> {task['tier']}/{task['reasoning']} ({capability})")
+    return {"policy": policies, "verification": verification, "routing": routing}
+
+
 def validate_packs(packs_root: Path = PACKS_ROOT) -> tuple[int, int]:
     packs = load_packs(packs_root)
     skill_names: set[str] = set()
@@ -502,12 +583,10 @@ def validate_packs(packs_root: Path = PACKS_ROOT) -> tuple[int, int]:
                 raise PackError(f"pack {identifier} has empty policy")
         for relative in pack["verification_definitions"]:
             verification = _load_json_object(root / relative, "verification definition")
-            if verification.get("schema_version") != 1 or not isinstance(verification.get("checks"), list):
-                raise PackError(f"pack {identifier} has invalid verification definition")
+            _validate_verification_definition(verification, identifier)
         for relative in pack["routing_additions"]:
             routing = _load_json_object(root / relative, "routing addition")
-            if routing.get("schema_version") != 1 or not isinstance(routing.get("task_classes"), list):
-                raise PackError(f"pack {identifier} has invalid routing addition")
+            _validate_routing_addition(routing, identifier)
         for relative in pack["command_policy_fragments"]:
             command = _load_json_object(root / relative, "command-policy fragment")
             if command.get("schema_version") != 1 or not isinstance(command.get("rules"), list):

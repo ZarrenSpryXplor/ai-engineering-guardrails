@@ -9,6 +9,9 @@ Canonical policy and data
        |       +--> Codex aggregate, hooks, rules, agents, skills
        |       +--> Claude modular rules, hooks, agents, skills
        |       +--> Cursor User Rules, hooks, agents, skills
+       |       +--> VS Code Copilot instructions, Preview hook, agents, skills
+       |       +--> Visual Studio Copilot instruction block, agents, skills
+       |       +--> JetBrains AI Assistant/Copilot manual guidance, project-rule export, skills
        |
        +--> portable skills
        |
@@ -44,11 +47,11 @@ Capability packs (progressive, separate from global policy)
 
 ## Canonical sources
 
-`ai_engineering_guardrails/_resources/` is the single canonical read-only resource root. Within it, `policy/manifest.json` establishes fragment order, stable identifiers, product applicability, descriptions, classifications, and per-product output limits. Markdown under `policy/fragments/` contains vendor-neutral behavioural content. `skills/` contains repeatable procedures that should not consume every session's instruction budget. `enforcement/command-policy.json` defines deterministic denial intent and examples; the Python package's `enforcement.py` provides bounded parsing and strategy implementations without executing payload data.
+`ai_engineering_guardrails/_resources/` is the single canonical read-only resource root. Within it, `policy/manifest.json` establishes fragment order, stable identifiers, product applicability, descriptions, classifications, per-product output limits, and an 8 KiB always-loaded-policy budget. Markdown under `policy/fragments/` contains vendor-neutral behavioural content. `skills/` contains repeatable procedures that should not consume every session's instruction budget. `enforcement/command-policy.json` defines deterministic denial intent and examples; the Python package's `enforcement.py` provides bounded parsing and strategy implementations without executing payload data.
 
 `routing/` is a fourth canonical resource area, but it does not participate in behavioural or enforcement authority. Task classes and profiles hold portable tiers, reasoning, parallelism, capabilities, attempts, and thresholds. Model maps are the only canonical files containing vendor model IDs. Role Markdown and shared context guidance generate native subagents. The metrics schema defines optional content-free records; the repository installs no telemetry collector.
 
-`packs/` is the canonical stack-specific layer. Each language, infrastructure, or shared pack owns a manifest, on-demand policy, portable skill, verification data, routing hints, deterministic command fragment, and fixtures. Marker-based discovery supports several simultaneous packs in a monorepository while pruning build output, caches, vendored code, and configured generated directories. Detection has no installation authority and does not contact a toolchain or network.
+`packs/` is the canonical stack-specific layer. Each language, infrastructure, or shared pack owns a manifest, on-demand policy, portable skill, verification data, routing hints, deterministic command fragment, and fixtures. `packs explain` is the deliberate on-demand reader for its concise policy heading plus named verification and routing guidance; it avoids a second routing or verification engine and keeps this material out of global instructions. Marker-based discovery supports several simultaneous packs in a monorepository while pruning build output, caches, vendored code, and configured generated directories. Detection has no installation authority and does not contact a toolchain or network.
 
 `config/safety-profiles.json` is independent of `routing/profiles/`. It maps `observe`, `validate`, `mutate`, `destructive`, `sensitive-read`, `publish`, `privilege-escalation`, and `guardrail-modification` to lifecycle-aware treatment. `config/targets.example.json` documents the local `~/.ai-guardrails/targets.json` mapping for Ansible inventories, Kubernetes, Helm, Spacelift, Azure/cloud, Terraform, and database identifiers. Canonical lifecycle values are `dev`, `tst`, `int`, and `prd`; unknown targets are protected.
 
@@ -58,7 +61,7 @@ The root `AGENTS.md` is repository contribution guidance, not the global policy'
 
 ## Build flow
 
-`python tools/guardrails.py build` validates every canonical source before rendering. It uses manifest order, fixed headers, stable JSON key order, no timestamp, configured byte limits, and exactly one final newline. It generates:
+`python tools/guardrails.py build` validates the canonical behavioural and generated-artifact inputs it consumes before rendering. `validate` additionally checks every pack manifest, verification definition, and routing hint. Build uses manifest order, fixed headers, stable JSON key order, no timestamp, configured byte limits, and exactly one final newline. It generates:
 
 - a concise Codex aggregate;
 - one Claude user-rule file per applicable fragment;
@@ -77,7 +80,9 @@ The CLI resolves authored sources from its package-local `_resources` tree and u
 
 Codex and Cursor share skill destinations. State records both owners, so uninstalling one product does not remove a skill still owned by the other. Claude receives a separate copy in its documented personal skill directory.
 
-Routing installation is opt-in. Native agent files are copied to the documented user agent directory for each selected product and tracked separately inside the product's state. The state records profile, resolved tier mappings, hashes, overrides, and `unverified` availability—never prompts or configuration contents. Routing operations do not edit a main-model setting or global concurrency setting. Concurrency is portable profile guidance because native products do not expose one common safe user-level configuration surface.
+Routing installation is opt-in. Native agent files are copied to the documented user agent directory for Codex, Claude, Cursor, VS Code, and version-unverified Visual Studio; JetBrains receives only a reviewable manual Copilot bundle because its customizations are Preview and no stable personal path is assumed. The state records profile, resolved tier mappings, hashes, overrides, manual activation, and `unverified` availability—never prompts or configuration contents. Routing operations do not edit a main-model setting or global concurrency setting. Concurrency is portable profile guidance because native products do not expose one common safe user-level configuration surface.
+
+VS Code can load Claude-compatible hooks. The installer uses a tiny recorded ownership choice rather than a general dependency graph: when a managed Claude hook is present, VS Code uses it as `shared-claude`; otherwise VS Code owns its Preview-native hook. Claude is registered before a native VS Code hook is removed, and VS Code is restored to a native hook before Claude is removed. Visual Studio and JetBrains are behavioural/skill adapters only: neither receives a fabricated deterministic hook.
 
 Fresh consumer installation makes every stable capability pack available through portable skill copies and compiles deterministic enforcement into the immutable runtime; product skill discovery still loads detailed guidance only when relevant, and pack policy is not concatenated into global instructions. Explicit pack subsets remain an advanced distribution-authoring option. A fresh installation defaults to the non-mutating `infrastructure-observe` profile. State tracks pack IDs, safety/trust/routing profiles, paths, hashes, backups, and manual steps. Unmanaged collisions are preserved, and forced replacement is backed up.
 
@@ -95,7 +100,7 @@ The parser deliberately does not expand variables, command substitutions, aliase
 
 `explain` and `simulate` call the same evaluator with waiver consumption disabled and never execute the request. Rule rollout is data: disabled produces no decision; observe audits; warn audits and uses a safe diagnostic; deny translates to a documented product response. Waivers are exact digest/repository/target/rule matches with expiry and use counts. Audit JSONL is rotated during writes and contains only schema-approved hashes and classifications.
 
-`scan` is deliberately independent from enforcement. It enumerates repository files, applies conservative static checks, and renders human, JSON, SARIF, or JUnit output. Risk data classifies changed paths and reports missing verification metadata without inventing an execution framework. Installed state—not generated Markdown—drives status, diff, update, and uninstallation.
+`scan` is deliberately independent from enforcement. It enumerates repository files, applies conservative static checks, and renders human, JSON, SARIF, or JUnit output. Risk data maps changed high-risk paths to a named canonical requirement and checks that local evidence declares every named review and verification outcome; it does not execute commands or claim to prove an external review. Installed state—not generated Markdown—drives status, diff, update, and uninstallation.
 
 ## Simplicity boundaries
 

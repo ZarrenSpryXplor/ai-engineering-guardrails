@@ -32,7 +32,9 @@ ai-guardrails = "ai_engineering_guardrails.cli:main"
 version = {attr = "ai_engineering_guardrails.__version__"}
 
 [tool.setuptools]
-include-package-data = true
+# The resource tree is data, not a collection of implicit namespace packages.
+# Its complete wheel contents are declared explicitly below.
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]

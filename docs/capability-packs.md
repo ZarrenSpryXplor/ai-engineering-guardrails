@@ -11,13 +11,13 @@ This list is not universal protection for every adjacent CLI, cloud provider, co
 ## Detection
 
 ```sh
-python tools/guardrails.py packs list
-python tools/guardrails.py packs detect --repo /path/to/repository
-python tools/guardrails.py packs explain --repo /path/to/repository
-python tools/guardrails.py packs validate
+ai-guardrails packs list
+ai-guardrails packs detect --repo /path/to/repository
+ai-guardrails packs explain --repo /path/to/repository
+ai-guardrails packs validate
 ```
 
-Detection uses manifests, wrappers, locks, configuration, and directories—not source extensions alone. It supports multiple roots in monorepositories and reports every evidence path. It prunes `.git`, dependency caches, build output, generated and vendored directories, makes no network call, runs no toolchain, and modifies nothing.
+Detection uses manifests, wrappers, locks, configuration, and directories—not source extensions alone. It supports multiple roots in monorepositories and reports every evidence path. `packs explain` adds the detected pack's concise policy heading plus data-derived verification and routing hints. It prunes `.git`, dependency caches, build output, generated and vendored directories, makes no network call, runs no toolchain, and modifies nothing.
 
 Optional `.ai-guardrails.json` can explicitly enable/disable packs, resolve package manager ambiguity, name a build root, add generated exclusions, and add credential-free target classifications. It is not required or automatically committed. Credentials and secret-shaped keys are rejected.
 

@@ -340,7 +340,7 @@ def render_agents(
                 + instructions
             )
             filename = f"{native}.md"
-        else:
+        elif product == "cursor":
             cursor_model = models[tier]
             if cursor_model != "inherit" and "[" not in cursor_model:
                 cursor_model = f"{cursor_model}[effort={reasoning}]"
@@ -357,6 +357,48 @@ def render_agents(
                 f"{instructions}"
             )
             filename = f"{native}.md"
+        elif product == "vscode":
+            frontmatter = [
+                "---",
+                f"name: {native}",
+                f"description: {json.dumps(description, ensure_ascii=False)}",
+            ]
+            if fields["capability"] == "read-only":
+                # These documented VS Code tool names omit edit and terminal-write
+                # surfaces. The role body remains the portable source of truth.
+                frontmatter.append("tools: ['search/codebase', 'search/usages', 'read/terminalLastCommand']")
+            frontmatter.append("---")
+            text = one_newline(
+                "\n".join(frontmatter)
+                + f"\n\n<!-- GENERATED — DO NOT EDIT\nCanonical sources: {source}, {model_source}\n"
+                "Model is intentionally omitted so the active model picker remains authoritative.\n-->\n\n"
+                + instructions
+            )
+            filename = f"{native}.agent.md"
+        elif product == "visualstudio":
+            # Tool names vary by Visual Studio release. Omit them rather than
+            # claim a portable restriction that the IDE might ignore.
+            text = one_newline(
+                "---\n"
+                f"name: {native}\n"
+                f"description: {json.dumps(description, ensure_ascii=False)}\n"
+                "---\n\n"
+                f"<!-- GENERATED — DO NOT EDIT\nCanonical sources: {source}, {model_source}\n"
+                "Model and tools are intentionally omitted: the Visual Studio model picker and available tools remain authoritative.\n-->\n\n"
+                + instructions
+            )
+            filename = f"{native}.agent.md"
+        else:  # jetbrains Copilot manual bundle, currently Preview.
+            text = one_newline(
+                "---\n"
+                f"name: {native}\n"
+                f"description: {json.dumps(description, ensure_ascii=False)}\n"
+                "---\n\n"
+                f"<!-- GENERATED — DO NOT EDIT\nCanonical sources: {source}, {model_source}\n"
+                "JetBrains Copilot custom-agent activation is Preview and manual. Model selection is intentionally inherited.\n-->\n\n"
+                + instructions
+            )
+            filename = f"{native}.agent.md"
         data = text.encode("utf-8")
         if len(data) > config["task_data"]["agent_output_limit_bytes"]:
             raise GuardrailsError(f"generated routing agent exceeds configured limit: {product}/{filename}")

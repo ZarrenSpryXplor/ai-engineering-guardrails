@@ -14,7 +14,15 @@ pipx install .
 ai-guardrails install --dry-run
 ```
 
-Install for locally detected Codex, Claude Code, and Cursor products:
+After reviewing a specific tag or full commit, a direct VCS install is also available:
+
+```sh
+pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git@<reviewed-tag-or-full-commit>'
+```
+
+This repository does not publish a package as part of its normal workflow.
+
+Install for locally detected Codex, Claude Code, Cursor, VS Code Copilot, Visual Studio Copilot, and JetBrains IDE evidence:
 
 ```sh
 ai-guardrails install
@@ -30,6 +38,22 @@ ai-guardrails print-cursor-rules
 ```
 
 Open **Cursor Settings / Customize / Rules / User Rules**, paste the complete output, and save it. The command prints the rules; it does not install them.
+
+## VS Code, Visual Studio, and JetBrains
+
+VS Code Copilot gets a native user instruction file and a **Preview** `PreToolUse` hook when no project-managed Claude-compatible hook already covers it. Hooks can be disabled by an organisation and do not cover inline suggestions.
+
+Visual Studio gets `~/copilot-instructions.md` (the documented `%USERPROFILE%\copilot-instructions.md` on Windows). Skills require Visual Studio 18.5+; custom agents require 18.4+ and are user-selectable roles. Hooks and subagents are unsupported, so native approvals remain in charge.
+
+JetBrains intentionally needs a couple of manual confirmations:
+
+```sh
+ai-guardrails jetbrains print-chat-instructions
+ai-guardrails jetbrains export-project-rules --repo . --dry-run
+ai-guardrails jetbrains export-project-rules --repo .
+```
+
+Paste the first command's output in **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions**. After exporting, open **Settings > Tools > AI Assistant > Rules** and confirm the rule is **Always**. Register `~/.agents/skills` under **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**. The installer does not change JetBrains operation modes, approvals, MCP settings, or plugins. Copilot custom agents in JetBrains are Preview/manual, and no JetBrains hook is installed.
 
 ## Day-to-day use
 
@@ -108,9 +132,10 @@ ai-guardrails status
 ```sh
 ai-guardrails uninstall --dry-run
 ai-guardrails uninstall
+pipx uninstall ai-engineering-guardrails
 ```
 
-Uninstall removes only recorded managed content. User-modified managed files are retained unless `--force` is explicit.
+The first command removes only recorded managed product content; the last removes the pipx application. User-modified managed files are retained unless `--force` is explicit.
 
 ## Troubleshoot
 

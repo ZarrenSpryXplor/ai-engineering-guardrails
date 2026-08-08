@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "product": "visualstudio",
+  "tiers": {
+    "economy": {"model": "inherit", "availability": "unverified"},
+    "balanced": {"model": "inherit", "availability": "unverified"},
+    "deep": {"model": "inherit", "availability": "unverified"}
+  },
+  "reasoning_field": "inherit",
+  "main_session_unchanged": true,
+  "documentation": "https://learn.microsoft.com/en-us/visualstudio/ide/copilot-specialized-agents"
+}

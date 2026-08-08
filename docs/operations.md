@@ -30,6 +30,14 @@ The installer creates `~/.ai-guardrails/runtime/<content-digest>/` before regist
 
 `update` preserves each product's selected packs, routing profile, model overrides, safety profile, and trust mode. It creates a new immutable runtime first and never silently changes the main model, approval policy, sandbox, network access, or permissions. Old unreferenced runtime versions are pruned only after safe path validation; a small retained history supports recovery.
 
+## IDE-specific operational notes
+
+VS Code installs `~/.copilot/instructions/workstation-guardrails.instructions.md` and, unless a project-managed Claude hook already covers VS Code, `~/.copilot/hooks/workstation-guardrails.json`. The hook is Preview: status reports configuration as installed but activation as unverified and notes that an organisation may disable it. If Claude and VS Code are both managed, state records one `shared-claude` hook registration. Removing Claude first restores the native VS Code hook before the shared registration is removed.
+
+Visual Studio receives a managed block in `~/copilot-instructions.md` only on real Windows CLI installation. Its shared skills and optional agents are ordinary managed files, but custom agents are user-selectable roles and version-dependent (18.4+); skills require 18.5+. There is no Visual Studio hook or subagent installation.
+
+JetBrains installation records, rather than fabricates, the manual native Chat Instructions and Skill Directory steps. Use `ai-guardrails jetbrains print-chat-instructions` to print or explicitly copy text, and `ai-guardrails jetbrains export-project-rules --repo .` to write a project-local `.aiassistant/rules/workstation-guardrails.md`. The export is never part of global installation, refuses `.noai`, supports dry-run and force-with-backup, and does not touch `.idea`. No JetBrains hook, MCP configuration, approval mode, or plugin setting is changed.
+
 ## Status, effective policy, explanation, and diff
 
 ```sh
@@ -41,7 +49,7 @@ ai-guardrails simulate --tool mcp__spacelift__query \
   --tool-arguments '{"query":"query { stacks { id } }"}' --pack spacelift --format json
 ```
 
-Status distinguishes missing, installed, modified, stale, collision, unavailable product, unverified model availability, and manual Cursor work. `effective` reports each installed policy digest, command/classification/structured-rule counts, rollout-mode counts, packs, and profiles without printing user configuration. Doctor is read-only and checks Python, source/build validity, state, runtime hashes, hook registration, duplicate managed content, target mappings, optional validators, and effective Codex instructions. Explain and simulate use the actual evaluator with waiver consumption disabled and never execute a request.
+Status distinguishes missing, installed, modified, stale, collision, unavailable product, unverified model availability, and manual Cursor work. `effective` reports each installed policy digest, command/classification/structured-rule counts, rollout-mode counts, packs, and profiles without printing user configuration. Doctor is read-only and checks Python, source/build validity, state, runtime hashes, hook registration, duplicate managed content, target mappings, optional validators, effective Codex instructions, and the count of locally declared MCP servers/observed tool names when a trusted-component registry exists. Explain and simulate use the actual evaluator with waiver consumption disabled and never execute a request.
 
 The status credential check inspects only presence and names of known environment variables or credential files. It never opens or prints credential values. “Detected” means a production-capable credential might be available, not that validity or scope was verified.
 
@@ -83,4 +91,26 @@ ai-guardrails scan --repo . --format sarif --output guardrails.sarif
 ai-guardrails scan --repo . --format junit --output guardrails.xml
 ```
 
-An optional `.ai-guardrails-verification.json` may provide a non-sensitive `verification_outcomes` list to a local/CI scan. It must contain no prompts, source, full commands, raw logs, environment data, or secrets. Static scan cannot infer external review or semantic validation and explicitly reports that limitation.
+An optional `.ai-guardrails-verification.json` may provide non-sensitive named outcomes to a local/CI scan. For a high-risk change, use the canonical requirement identifier and report every named review and verification category; status is `passed` or `not-applicable` (only where genuinely inapplicable). For example:
+
+```json
+{
+  "verification_outcomes": [
+    {
+      "requirement_id": "high-risk-change",
+      "reviews": {
+        "independent correctness review": "passed",
+        "security and compatibility review": "passed"
+      },
+      "verification": {
+        "affected narrow tests": "passed",
+        "repository static checks": "passed",
+        "applicable native semantic validator": "not-applicable",
+        "final diff review": "passed"
+      }
+    }
+  ]
+}
+```
+
+The file must contain no prompts, source, full commands, raw logs, environment data, or secrets. Static scan cannot infer or prove external review or semantic validation; it only checks that declared categories match the canonical requirement and explicitly reports that limitation.

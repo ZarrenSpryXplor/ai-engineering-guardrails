@@ -28,6 +28,10 @@ Lifecycle mapping is workstation-local configuration. `dev`, `tst`, `int`, and `
 
 Codex `.rules` entries apply to commands requested outside its sandbox and are an experimental defence-in-depth layer. They do not replace the shared hook and must not be described as a complete workstation security boundary. Cursor CLI permission tokens apply to the CLI configuration, not every Cursor IDE execution path. Cursor User Rules apply only to documented Agent Chat scope.
 
+VS Code hook configuration is not proof that an organisation enables hooks or that a request passed through the hook. VS Code hooks are Preview and run with the permissions of the VS Code process. VS Code instructions do not govern inline completions. Visual Studio has no hook supplied by this project, so its behavioural instructions and native tool approvals are not deterministic command enforcement.
+
+JetBrains AI Assistant native Chat, hosted coding agents, and the GitHub Copilot plugin have different instruction, skill, approval, and ignore-file behaviour. This project has no JetBrains hook. An integrated or third-party agent may not respect JetBrains `.aiignore`; enabling MCP tool exposure or a brave/automatic operation mode can create paths outside this installer's assumptions. Native JetBrains modes, approvals, MCP settings, and plugin configuration remain user or administrator controls. OS least privilege, branch protection, cloud IAM, platform RBAC, and production change controls remain authoritative.
+
 ## Out of scope
 
 The policy engine is not a replacement for least privilege, sandboxing, source-control protection, code review, protected branches, cloud IAM, secret management, network controls, database permissions, release approvals, or production change controls. It is not malware protection, a data-loss-prevention system, a complete shell parser, or central enterprise policy enforcement.

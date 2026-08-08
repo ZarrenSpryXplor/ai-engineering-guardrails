@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "classifications": [
-    {"id": "guardrail-governance", "risk_class": "high", "patterns": ["AGENTS.md", "CLAUDE.md", ".cursor/**", ".codex/**", ".claude/**", ".ai-guardrails.json", "policy/**", "enforcement/**", "trust/**", "waivers/**"]},
+    {"id": "guardrail-governance", "risk_class": "high", "patterns": ["AGENTS.md", "CLAUDE.md", ".cursor/**", ".codex/**", ".claude/**", ".ai-guardrails.json", "policy/**", "enforcement/**", "trust/**", "waivers/**", "ai_engineering_guardrails/**"]},
     {"id": "ci-cd", "risk_class": "high", "patterns": [".github/workflows/**", "azure-pipelines*.yml", "azure-pipelines*.yaml", ".azure-pipelines/**", "CODEOWNERS"]},
     {"id": "security-and-identity", "risk_class": "high", "patterns": ["**/auth/**", "**/authorization/**", "**/crypto/**", "**/*certificate*", "**/*private-key*"]},
     {"id": "secrets-and-pki", "risk_class": "high", "patterns": ["**/secrets/**", "**/pki/**", "**/*.pfx", "**/*.p12", "**/*.jks", "**/*keystore*"]},

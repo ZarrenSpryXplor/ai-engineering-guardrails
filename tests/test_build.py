@@ -104,6 +104,14 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(GuardrailsError, "exceeds"):
             build.build_artifacts(("codex",), manifest_path=manifest_path)
 
+    def test_always_loaded_policy_budget_fails_before_product_limit(self) -> None:
+        temporary, manifest_path, manifest = self._temporary_manifest()
+        self.addCleanup(temporary.cleanup)
+        manifest["always_loaded_budget_bytes"] = 10
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(GuardrailsError, "always-loaded budget"):
+            build.build_artifacts(("codex",), manifest_path=manifest_path)
+
     def test_unknown_requested_product_fails(self) -> None:
         with self.assertRaisesRegex(GuardrailsError, "unknown product"):
             build.build_artifacts(("unknown",))
@@ -154,6 +162,10 @@ class SkillTests(unittest.TestCase):
             text = skill.read_text(encoding="utf-8")
             self.assertNotIn(str(Path.home()), text)
             self.assertNotIn(str(ROOT), text)
+
+    def test_code_review_skill_requires_a_material_simplicity_review(self) -> None:
+        text = (policy.SKILLS_ROOT / "workstation-code-review/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("three concrete consumers", text)
 
 
 if __name__ == "__main__":

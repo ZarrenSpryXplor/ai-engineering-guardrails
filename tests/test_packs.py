@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_engineering_guardrails import install as installer, packs
+from ai_engineering_guardrails import cli, install as installer, packs
 from ai_engineering_guardrails.resources import RESOURCE_ROOT
 from ai_engineering_guardrails.util import ROOT, GuardrailsError
 
@@ -161,6 +161,15 @@ class PackDetectionTests(unittest.TestCase):
         self.assertEqual("./mvnw", packs.select_java_tool(FIXTURES / "maven-single"))
         self.assertEqual("./gradlew", packs.select_java_tool(FIXTURES / "gradle"))
 
+    def test_explain_reports_on_demand_pack_policy_verification_and_routing(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(0, cli.main(["packs", "explain", "--repo", str(FIXTURES / "maven-single")]))
+        text = output.getvalue()
+        self.assertIn("java: on-demand policy: policy.md: Java capability policy", text)
+        self.assertIn("java: verification: java-targeted-test (test; affected-module-first)", text)
+        self.assertIn("java: routing hints: java-implementation -> balanced/medium (write)", text)
+
 
 class PackValidationTests(unittest.TestCase):
     def test_all_packs_validate(self) -> None:
@@ -177,6 +186,25 @@ class PackValidationTests(unittest.TestCase):
             (destination / "pack.json").write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(GuardrailsError, "missing field"):
                 packs.load_pack(destination / "pack.json")
+
+    def test_invalid_pack_verification_and_routing_data_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            packs_root = Path(temporary) / "packs"
+            shutil.copytree(RESOURCE_ROOT / "packs", packs_root)
+            destination = packs_root / "languages/java"
+            verification = json.loads((destination / "verification.json").read_text(encoding="utf-8"))
+            verification["checks"][0]["commands"] = []
+            (destination / "verification.json").write_text(json.dumps(verification), encoding="utf-8")
+            with self.assertRaisesRegex(GuardrailsError, "verification commands"):
+                packs.validate_packs(packs_root)
+
+            verification["checks"][0]["commands"] = ["synthetic check"]
+            (destination / "verification.json").write_text(json.dumps(verification), encoding="utf-8")
+            routing_data = json.loads((destination / "routing.json").read_text(encoding="utf-8"))
+            routing_data["task_classes"][0]["tier"] = "unbounded"
+            (destination / "routing.json").write_text(json.dumps(routing_data), encoding="utf-8")
+            with self.assertRaisesRegex(GuardrailsError, "routing task metadata"):
+                packs.validate_packs(packs_root)
 
     def test_pack_skill_frontmatter_is_portable_and_unique(self) -> None:
         names: set[str] = set()

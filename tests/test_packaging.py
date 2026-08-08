@@ -28,6 +28,23 @@ def _tree_hashes(root: Path) -> dict[str, str]:
     }
 
 
+def _package_build_available() -> bool:
+    """Avoid treating an unrelated module named ``build`` as PyPA build."""
+    if importlib.util.find_spec("build") is None or importlib.util.find_spec("wheel") is None:
+        return False
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "build", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
 class PackagingTests(unittest.TestCase):
     def test_declarative_metadata_and_resource_tree(self) -> None:
         data = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -43,10 +60,12 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue((RESOURCE_ROOT / "packs").is_dir())
         self.assertFalse((REPOSITORY_ROOT / "guardrails").exists())
 
-    @unittest.skipUnless(
-        importlib.util.find_spec("build") is not None and importlib.util.find_spec("wheel") is not None,
-        "package build and wheel modules are not installed",
-    )
+    def test_packaged_readme_uses_absolute_documentation_links(self) -> None:
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("](docs/", readme)
+        self.assertIn("assets/ai_comic_screen_only_corrected.png", (REPOSITORY_ROOT / "MANIFEST.in").read_text(encoding="utf-8"))
+
+    @unittest.skipUnless(_package_build_available(), "PyPA build and wheel are not installed")
     def test_wheel_and_sdist_work_outside_source_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             temporary_root = Path(temporary)
@@ -67,13 +86,24 @@ class PackagingTests(unittest.TestCase):
             )
             wheel = next(output.glob("*.whl"))
             sdist = next(output.glob("*.tar.gz"))
+            expected_resources = _tree_hashes(RESOURCE_ROOT)
             with zipfile.ZipFile(wheel) as archive:
                 names = set(archive.namelist())
                 self.assertIn("ai_engineering_guardrails/__init__.py", names)
                 self.assertIn("ai_engineering_guardrails/_resources/policy/manifest.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/enforcement/command-policy.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/packs/languages/python/pack.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/vscode.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/visualstudio.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/jetbrains.json", names)
                 self.assertFalse(any(name.startswith("guardrails/") for name in names))
+                resource_prefix = "ai_engineering_guardrails/_resources/"
+                wheel_resources = {
+                    name.removeprefix(resource_prefix): hashlib.sha256(archive.read(name)).hexdigest()
+                    for name in names
+                    if name.startswith(resource_prefix) and not name.endswith("/")
+                }
+                self.assertEqual(expected_resources, wheel_resources)
                 entry_point_path = next(name for name in names if name.endswith(".dist-info/entry_points.txt"))
                 entry_points = archive.read(entry_point_path).decode("utf-8")
                 self.assertIn("ai-guardrails = ai_engineering_guardrails.cli:main", entry_points)
@@ -83,6 +113,15 @@ class PackagingTests(unittest.TestCase):
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
                 self.assertFalse(any("/guardrails/" in name for name in names))
+                self.assertFalse(any("/.idea/" in name or "/release/" in name for name in names))
+                resource_marker = "/ai_engineering_guardrails/_resources/"
+                sdist_resources = {
+                    name.split(resource_marker, 1)[1]: hashlib.sha256(archive.extractfile(name).read()).hexdigest()
+                    for name in names
+                    if resource_marker in name and archive.getmember(name).isfile()
+                }
+                self.assertEqual(expected_resources, sdist_resources)
+                self.assertTrue(any(name.endswith("assets/ai_comic_screen_only_corrected.png") for name in names))
 
             environment_root = temporary_root / "venv"
             venv.EnvBuilder(with_pip=True).create(environment_root)
@@ -124,11 +163,21 @@ class PackagingTests(unittest.TestCase):
                 [str(interpreter), "-c", "import guardrails"], cwd=outside, env=environment, capture_output=True, text=True
             )
             self.assertNotEqual(0, old_import.returncode)
+            module_version = subprocess.run(
+                [str(interpreter), "-m", "ai_engineering_guardrails", "--version"],
+                cwd=outside,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(f"ai-engineering-guardrails {__version__}", module_version)
             for arguments in (
                 ["--help"],
                 ["--version"],
                 ["validate"],
                 ["install", "--product", "codex", "--home", str(home), "--dry-run"],
+                ["install", "--product", "vscode", "--home", str(home), "--dry-run"],
                 ["install", "--product", "codex", "--home", str(home)],
                 ["status", "--product", "codex", "--home", str(home)],
                 ["update", "--product", "codex", "--home", str(home), "--dry-run"],
@@ -137,6 +186,7 @@ class PackagingTests(unittest.TestCase):
                 ["uninstall", "--product", "codex", "--home", str(home)],
                 ["packs", "list"],
                 ["routing", "validate"],
+                ["jetbrains", "print-chat-instructions"],
                 ["explain", "--command", "git reset --hard"],
             ):
                 subprocess.run([str(command), *arguments], cwd=outside, env=environment, check=True, capture_output=True, text=True)

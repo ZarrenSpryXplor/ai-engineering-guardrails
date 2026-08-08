@@ -455,25 +455,86 @@ def _changed_risk_matches(repo: Path) -> list[tuple[Path, str, str]]:
     return matches
 
 
+def _risk_verification_requirements() -> dict[str, Mapping[str, Any]]:
+    """Load the small, canonical risk-to-evidence mapping for static scan."""
+    data = read_json(RESOURCE_ROOT / "risk/verification-requirements.json", default={})
+    requirements = data.get("requirements") if isinstance(data, Mapping) else []
+    result: dict[str, Mapping[str, Any]] = {}
+    if not isinstance(requirements, list):
+        return result
+    for requirement in requirements:
+        if not isinstance(requirement, Mapping):
+            continue
+        risk_class = requirement.get("risk_class")
+        identifier = requirement.get("id")
+        if isinstance(risk_class, str) and isinstance(identifier, str) and risk_class not in result:
+            result[risk_class] = requirement
+    return result
+
+
+def _outcome_gaps(values: Any, expected: Any, category: str, requirement_id: str) -> list[str]:
+    if not isinstance(values, Mapping) or not isinstance(expected, list):
+        return [f"{requirement_id}: {category} metadata"]
+    gaps: list[str] = []
+    for name in expected:
+        if not isinstance(name, str):
+            continue
+        if values.get(name) not in {"passed", "not-applicable"}:
+            gaps.append(f"{requirement_id}: {category} {name}")
+    return gaps
+
+
+def _verification_evidence_gaps(evidence: Any, risk_classes: set[str]) -> list[str]:
+    """Return missing declared evidence categories without echoing user input."""
+    outcomes = evidence.get("verification_outcomes") if isinstance(evidence, Mapping) else None
+    entries: dict[str, Mapping[str, Any]] = {}
+    if isinstance(outcomes, list):
+        for outcome in outcomes:
+            if isinstance(outcome, Mapping) and isinstance(outcome.get("requirement_id"), str):
+                entries.setdefault(outcome["requirement_id"], outcome)
+
+    requirements = _risk_verification_requirements()
+    gaps: list[str] = []
+    for risk_class in sorted(risk_classes):
+        requirement = requirements.get(risk_class)
+        if requirement is None:
+            gaps.append(f"{risk_class}: no canonical verification requirement")
+            continue
+        identifier = str(requirement["id"])
+        outcome = entries.get(identifier)
+        if outcome is None:
+            gaps.append(f"{identifier}: missing outcome")
+            continue
+        gaps.extend(_outcome_gaps(outcome.get("reviews"), requirement.get("required_reviews"), "review", identifier))
+        gaps.extend(
+            _outcome_gaps(
+                outcome.get("verification"), requirement.get("required_verification"), "verification",
+                identifier,
+            )
+        )
+    return gaps
+
+
 def _scan_changed_high_risk_paths(repo: Path) -> list[Finding]:
-    matched_paths: dict[Path, str] = {}
+    matched_paths: dict[Path, tuple[str, str]] = {}
     for path, identifier, risk_class in _changed_risk_matches(repo):
         if risk_class == "high":
-            matched_paths.setdefault(path, identifier)
+            matched_paths.setdefault(path, (identifier, risk_class))
     matches = list(matched_paths.items())
     if not matches:
         return []
     evidence_path = repo / ".ai-guardrails-verification.json"
-    verified = False
+    evidence: Any = None
     if evidence_path.is_file():
         try:
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-            verified = isinstance(evidence, Mapping) and bool(evidence.get("verification_outcomes"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            verified = False
-    if verified:
+            evidence = None
+    gaps = _verification_evidence_gaps(evidence, {risk_class for _, (_, risk_class) in matches})
+    if not gaps:
         return []
-    path, classification = matches[0]
+    path, (classification, _) = matches[0]
+    detail = "; ".join(gaps[:3])
     return [
         _finding(
             "high-risk-change-verification-unavailable",
@@ -481,8 +542,8 @@ def _scan_changed_high_risk_paths(repo: Path) -> list[Finding]:
             repo,
             path,
             1,
-            f"{len(matches)} changed high-risk path(s) include class {classification}, but scan received no verification outcome metadata.",
-            "External CI, review, and session evidence may exist; static scan cannot infer it. A local verification file is optional and must contain no prompts, source, commands, or secrets.",
+            f"{len(matches)} changed high-risk path(s) include class {classification}, but declared verification evidence is incomplete: {detail}.",
+            "External CI and review evidence may exist; static scan only checks named outcome categories. A local verification file is optional and must contain no prompts, source, commands, or secrets.",
         )
     ]
 

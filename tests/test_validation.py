@@ -62,6 +62,23 @@ class ValidationTests(unittest.TestCase):
     def test_canonical_governance_data_validates(self) -> None:
         policy.validate_canonical_data()
 
+    def test_risk_verification_requirements_reject_duplicate_risk_classes(self) -> None:
+        requirements_path = RESOURCE_ROOT / "risk/verification-requirements.json"
+        original_read_json = policy.read_json
+        duplicate_data = original_read_json(requirements_path)
+        duplicate = dict(duplicate_data["requirements"][0])
+        duplicate["id"] = "another-high-risk-change"
+        duplicate_data["requirements"].append(duplicate)
+
+        def read_with_duplicate(path: Path, default: object = None) -> object:
+            if path == requirements_path:
+                return duplicate_data
+            return original_read_json(path, default=default)
+
+        with mock.patch("ai_engineering_guardrails.policy.read_json", side_effect=read_with_duplicate):
+            with self.assertRaisesRegex(GuardrailsError, "risk class"):
+                policy.validate_canonical_data()
+
     def test_high_risk_classification_covers_required_domains(self) -> None:
         data = json.loads((RESOURCE_ROOT / "risk/path-classification.json").read_text(encoding="utf-8"))
         identifiers = {entry["id"] for entry in data["classifications"]}

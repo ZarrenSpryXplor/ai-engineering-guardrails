@@ -128,6 +128,7 @@ def _run_consumer_install(
                 safety_profile=args.safety_profile,
                 trust_mode=args.trust_mode,
                 model_overrides=parse_model_overrides(args.model_override) or None,
+                explicit_product=args.product is not None,
             )
     if args.verbose:
         print(details.getvalue(), end="")
@@ -163,6 +164,12 @@ def _packs_detect(repo: Path, explain: bool) -> None:
             print(f"{evidence.pack_id}: {evidence.kind} {evidence.path} matched {evidence.detector}")
         for warning in result.warnings:
             print(f"warning: {warning}")
+        available = packs.load_packs()
+        for identifier in result.active_packs:
+            guidance = packs.pack_guidance(available[identifier])
+            print(f"{identifier}: on-demand policy: {'; '.join(guidance['policy'])}")
+            print(f"{identifier}: verification: {'; '.join(guidance['verification'])}")
+            print(f"{identifier}: routing hints: {'; '.join(guidance['routing'])}")
 
 
 def _installed_runtime(home: Path, product: str) -> tuple[Mapping[str, Any], Mapping[str, Any]] | None:
@@ -446,6 +453,16 @@ def create_parser() -> argparse.ArgumentParser:
     cursor_parser.add_argument("--clipboard", action="store_true")
     add_home(cursor_parser)
 
+    jetbrains_parser = sub.add_parser("jetbrains", help="print or explicitly export JetBrains guidance")
+    jetbrains_sub = jetbrains_parser.add_subparsers(dest="jetbrains_command", required=True)
+    chat_instructions = jetbrains_sub.add_parser("print-chat-instructions")
+    chat_instructions.add_argument("--clipboard", action="store_true")
+    add_home(chat_instructions)
+    project_rules = jetbrains_sub.add_parser("export-project-rules")
+    project_rules.add_argument("--repo", type=Path, required=True)
+    add_home(project_rules)
+    add_mutation_flags(project_rules)
+
     waiver_parser = sub.add_parser("waiver", help="manage local, expiring, human-confirmed waivers")
     waiver_sub = waiver_parser.add_subparsers(dest="waiver_command", required=True)
     waiver_create = waiver_sub.add_parser("create")
@@ -502,7 +519,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_root=output_root,
             )
         elif args.command == "install":
+            if args.product == "visualstudio" and sys.platform != "win32":
+                raise GuardrailsError(
+                    "Visual Studio installation is supported only on Windows; build and validation remain cross-platform"
+                )
             products, detected = _resolve_consumer_products(args.product, args.home, "install")
+            if args.product == "all" and sys.platform != "win32" and "visualstudio" in products:
+                products = tuple(product for product in products if product != "visualstudio")
+                print("Visual Studio was skipped: its user-level adapter is supported only on Windows")
             _run_consumer_install(args, products, detected, updating=False)
         elif args.command == "update":
             products, detected = _resolve_consumer_products(args.product, args.home, "update")
@@ -554,6 +578,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
         elif args.command == "print-cursor-rules":
             install.print_cursor_rules(clipboard=args.clipboard, home=args.home)
+        elif args.command == "jetbrains":
+            if args.jetbrains_command == "print-chat-instructions":
+                install.print_jetbrains_chat_instructions(clipboard=args.clipboard, home=args.home)
+            else:
+                install.export_jetbrains_project_rules(
+                    args.repo, dry_run=args.dry_run, force=args.force, home=args.home
+                )
         elif args.command == "waiver":
             if args.waiver_command == "create":
                 _waiver_create(args)

@@ -157,7 +157,7 @@ class LocalPolicyOverlayTests(unittest.TestCase):
         self.assertIn("local-block-demo", {rule["id"] for rule in effective["rules"]})
         data["additional_rules"] = [self.local_rule("git-reset-hard")]
         self.write_overlay(data)
-        with self.assertRaisesRegex(GuardrailsError, "local-\* prefix|collides"):
+        with self.assertRaisesRegex(GuardrailsError, r"local-\* prefix|collides"):
             policy.validate_local_overlay(self.home)
         bad = self.local_rule()
         bad["matching_strategy"] = {"type": "not-implemented"}

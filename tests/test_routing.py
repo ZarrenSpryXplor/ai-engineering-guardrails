@@ -33,8 +33,12 @@ class RoutingConfigurationTests(unittest.TestCase):
                         self.assertIn("developer_instructions", fields)
                     else:
                         fields = routing.frontmatter_fields(text, filename)
-                        self.assertEqual(Path(filename).stem, fields["name"])
-                        self.assertIn("model", fields)
+                        expected_name = Path(filename).name.removesuffix(".agent.md").removesuffix(".md")
+                        self.assertEqual(expected_name, fields["name"])
+                        if product in {"claude", "cursor"}:
+                            self.assertIn("model", fields)
+                        else:
+                            self.assertNotIn("model", fields)
 
     def test_official_default_tier_maps(self) -> None:
         config = routing.load_config()
@@ -47,6 +51,11 @@ class RoutingConfigurationTests(unittest.TestCase):
             routing.resolved_models("claude", config, None),
         )
         self.assertEqual({"economy":"inherit", "balanced":"inherit", "deep":"inherit"}, routing.resolved_models("cursor", config, None))
+        for product in ("vscode", "visualstudio", "jetbrains"):
+            self.assertEqual(
+                {"economy":"inherit", "balanced":"inherit", "deep":"inherit"},
+                routing.resolved_models(product, config, None),
+            )
 
     def test_profile_selection_and_product_specific_override(self) -> None:
         codex = routing.render_agents("codex", "quality")

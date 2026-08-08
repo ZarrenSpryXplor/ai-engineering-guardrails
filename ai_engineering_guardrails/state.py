@@ -31,7 +31,7 @@ from .util import (
 )
 
 
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 STATE_RELATIVE = Path(".ai-guardrails/state.json")
 BACKUPS_RELATIVE = Path(".ai-guardrails/backups")
 WAIVERS_RELATIVE = Path(".ai-guardrails/waivers")
@@ -63,9 +63,9 @@ def load_state(home: Path) -> dict[str, Any]:
     data = read_json(path, default=empty_state())
     if not isinstance(data, dict):
         raise GuardrailsError(f"invalid installation state in {path}")
-    if data.get("format_version") in {1, 2}:
+    if data.get("format_version") in {1, 2, 3}:
         # Read pre-packaging state for update/uninstall; the next successful write
-        # records the package and overlay identities in v3.
+        # records the package, overlay, and expanded product identities in v4.
         upgraded = empty_state()
         for key in upgraded:
             if key in data:

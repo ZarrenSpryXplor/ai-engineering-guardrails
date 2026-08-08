@@ -545,6 +545,19 @@ class DecisionTests(unittest.TestCase):
                 policy_data=self.policy,
                 metadata=metadata(),
             )
+            packaged_governance = enforcement.evaluate_request(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Edit",
+                    "tool_input": {
+                        "file_path": "ai_engineering_guardrails/_resources/policy/manifest.json",
+                        "new_string": "x",
+                    },
+                    "cwd": str(root),
+                },
+                policy_data=self.policy,
+                metadata=metadata(),
+            )
             managed = root / ".codex/hooks.json"
             relative_managed = enforcement.evaluate_request(
                 {
@@ -559,6 +572,7 @@ class DecisionTests(unittest.TestCase):
             self.assertEqual("deny", protected.decision)
             self.assertEqual("guardrail-modification", protected.operation_class)
             self.assertEqual("warn", governance.decision)
+            self.assertEqual("repository-governance-file-change", packaged_governance.rule_id)
             self.assertEqual("guardrail-self-protection", relative_managed.rule_id)
 
     def test_managed_directory_contents_are_protected_without_claiming_siblings(self) -> None:

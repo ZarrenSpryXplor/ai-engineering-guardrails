@@ -24,12 +24,12 @@ Escalate when evidence conflicts, ambiguity remains material, more than two viab
 
 ## Product maps and availability
 
-Current verified defaults are Codex Luna/Terra/Sol, Claude `haiku`/`sonnet`/`opus`, and Cursor `inherit`. Cursor explicit IDs depend on provider, plan, and organisation and may fall back. Model files are configuration, not proof of account entitlement. Status therefore says configured but availability unverified.
+Current verified defaults are Codex Luna/Terra/Sol, Claude `haiku`/`sonnet`/`opus`, and Cursor `inherit`. VS Code, Visual Studio, and JetBrains maps also use inherited selection: the installer omits `model` rather than guessing a plan-specific identifier. VS Code installs native custom agents only when routing is explicit. Visual Studio custom agents are user-selectable, version-dependent roles rather than automatic subagents. JetBrains emits a reviewable manual Copilot bundle because that surface is Preview. Cursor explicit IDs depend on provider, plan, and organisation and may fall back. Model files are configuration, not proof of account entitlement. Status therefore says configured but availability unverified.
 
 ```sh
-python tools/guardrails.py routing show --profile balanced --product all
-python tools/guardrails.py routing validate
-python tools/guardrails.py routing set balanced --product cursor \
+ai-guardrails routing show --profile balanced --product all
+ai-guardrails routing validate
+ai-guardrails routing set balanced --product cursor \
   --model-override cursor:economy=provider/model-id --dry-run
 ```
 
@@ -44,6 +44,12 @@ Native roles search before large reads, use targeted ranges, avoid rereading unc
 The content-free metrics schema can represent product, model, task class, tier, reasoning, subagent count, available token counts, duration, retries, escalations, and outcome. It excludes prompts, code, commands, arguments, and tool output. This repository installs no collector and uploads no telemetry.
 
 API-token billing, included subscription usage, product credits, third-party model pools, and list-price estimates are different accounting systems. Lower latency is not the same as lower cost, and extra subagent contexts can increase tokens. Use product-native usage information and compare representative completed tasks; do not promise exact monetary savings.
+
+## Evaluate before changing routing
+
+Treat a routing change as a small configuration experiment, not a model popularity contest. Start with 10–20 representative, bounded tasks and compare the same tasks against the current profile. Record only outcome, unnecessary files or dependencies, diff size, verification result, retries, duration, and product-native token data when it is available. Include at least one task where the correct answer is to make no code change and one that can expose unnecessary abstraction.
+
+Keep the comparison local or use product-native reporting. Do not upload prompts, source, commands, or logs; do not add a telemetry collector or an LLM evaluation framework. A configuration should remain unchanged unless it produces reliable task outcomes with no material increase in unnecessary edits or verification failures.
 
 - [Codex pricing and plans](https://developers.openai.com/codex/pricing)
 - [Claude Code costs and `/usage`](https://code.claude.com/docs/en/costs)
