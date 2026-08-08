@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "secrets-value-retrieval",
+      "description": "Block high-confidence secret-value retrieval through common clients.",
+      "risk_category": "secret_exposure",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "reason": "Secret values, access tokens, and credential-bearing configurations must not enter agent context.",
+      "matching_strategy": {"type": "command_regex", "executables": ["az", "kubectl", "ksm", "keeper"], "patterns_by_executable": {"az": "^(?:keyvault\\s+secret\\s+(?:show|download)|account\\s+get-access-token)(?:\\s|$)", "kubectl": "^(?:config\\s+view\\b[^;|]*--raw\\b|(?:get|describe)\\s+(?:secret|secrets)\\b[^;|]*(?:-o|--output)(?:=|\\s+)(?:json|yaml|jsonpath|go-template))", "ksm": "^secret\\s+get(?:\\s|$)", "keeper": "^secret\\s+get(?:\\s|$)"}},
+      "must_match": ["az keyvault secret show --vault-name example --name synthetic", "az account get-access-token", "kubectl config view --raw", "kubectl get secret example -o yaml", "ksm secret get synthetic-record"],
+      "must_not_match": ["az keyvault secret list --vault-name example", "kubectl get secrets", "kubectl get secret example -o name", "openssl x509 -in certificate.pem -noout -dates", "echo 'ksm secret get example'"]
+    },
+    {
+      "id": "pki-private-material-export",
+      "description": "Block commands that print or export private key and decrypted keystore material.",
+      "risk_category": "private_key_exposure",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "reason": "Private keys and decrypted keystore contents must not be exported or printed to agent-visible output.",
+      "matching_strategy": {"type": "command_regex", "executables": ["openssl", "keytool"], "patterns_by_executable": {"openssl": "^(?:pkey|rsa|ec)\\b[^;|]*(?:-text\\b|-[^;|]*out\\s+-)|^pkcs12\\b[^;|]*(?:-nodes\\b|-nocerts\\b)", "keytool": "^-importkeystore\\b[^;|]*-deststoretype\\s+PKCS12\\b[^;|]*(?:-srcstorepass|-deststorepass)"}},
+      "must_match": ["openssl pkey -in synthetic-private.pem -text -noout", "openssl rsa -in synthetic-private.pem -out -", "openssl pkcs12 -in synthetic.pfx -nodes", "keytool -importkeystore -srckeystore synthetic.jks -destkeystore export.p12 -deststoretype PKCS12 -srcstorepass synthetic -deststorepass synthetic"],
+      "must_not_match": ["openssl x509 -in certificate.pem -noout -subject -issuer -dates -fingerprint", "openssl verify certificate.pem", "keytool -list -keystore synthetic.jks", "openssl pkey -help", "grep -R 'openssl pkcs12 -nodes' docs"]
+    }
+  ],
+  "classifications": [
+    {"id": "pki-metadata-observe", "operation_class": "observe", "matching_strategy": {"type": "command_regex", "executables": ["openssl", "keytool"], "patterns_by_executable": {"openssl": "^x509\\b[^;|]*-noout\\b[^;|]*(?:-subject|-issuer|-dates|-fingerprint|-serial)", "keytool": "^-list(?:\\s|$)"}}}
+  ]
+}

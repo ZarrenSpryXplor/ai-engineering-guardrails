@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"spacelift-read-analysis","tier":"balanced","reasoning":"medium","write":false},{"id":"spacelift-policy-design","tier":"deep","reasoning":"high","write":true}],"escalate_on":["GraphQL mutation","MCP write tool","run confirmation","credential access"]}

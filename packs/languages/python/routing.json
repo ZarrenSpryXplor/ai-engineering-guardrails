@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"python-implementation","tier":"balanced","reasoning":"medium","write":true},{"id":"python-security-change","tier":"deep","reasoning":"high","write":false}],"escalate_on":["public API change","authentication","native extension or concurrency"]}

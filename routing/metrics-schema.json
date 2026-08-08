@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:workstation-ai-guardrails:efficiency-metric:v1",
+  "title": "Content-free execution-efficiency metric",
+  "description": "Optional local measurements. Prompts, source, commands, arguments, output, credentials, and secret values are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "product",
+    "model",
+    "task_class",
+    "tier",
+    "reasoning_level",
+    "subagent_count",
+    "wall_clock_duration_ms",
+    "retries",
+    "escalation_count",
+    "completion_outcome"
+  ],
+  "properties": {
+    "product": {"enum": ["codex", "claude", "cursor"]},
+    "model": {"type": ["string", "null"]},
+    "task_class": {"type": "string", "minLength": 1},
+    "tier": {"enum": ["economy", "balanced", "deep"]},
+    "reasoning_level": {"enum": ["low", "medium", "high"]},
+    "subagent_count": {"type": "integer", "minimum": 0},
+    "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "cached_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "output_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "wall_clock_duration_ms": {"type": "integer", "minimum": 0},
+    "retries": {"type": "integer", "minimum": 0},
+    "escalation_count": {"type": "integer", "minimum": 0},
+    "completion_outcome": {"enum": ["completed", "partial", "failed", "cancelled", "escalated"]}
+  }
+}

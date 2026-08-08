@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "structured-secret-value-read",
+      "provider_patterns": ["*keyvault*", "*keeper*", "*secrets*", "kubernetes", "*pki*"],
+      "tool_patterns": ["get_secret", "get_secret_value", "read_secret_value", "export_secret", "export_private_key", "download_certificate_with_key", "getSecret", "getSecretValue", "readSecretValue", "exportSecret", "exportPrivateKey", "downloadCertificateWithKey"],
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "target_fields": ["vault", "secret_name", "name", "namespace", "certificate"],
+      "never_log_fields": ["value", "secret", "token", "password", "private_key", "pfx", "keystore_password", "kubeconfig", "content"],
+      "reason": "Structured secret-value and private-material reads must not enter agent context.",
+      "positive_fixtures": [{"tool_name":"mcp__keyvault__get_secret_value","tool_input":{"vault":"example","secret_name":"synthetic"}},{"tool_name":"mcp__pki__export_private_key","tool_input":{"certificate":"example"}}],
+      "negative_fixtures": [{"tool_name":"mcp__keyvault__list_secret_metadata","tool_input":{"vault":"example"}},{"tool_name":"mcp__pki__get_certificate_expiry","tool_input":{"certificate":"example"}}]
+    }
+  ]
+}

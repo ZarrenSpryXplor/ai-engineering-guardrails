@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "product": "unknown",
+  "policy_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "safety_profile": "infrastructure-observe",
+  "trust_mode": "trusted-workspace",
+  "home_directory": null,
+  "audit_directory": null,
+  "waiver_directory": null,
+  "targets_path": null,
+  "state_path": null,
+  "managed_paths": []
+}

@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"java-implementation","tier":"balanced","reasoning":"medium","write":true},{"id":"java-toolchain-change","tier":"deep","reasoning":"high","write":false}],"escalate_on":["wrapper change","public API change","security-sensitive framework configuration"]}

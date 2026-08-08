@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"package-local-build","class":"validate","selection":"release-candidate","commands":["<repository-pack-command>"]},{"id":"package-contents","class":"validate","selection":"local-artifact","commands":["<repository-inspect-command>"]}],"publication_forbidden":true}

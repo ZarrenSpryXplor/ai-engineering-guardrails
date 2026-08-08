@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"dependency-change","tier":"balanced","reasoning":"medium","write":true},{"id":"dependency-risk-review","tier":"deep","reasoning":"high","write":false}],"escalate_on":["manager migration","major upgrade","security exception"]}

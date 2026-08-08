@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "recommended": ["development", "infrastructure-observe"],
+  "profiles": {
+    "development": {
+      "allow": ["observe", "validate"],
+      "remote_mutation": "deny",
+      "production_mutation": "deny",
+      "package_publication": "deny",
+      "privilege_escalation": "deny",
+      "sensitive_read": "deny",
+      "description": "Local development plus read-only infrastructure access."
+    },
+    "infrastructure-observe": {
+      "allow": ["observe", "validate"],
+      "remote_mutation": "deny",
+      "production_mutation": "deny",
+      "package_publication": "deny",
+      "privilege_escalation": "deny",
+      "sensitive_read": "deny",
+      "description": "Observe and validate remote infrastructure without mutation."
+    },
+    "infrastructure-nonprod": {
+      "allow": ["observe", "validate", "mutate"],
+      "remote_mutation": "mapped-nonproduction-only",
+      "production_mutation": "deny",
+      "package_publication": "deny",
+      "privilege_escalation": "deny",
+      "sensitive_read": "deny",
+      "description": "Permit bounded mutation only for explicitly mapped dev, tst, or int targets."
+    },
+    "infrastructure-strict": {
+      "allow": ["observe", "validate"],
+      "remote_mutation": "deny",
+      "production_mutation": "deny",
+      "package_publication": "deny",
+      "privilege_escalation": "deny",
+      "sensitive_read": "deny",
+      "require_explicit_context": true,
+      "require_explicit_namespace": true,
+      "description": "Deny remote mutations and require explicit target identity for mutation attempts."
+    }
+  }
+}

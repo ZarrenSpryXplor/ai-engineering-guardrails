@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"redaction-fixtures","class":"test","selection":"fixture-only","commands":["python -m unittest tests.test_packs.StructuredToolTests"]}],"sensitive_values_forbidden":true}

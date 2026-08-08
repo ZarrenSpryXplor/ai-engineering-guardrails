@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "java-publication",
+      "description": "Block Maven deploy/release goals and Gradle publication or release tasks.",
+      "risk_category": "external_publication",
+      "operation_class": "publish",
+      "reason": "Java artifact publication is a human-controlled operation.",
+      "matching_strategy": {"type": "command_regex", "executables": ["mvn", "mvnw", "mvnw.cmd", "gradle", "gradlew", "gradlew.bat"], "pattern": "(?:^|\\s)(?:deploy|release(?::[^\\s]+)?|publish(?:ToMavenLocal)?|publishPlugins|artifactoryPublish|bintrayUpload)(?:\\s|$)"},
+      "must_match": ["./mvnw deploy", "mvn release:prepare", "./gradlew publish", "gradlew.bat artifactoryPublish"],
+      "must_not_match": ["./mvnw test", "mvn package", "./gradlew test", "./gradlew compileJava", "echo './mvnw deploy'"]
+    }
+  ]
+}

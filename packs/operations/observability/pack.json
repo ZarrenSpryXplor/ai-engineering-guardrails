@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "observability",
+  "type": "operations",
+  "description": "Read-oriented observability and incident evidence for metrics, logs, traces, dashboards, and alerts.",
+  "file_detectors": ["prometheus.yml", "prometheus.yaml", "prometheus.yaml.tmpl", "datadog.yaml", "otel-collector.yaml", "otel-collector.yml", "grafana.ini"],
+  "directory_detectors": ["grafana/provisioning", "dashboards", "observability", "monitoring", "alerts"],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/generated/**", "**/tests/fixtures/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-observability/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": ["structured-tool-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Vendor APIs and CLIs differ widely; native tool enforcement is limited to explicit high-confidence operations and structured-tool names."]
+}

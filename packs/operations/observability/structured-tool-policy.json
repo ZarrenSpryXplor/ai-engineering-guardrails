@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "observability-structured-control-mutation",
+      "provider_patterns": ["prometheus", "grafana", "loki", "datadog", "splunk", "elastic", "azure-monitor", "application-insights", "*observability*", "*otel*"],
+      "tool_patterns": ["create_alert", "update_alert", "delete_alert", "mute_alert", "silence_alert", "update_dashboard", "delete_dashboard", "delete_logs", "update_retention", "create_token", "rotate_token", "createAlert", "updateAlert", "deleteAlert", "muteAlert", "silenceAlert", "updateDashboard", "deleteDashboard", "deleteLogs", "updateRetention", "createToken", "rotateToken"],
+      "operation_class": "guardrail-modification",
+      "rollout_mode": "deny",
+      "target_fields": ["workspace", "project", "service", "dashboard", "alert", "environment"],
+      "never_log_fields": ["token", "authorization", "api_key", "secret", "query", "log", "logs", "result", "body", "headers"],
+      "reason": "Observability mutation, muting, deletion, retention, and token operations require external operational authority.",
+      "positive_fixtures": [{"tool_name":"mcp__grafana__mute_alert","tool_input":{"alert":"payments"}},{"tool_name":"mcp__datadog__delete_logs","tool_input":{"service":"payments"}},{"tool_name":"mcp__elastic__create_token","tool_input":{"name":"synthetic"}}],
+      "negative_fixtures": [{"tool_name":"mcp__grafana__get_dashboard","tool_input":{"dashboard":"payments"}},{"tool_name":"mcp__datadog__query_metrics","tool_input":{"service":"payments"}},{"tool_name":"mcp__elastic__search_logs","tool_input":{"service":"payments"}}]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "allow_fields": ["timestamp", "product", "session_id_hash", "event_type", "tool_category", "rule_id", "decision", "operation_class", "target_lifecycle", "request_digest", "waiver_id", "policy_digest"],
+  "deny_fields": ["prompt", "source_code", "command", "arguments", "environment", "secret", "token", "raw_log", "tool_output"],
+  "maximum_file_bytes": 1048576,
+  "retained_rotations": 3
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "sensitive-credential-output",
+      "description": "Block high-confidence commands that print credential-bearing configuration or tokens.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "reason": "Credential-bearing configuration and tokens must not be printed to an agent.",
+      "matching_strategy": {"type": "command_regex", "executables": ["kubectl", "spacectl"], "pattern": "(?:config\\s+view\\b[^;|]*--raw|profile\\s+export-token(?:\\s|$))"},
+      "must_match": ["kubectl config view --raw", "spacectl profile export-token"],
+      "must_not_match": ["kubectl config current-context", "spacectl profile current", "spacectl whoami", "echo 'spacectl profile export-token'"]
+    }
+  ]
+}

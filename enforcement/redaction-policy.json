@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "description": "Fields and value classes that must never enter hook diagnostics, audit events, state, or receipts.",
+  "never_log_field_patterns": [
+    "*password*",
+    "*passwd*",
+    "*secret*",
+    "*token*",
+    "*credential*",
+    "*private_key*",
+    "*api_key*",
+    "authorization",
+    "cookie",
+    "command",
+    "arguments",
+    "prompt",
+    "source_code",
+    "tool_output"
+  ],
+  "audit_value_fields": [
+    "timestamp",
+    "product",
+    "session_id_hash",
+    "event_type",
+    "tool_category",
+    "rule_id",
+    "decision",
+    "operation_class",
+    "target_lifecycle",
+    "request_digest",
+    "waiver_id",
+    "policy_digest"
+  ],
+  "maximum_file_bytes": 1048576,
+  "retained_rotations": 3
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "source-control-cicd",
+  "type": "delivery",
+  "description": "GitHub and Azure DevOps source-control and CI/CD workflows with human-controlled approval, merge, deployment, and release boundaries.",
+  "file_detectors": ["azure-pipelines.yml", "azure-pipelines.yaml", "CODEOWNERS", "action.yml", "action.yaml"],
+  "directory_detectors": [".github/workflows", ".azure-pipelines", ".github/actions"],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/generated/**"],
+  "dependent_packs": ["package-publication", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-source-control-cicd/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": ["structured-tool-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Workflow YAML is scanned conservatively as text; native GitHub and Azure validators remain authoritative when available."]
+}

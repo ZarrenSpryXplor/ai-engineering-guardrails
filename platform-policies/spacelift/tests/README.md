@@ -1,0 +1,1 @@
+Semantic tests live beside each Rego policy. `python tools/guardrails.py packs validate` runs `opa test platform-policies/spacelift` when OPA is available and otherwise reports a structural-only validation.

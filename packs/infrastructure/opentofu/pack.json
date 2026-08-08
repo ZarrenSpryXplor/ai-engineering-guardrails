@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "opentofu",
+  "type": "infrastructure",
+  "description": "OpenTofu configuration and state-sensitive workflows.",
+  "file_detectors": [".opentofu-version", "tofu.rc", ".tofurc", "*.tofu.tf"],
+  "directory_detectors": [],
+  "explicit_exclusions": ["**/.terraform/**", "**/vendor/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-opentofu/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["A shared .terraform.lock.hcl can be ambiguous; an OpenTofu-specific marker or explicit override is recommended."]
+}

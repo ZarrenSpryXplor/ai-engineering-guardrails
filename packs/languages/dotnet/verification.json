@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"dotnet-targeted-test","class":"test","selection":"affected-project-first","commands":["dotnet test <project>"]},{"id":"dotnet-solution-check","class":"verify","selection":"applicable-solution","commands":["dotnet build <solution>","dotnet test <solution>"]}]}

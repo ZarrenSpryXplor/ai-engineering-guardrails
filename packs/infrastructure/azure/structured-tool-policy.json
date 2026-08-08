@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "azure-structured-secret-read",
+      "provider_patterns": ["azure", "*azure*", "az"],
+      "tool_patterns": ["get_access_token", "getAccessToken", "get_secret_value", "getSecretValue", "list_storage_keys", "listStorageKeys", "get_credentials", "getCredentials"],
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "target_fields": ["subscription", "subscription_id", "tenant", "vault", "resource_group"],
+      "never_log_fields": ["token", "access_token", "secret", "value", "password", "credential", "private_key", "kubeconfig"],
+      "reason": "Structured Azure credential and secret-value reads must not enter agent context.",
+      "positive_fixtures": [{"tool_name":"mcp__azure__get_secret_value","tool_input":{"vault":"example","name":"synthetic"}},{"toolName":"azure.getAccessToken","toolInput":{"subscription":"00000000-0000-0000-0000-000000000001"}}],
+      "negative_fixtures": [{"tool_name":"mcp__azure__list_secret_metadata","tool_input":{"vault":"example"}},{"toolName":"azure.listResources","toolInput":{"subscription":"00000000-0000-0000-0000-000000000001"}}]
+    },
+    {
+      "id": "azure-structured-privilege-or-delete",
+      "provider_patterns": ["azure", "*azure*", "az"],
+      "tool_patterns": ["create_role_assignment", "delete_role_assignment", "createRoleAssignment", "deleteRoleAssignment", "delete_resource_group", "deleteResourceGroup", "purge_key_vault", "purgeKeyVault"],
+      "operation_class": "privilege-escalation",
+      "rollout_mode": "deny",
+      "target_fields": ["subscription", "subscription_id", "tenant", "resource_group", "scope"],
+      "never_log_fields": ["token", "authorization", "credential", "client_secret", "password"],
+      "reason": "Structured Azure privilege and destructive operations require an external human-controlled workflow.",
+      "positive_fixtures": [{"tool_name":"mcp__azure__create_role_assignment","tool_input":{"subscription":"00000000-0000-0000-0000-000000000001","role":"Owner"}},{"tool_name":"mcp__azure__delete_resource_group","tool_input":{"resource_group":"example"}}],
+      "negative_fixtures": [{"tool_name":"mcp__azure__list_role_assignments","tool_input":{"subscription":"00000000-0000-0000-0000-000000000001"}},{"tool_name":"mcp__azure__show_resource_group","tool_input":{"resource_group":"example"}}]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "azure-sensitive-credential-read",
+      "description": "Block Azure commands that return tokens, secret values, keys, credentials, or kubeconfigs.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "reason": "This Azure operation returns credential-bearing material that must not enter agent context.",
+      "matching_strategy": {"type": "command_regex", "executables": ["az"], "pattern": "^(?![^;|]*--help\\b)(?:account\\s+get-access-token|keyvault\\s+secret\\s+(?:show|download)|storage\\s+account\\s+keys\\s+list|ad\\s+sp\\s+credential\\s+(?:list|reset)|aks\\s+get-credentials|acr\\s+credential\\s+show)(?:\\s|$)"},
+      "must_match": ["az account get-access-token", "az keyvault secret show --vault-name example --name password", "az storage account keys list -g example -n storage", "az ad sp credential reset --id synthetic-app", "az aks get-credentials -g example -n cluster", "az acr credential show -n registry"],
+      "must_not_match": ["az account show", "az keyvault secret list --vault-name example", "az keyvault secret show --help", "az aks show -g example -n cluster", "az acr show -n registry", "echo 'az account get-access-token'"]
+    },
+    {
+      "id": "azure-privilege-escalation",
+      "description": "Block Azure role, service-principal credential, and policy-exemption changes.",
+      "risk_category": "cloud_privilege_escalation",
+      "operation_class": "privilege-escalation",
+      "rollout_mode": "deny",
+      "reason": "Cloud identity, role, and policy exemption changes require an externally controlled privileged workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["az"], "pattern": "^(?:role\\s+(?:assignment|definition)\\s+(?:create|delete|update)|ad\\s+(?:sp|app)\\s+credential\\s+(?:reset|delete)|policy\\s+exemption\\s+(?:create|update|delete))(?:\\s|$)"},
+      "must_match": ["az role assignment create --assignee synthetic --role Owner --scope /subscriptions/00000000-0000-0000-0000-000000000001", "az role assignment delete --assignee synthetic", "az role definition update --role-definition role.json", "az ad app credential reset --id synthetic-app", "az policy exemption create -n example --policy-assignment assignment"],
+      "must_not_match": ["az role assignment list --subscription 00000000-0000-0000-0000-000000000001", "az role definition list", "az ad sp show --id synthetic-app", "az policy exemption list", "grep -R 'az role assignment create' docs"]
+    },
+    {
+      "id": "azure-destructive-resource-operation",
+      "description": "Block high-confidence destructive Azure resource and subscription operations.",
+      "risk_category": "cloud_resource_destruction",
+      "operation_class": "destructive",
+      "rollout_mode": "deny",
+      "reason": "This Azure operation destroys a broad or difficult-to-recover cloud resource.",
+      "matching_strategy": {"type": "command_regex", "executables": ["az"], "pattern": "^(?:group\\s+delete|resource\\s+delete|keyvault\\s+purge|keyvault\\s+delete|account\\s+management-group\\s+delete)(?:\\s|$)"},
+      "must_match": ["az group delete --name example --subscription 00000000-0000-0000-0000-000000000001", "az resource delete --ids /subscriptions/synthetic/resourceGroups/example/providers/Example/type/name", "az keyvault purge --name example --location westus", "az keyvault delete --name example"],
+      "must_not_match": ["az group show --name example", "az resource show --ids /subscriptions/synthetic/resourceGroups/example/providers/Example/type/name", "az keyvault show --name example", "az deployment group what-if -g example -f main.bicep", "echo 'az group delete --name example'"]
+    }
+  ],
+  "classifications": [
+    {"id": "azure-observe", "operation_class": "observe", "remote": true, "matching_strategy": {"type": "command_regex", "executables": ["az"], "pattern": "^(?:account|resource|aks|acr|role\\s+assignment|monitor|deployment\\s+(?:group|sub|mg))\\s+(?:show|list|check-name|what-if)(?:\\s|$)"}},
+    {"id": "azure-mutate", "operation_class": "mutate", "remote": true, "matching_strategy": {"type": "command_regex", "executables": ["az"], "pattern": "^(?:resource|group|deployment\\s+(?:group|sub|mg)|aks|acr|monitor)\\s+(?:create|update|set|start|stop|restart|deploy|cancel)(?:\\s|$)"}}
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "dotnet-global-or-workload-mutation",
+      "description": "Block machine-global .NET tool and workload changes.",
+      "risk_category": "global_tooling_mutation",
+      "operation_class": "destructive",
+      "reason": "Machine-global .NET tools and workloads are outside repository scope.",
+      "matching_strategy": {"type": "command_regex", "executables": ["dotnet"], "pattern": "(?:tool\\s+(?:install|uninstall|update)\\s+--global|workload\\s+(?:install|uninstall|update|repair)|nuget\\s+locals\\s+all\\s+--clear)"},
+      "must_match": ["dotnet tool install --global dotnetsay", "dotnet workload install wasm-tools", "dotnet nuget locals all --clear"],
+      "must_not_match": ["dotnet tool restore", "dotnet test", "dotnet workload list", "echo 'dotnet workload install wasm-tools'"]
+    },
+    {
+      "id": "dotnet-database-execution",
+      "description": "Block Entity Framework migration execution and destructive migration removal.",
+      "risk_category": "database_mutation",
+      "operation_class": "destructive",
+      "reason": "Database migration execution must remain a separate human-controlled operation.",
+      "matching_strategy": {"type": "command_regex", "executables": ["dotnet"], "pattern": "ef\\s+(?:database\\s+(?:update|drop)|migrations\\s+remove)"},
+      "must_match": ["dotnet ef database update", "dotnet ef database drop --force", "dotnet ef migrations remove --force"],
+      "must_not_match": ["dotnet ef migrations add AddIndex", "dotnet test", "grep -R 'dotnet ef database update' docs"]
+    }
+  ]
+}

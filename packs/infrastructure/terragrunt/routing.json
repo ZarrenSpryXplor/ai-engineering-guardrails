@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"terragrunt-source-change","tier":"deep","reasoning":"high","write":true},{"id":"terragrunt-plan-summary","tier":"balanced","reasoning":"medium","write":false}],"escalate_on":["run-all","dependency fanout","remote mutation","prd lifecycle"]}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-guardrails/trusted-components.schema.json",
+  "type": "object",
+  "required": ["schema_version", "components"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "source", "version", "digest", "allowed_tools", "denied_tools", "credential_class", "expected_network_destinations"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "kind": {"enum": ["mcp-server", "plugin", "marketplace", "skill", "custom-agent", "external-validator"]},
+          "source": {"type": "string"},
+          "version": {"type": ["string", "null"]},
+          "digest": {"type": ["string", "null"]},
+          "allowed_tools": {"type": "array", "items": {"type": "string"}},
+          "denied_tools": {"type": "array", "items": {"type": "string"}},
+          "observed_tools": {"type": "array", "items": {"type": "string"}},
+          "executable_files": {"type": "array", "items": {"type": "string"}},
+          "credential_class": {"enum": ["none", "read-only", "write-capable", "unknown"]},
+          "expected_network_destinations": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "package-publication-all-supported",
+      "description": "Block publication for supported language and chart ecosystems.",
+      "risk_category": "external_publication",
+      "operation_class": "publish",
+      "reason": "Package and release publication is reserved for a human-controlled workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["mvn", "mvnw", "gradle", "gradlew", "dotnet", "twine", "python", "python3", "uv", "poetry", "pdm", "npm", "pnpm", "yarn", "helm", "gh"], "pattern": "(?:^deploy(?:\\s|$)|^release:|^publish(?:\\s|$)|^nuget\\s+push|^-m\\s+twine\\s+upload|^upload(?:\\s|$)|^push(?:\\s|$)|^release\\s+create)"},
+      "must_match": ["mvn deploy", "gradle publish", "dotnet nuget push app.nupkg", "twine upload dist/*", "python -m twine upload dist/*", "uv publish", "poetry publish", "npm publish", "pnpm publish", "yarn publish", "helm push chart.tgz oci://registry.invalid", "gh release create v1"],
+      "must_not_match": ["mvn package", "gradle test", "dotnet pack", "twine check dist/*", "uv build", "npm pack", "pnpm test", "helm template app ./chart", "gh release view v1"]
+    }
+  ]
+}

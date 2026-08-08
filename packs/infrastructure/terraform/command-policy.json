@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "terraform-destructive-state-or-apply",
+      "description": "Block Terraform destroy, unsafe apply, and destructive state operations.",
+      "risk_category": "infrastructure_destruction",
+      "operation_class": "destructive",
+      "reason": "Terraform destruction, auto-approved apply, and destructive state operations require an external human-controlled workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["terraform"], "pattern": "(?:^|\\s)(?:destroy)(?:\\s|$)|^apply\\b[^;|]*(?:-auto-approve|(?:destroy|destroy-plan)[^\\s]*\\.?(?:tfplan|plan)?)(?:\\s|$)|^state\\s+(?:rm|push)(?:\\s|$)|^force-unlock\\b[^;|]*(?:-force|--force)|^workspace\\s+delete(?:\\s|$)"},
+      "must_match": ["terraform destroy", "terraform apply -auto-approve", "terraform apply destroy.tfplan", "terraform state rm module.db", "terraform state push state.tfstate", "terraform force-unlock -force deadbeef", "terraform workspace delete old"],
+      "must_not_match": ["terraform fmt -check", "terraform validate", "terraform plan", "terraform apply reviewed.tfplan", "terraform show reviewed.tfplan", "grep -R 'terraform destroy' docs"]
+    }
+  ],
+  "classifications": [
+    {"id":"terraform-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["terraform"],"pattern":"^(?:fmt|validate|providers|plan)(?:\\s|$)|^show\\s+[^-][^\\s]*"}},
+    {"id":"terraform-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["terraform"],"pattern":"^(?:apply|import|taint|untaint|force-unlock)(?:\\s|$)|^workspace\\s+(?:new|delete)(?:\\s|$)|^state\\s+mv(?:\\s|$)"}}
+  ]
+}

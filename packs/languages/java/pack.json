@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "java",
+  "type": "language",
+  "description": "Java projects using Maven or Gradle.",
+  "file_detectors": ["pom.xml", "mvnw", "mvnw.cmd", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradlew", "gradlew.bat"],
+  "directory_detectors": [".mvn", "gradle/wrapper"],
+  "explicit_exclusions": ["**/target/**", "**/.gradle/**", "**/vendor/**"],
+  "dependent_packs": ["dependency-management", "package-publication", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-java/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Maven and Gradle may coexist in a monorepository; detection does not choose between them."]
+}

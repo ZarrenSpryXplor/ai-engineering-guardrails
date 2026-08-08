@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"node-targeted-test","class":"test","selection":"affected-workspace-first","commands":["<manager> run test -- <target>"]},{"id":"node-static-checks","class":"verify","selection":"repository-defined","commands":["<manager> run lint","<manager> run typecheck","<manager> run build"]}]}

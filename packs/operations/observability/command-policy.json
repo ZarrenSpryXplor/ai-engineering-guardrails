@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "observability-control-mutation",
+      "description": "Block high-confidence alert, dashboard, retention, token, and log-control changes.",
+      "risk_category": "operational_visibility_weakening",
+      "operation_class": "guardrail-modification",
+      "rollout_mode": "deny",
+      "reason": "Operational visibility, retention, alerting, and access-token changes require an externally controlled operational workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["grafana", "grafana-cli", "datadog-ci", "splunk", "logcli"], "patterns_by_executable": {"grafana": "^(?:alert|dashboard|service-account|token)\\s+(?:create|update|delete|mute|disable)(?:\\s|$)", "grafana-cli": "^admin\\s+reset-admin-password(?:\\s|$)", "datadog-ci": "^(?:synthetics|monitors)\\s+(?:delete|pause|mute)(?:\\s|$)", "splunk": "^(?:remove|delete|edit)\\s+(?:alert|saved-search|index|token)(?:\\s|$)", "logcli": "^(?:delete|retention)(?:\\s|$)"}},
+      "must_match": ["grafana alert mute incident-alert", "grafana dashboard delete uid", "grafana-cli admin reset-admin-password synthetic", "datadog-ci monitors delete 42", "splunk remove alert payments", "logcli delete --query '{app=\"payments\"}'"],
+      "must_not_match": ["grafana dashboard list", "grafana alert list", "datadog-ci synthetics run-tests --dry-run", "splunk search 'index=main error'", "logcli query '{app=\"payments\"}'", "echo 'grafana alert mute incident-alert'"]
+    }
+  ],
+  "classifications": [
+    {"id": "observability-observe", "operation_class": "observe", "remote": true, "matching_strategy": {"type": "command_regex", "executables": ["promtool", "logcli", "grafana", "splunk"], "patterns_by_executable": {"promtool": "^(?:query|tsdb|debug)(?:\\s|$)", "logcli": "^(?:query|series|labels)(?:\\s|$)", "grafana": "^(?:dashboard|alert|datasource)\\s+(?:get|show|list)(?:\\s|$)", "splunk": "^(?:search|show|list)(?:\\s|$)"}}},
+    {"id": "observability-validate", "operation_class": "validate", "matching_strategy": {"type": "command_regex", "executables": ["promtool", "otelcol", "otelcol-contrib"], "patterns_by_executable": {"promtool": "^check(?:\\s|$)", "otelcol": "^validate(?:\\s|$)", "otelcol-contrib": "^validate(?:\\s|$)"}}}
+  ]
+}

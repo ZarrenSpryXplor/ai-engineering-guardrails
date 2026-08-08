@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"opentofu-source-change","tier":"deep","reasoning":"high","write":true},{"id":"opentofu-plan-summary","tier":"balanced","reasoning":"medium","write":false}],"escalate_on":["engine ambiguity","state operation","remote mutation","prd lifecycle"]}

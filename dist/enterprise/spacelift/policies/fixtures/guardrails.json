@@ -1,0 +1,59 @@
+{
+  "_generated": "GENERATED — DO NOT EDIT. Canonical source: platform-policies/spacelift/fixtures/guardrails.json.",
+  "guardrails": {
+    "config": {
+      "admin_teams": [
+        "example-spacelift-admins"
+      ],
+      "allowed_account_ids": [
+        "000000000000"
+      ],
+      "allowed_idp_subjects": [
+        "user:example/example-user"
+      ],
+      "allowed_regions": [
+        "example-region-1"
+      ],
+      "critical_resource_types": [
+        "example_critical_resource"
+      ],
+      "maximum_resource_changes": 50,
+      "notification_states": [
+        "UNCONFIRMED",
+        "FAILED"
+      ],
+      "privilege_sensitive_resource_types": [
+        "example_iam_binding"
+      ],
+      "production_labels": [
+        "lifecycle:prd"
+      ],
+      "protected_space_ids": [
+        "example-prd-space"
+      ],
+      "public_exposure_resource_types": [
+        "example_public_resource"
+      ],
+      "required_change_metadata": [
+        "change-ticket",
+        "change-owner"
+      ],
+      "sensitive_approver_teams": [
+        "example-sensitive-approvers"
+      ],
+      "tracked_branches": [
+        "main"
+      ],
+      "tracked_events": [
+        "PUSH",
+        "PULL_REQUEST"
+      ],
+      "trigger_targets": {
+        "example-source-stack": [
+          "example-dependent-stack"
+        ]
+      },
+      "warning_resource_changes": 20
+    }
+  }
+}

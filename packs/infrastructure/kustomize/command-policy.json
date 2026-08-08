@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "kustomize-remote-delete",
+      "description": "Block deletion of resources rendered from a Kustomize target.",
+      "risk_category": "cluster_destruction",
+      "operation_class": "destructive",
+      "reason": "kubectl delete -k can remove an entire rendered resource set.",
+      "matching_strategy": {"type": "command_regex", "executables": ["kubectl"], "pattern": "\\bdelete\\b[^;|]*(?:-k|--kustomize)(?:=|\\s+)"},
+      "must_match": ["kubectl delete -k overlays/dev", "kubectl delete --kustomize=overlays/int"],
+      "must_not_match": ["kustomize build overlays/dev", "kubectl kustomize overlays/dev", "kubectl apply -k overlays/dev", "echo 'kubectl delete -k overlays/dev'"]
+    }
+  ],
+  "classifications": [
+    {"id":"kustomize-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["kustomize","kubectl"],"pattern":"^build(?:\\s|$)|^kustomize(?:\\s|$)"}},
+    {"id":"kustomize-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["kubectl"],"pattern":"^apply\\b[^;|]*(?:-k|--kustomize)(?:=|\\s+)"}}
+  ]
+}

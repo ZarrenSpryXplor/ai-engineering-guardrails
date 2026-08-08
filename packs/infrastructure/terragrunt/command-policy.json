@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "terragrunt-destructive-or-broad-apply",
+      "description": "Block Terragrunt destroy and broad run-all apply/destroy.",
+      "risk_category": "infrastructure_destruction",
+      "operation_class": "destructive",
+      "reason": "Terragrunt destroy and broad run-all mutation can affect many infrastructure units.",
+      "matching_strategy": {"type": "command_regex", "executables": ["terragrunt"], "pattern": "(?:^destroy(?:\\s|$)|^(?:run-all|run\\s+--all)\\s+(?:apply|destroy)(?:\\s|$)|^apply\\b[^;|]*-auto-approve)"},
+      "must_match": ["terragrunt destroy", "terragrunt run-all apply", "terragrunt run-all destroy", "terragrunt run --all apply", "terragrunt apply -auto-approve"],
+      "must_not_match": ["terragrunt plan", "terragrunt run-all plan", "terragrunt hcl fmt --check", "grep -R 'terragrunt run-all apply' docs"]
+    }
+  ],
+  "classifications": [
+    {"id":"terragrunt-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["terragrunt"],"pattern":"^(?:hcl\\s+fmt|validate|plan)(?:\\s|$)"}},
+    {"id":"terragrunt-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["terragrunt"],"pattern":"^(?:apply|import|taint|untaint|force-unlock)(?:\\s|$)|^(?:run-all|run\\s+--all)\\s+plan(?:\\s|$)"}}
+  ]
+}

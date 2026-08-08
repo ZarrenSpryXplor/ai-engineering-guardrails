@@ -1,0 +1,207 @@
+# GENERATED — DO NOT EDIT
+# Canonical sources: enforcement/command-policy.json and pack command-policy fragments.
+# These experimental prefix rules are defence in depth. The shared hook handles
+# wrappers and flag orderings that prefix matching cannot safely express.
+
+# git-reset-hard: Block Git hard resets that discard working-tree and index state.
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Blocked git reset --hard because it can discard uncommitted work.",
+    match = [
+        "git reset --hard",
+        "git reset --hard HEAD~1",
+    ],
+    not_match = [
+        "git status",
+        "git reset --soft HEAD~1",
+        "echo \"git reset --hard\"",
+        "grep -R \"git reset --hard\" docs",
+    ],
+)
+
+# git-clean-force-directories: Block forced Git clean operations that recursively remove untracked directories.
+prefix_rule(
+    pattern = ["git", "clean", ["-fd", "-df", "-xfd", "-dxf"]],
+    decision = "forbidden",
+    justification = "Blocked destructive git clean using both force and directory removal.",
+    match = [
+        "git clean -fd",
+        "git clean -df",
+        "git clean -xfd",
+    ],
+    not_match = [
+        "git clean -nfd",
+        "git clean -n -d -f",
+        "git clean -f file.tmp",
+        "git status",
+    ],
+)
+
+# git-force-push: Block Git pushes that request forced remote-history updates.
+prefix_rule(
+    pattern = ["git", "push", ["-f", "--force", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "Blocked force-push because it can rewrite shared remote history.",
+    match = [
+        "git push --force origin main",
+        "git push -f origin feature",
+    ],
+    not_match = [
+        "git push origin feature/name",
+        "git push --follow-tags",
+        "git status",
+        "echo git push --force",
+    ],
+)
+
+# infrastructure-destroy: Block direct Terraform and OpenTofu destroy operations.
+prefix_rule(
+    pattern = [["terraform", "tofu"], "destroy"],
+    decision = "forbidden",
+    justification = "Blocked infrastructure destroy; destructive infrastructure changes require an explicitly controlled workflow.",
+    match = [
+        "terraform destroy",
+        "tofu destroy",
+    ],
+    not_match = [
+        "terraform plan",
+        "terraform apply",
+        "tofu plan",
+        "grep -R \"terraform destroy\" .",
+    ],
+)
+
+# kubernetes-namespace-delete: Block deletion of Kubernetes namespaces.
+prefix_rule(
+    pattern = ["kubectl", "delete", ["namespace", "namespaces", "ns"]],
+    decision = "forbidden",
+    justification = "Blocked Kubernetes namespace deletion because it removes a broad resource boundary.",
+    match = [
+        "kubectl delete namespace production",
+        "kubectl delete namespaces staging",
+    ],
+    not_match = [
+        "kubectl get namespaces",
+        "kubectl delete pod one-pod",
+        "echo kubectl delete namespace production",
+    ],
+)
+
+# helm-uninstall: Block Helm release removal.
+prefix_rule(
+    pattern = ["helm", ["uninstall", "delete"]],
+    decision = "forbidden",
+    justification = "Blocked Helm uninstall because it removes a deployed release.",
+    match = [
+        "helm uninstall payments",
+        "helm delete old-release",
+    ],
+    not_match = [
+        "helm template payments ./chart",
+        "helm list",
+        "echo helm uninstall payments",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["npm", "publish"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "npm publish",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["pnpm", "publish"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "pnpm publish --access public",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["cargo", "publish"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "cargo publish",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["twine", "upload"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "twine upload dist/*",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["gh", "release", "create"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "gh release create v1.2.3",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)
+
+# prohibited-publication: Block explicitly configured package and release publication commands.
+prefix_rule(
+    pattern = ["dotnet", "nuget", "push"],
+    decision = "forbidden",
+    justification = "Blocked package or release publication; publishing requires an explicitly authorised release workflow.",
+    match = [
+        "dotnet nuget push package.nupkg",
+    ],
+    not_match = [
+        "npm pack",
+        "cargo package",
+        "twine check dist/*",
+        "gh release view v1.2.3",
+        "dotnet test",
+    ],
+)

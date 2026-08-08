@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"kubernetes-render","class":"validate","selection":"affected-source","commands":["kubectl kustomize <overlay>"]},{"id":"kubernetes-dry-run","class":"validate","selection":"explicit-target-only","commands":["kubectl --context <context> --namespace <namespace> apply --dry-run=server -f <file>"]}],"network_tests_forbidden":true}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "enable_packs": ["kubernetes", "terraform"],
+  "disable_packs": [],
+  "package_manager": "pnpm",
+  "build_root": ".",
+  "generated_directories": ["generated", "website/static/generated"],
+  "ambiguity_overrides": {
+    "package_manager": "pnpm"
+  },
+  "target_classifications": {
+    "kubernetes_contexts": {
+      "local-kind": "dev"
+    }
+  }
+}

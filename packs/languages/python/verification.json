@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"python-targeted-test","class":"test","selection":"test-node-first","commands":["pytest <test-node>"]},{"id":"python-configured-checks","class":"verify","selection":"repository-defined","commands":["tox <target>","nox -s <session>"]}]}

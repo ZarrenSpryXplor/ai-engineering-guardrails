@@ -1,0 +1,23 @@
+{
+  "guardrails": {
+    "config": {
+      "production_labels": ["lifecycle:prd"],
+      "protected_space_ids": ["example-prd-space"],
+      "sensitive_approver_teams": ["example-sensitive-approvers"],
+      "required_change_metadata": ["change-ticket", "change-owner"],
+      "critical_resource_types": ["example_critical_resource"],
+      "privilege_sensitive_resource_types": ["example_iam_binding"],
+      "public_exposure_resource_types": ["example_public_resource"],
+      "allowed_regions": ["example-region-1"],
+      "allowed_account_ids": ["000000000000"],
+      "maximum_resource_changes": 50,
+      "warning_resource_changes": 20,
+      "tracked_branches": ["main"],
+      "tracked_events": ["PUSH", "PULL_REQUEST"],
+      "trigger_targets": {"example-source-stack": ["example-dependent-stack"]},
+      "notification_states": ["UNCONFIRMED", "FAILED"],
+      "allowed_idp_subjects": ["user:example/example-user"],
+      "admin_teams": ["example-spacelift-admins"]
+    }
+  }
+}

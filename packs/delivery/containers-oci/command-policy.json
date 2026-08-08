@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "container-privileged-host-access",
+      "description": "Block high-confidence privileged and host-access container launches.",
+      "risk_category": "host_privilege_escalation",
+      "operation_class": "privilege-escalation",
+      "rollout_mode": "deny",
+      "reason": "This container launch grants broad host access or privilege and requires an external human-controlled workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl"], "pattern": "^(?:run|create)\\b[^;|]*(?:--privileged\\b|--network(?:=|\\s+)host\\b|--pid(?:=|\\s+)host\\b|--ipc(?:=|\\s+)host\\b|--device(?:=|\\s+)|(?:-v|--volume)(?:=|\\s+)(?:/|[A-Za-z]:\\\\)(?::|$)|/var/run/docker\\.sock)"},
+      "must_match": ["docker run --privileged example:1", "podman run --network host example:1", "nerdctl run --pid=host example:1", "docker run -v /:/host example:1", "docker run -v /var/run/docker.sock:/var/run/docker.sock example:1"],
+      "must_not_match": ["docker run --rm example:1", "docker image inspect example:1", "docker build .", "podman run -v ./out:/out example:1", "echo 'docker run --privileged example:1'"]
+    },
+    {
+      "id": "container-broad-prune",
+      "description": "Block broad container-system, image, and volume cleanup.",
+      "risk_category": "local_data_destruction",
+      "operation_class": "destructive",
+      "rollout_mode": "deny",
+      "reason": "Broad prune can remove unrelated images, caches, containers, or volumes.",
+      "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl"], "pattern": "^(?:(?:system|image|container|volume)\\s+prune\\b[^;|]*(?:--all\\b|-a(?:\\s|$)|--volumes\\b)|system\\s+reset\\b)"},
+      "must_match": ["docker system prune --all", "docker system prune --volumes", "podman image prune -a", "nerdctl volume prune --all", "podman system reset"],
+      "must_not_match": ["docker image prune", "docker rm generated-container", "podman image list", "docker compose down", "grep -R 'docker system prune --all' docs"]
+    },
+    {
+      "id": "container-publication",
+      "description": "Block container image publication.",
+      "risk_category": "artifact_publication",
+      "operation_class": "publish",
+      "rollout_mode": "deny",
+      "reason": "Publishing a container image is a human-controlled release action.",
+      "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl", "buildah", "skopeo"], "patterns_by_executable": {"docker": "^push(?:\\s|$)", "podman": "^push(?:\\s|$)", "nerdctl": "^push(?:\\s|$)", "buildah": "^push(?:\\s|$)", "skopeo": "^copy\\b[^;|]*docker://"}},
+      "must_match": ["docker push registry.example/app:1", "podman push registry.example/app:1", "nerdctl push registry.example/app:1", "buildah push app registry.example/app:1", "skopeo copy containers-storage:app docker://registry.example/app:1"],
+      "must_not_match": ["docker build -t app:1 .", "docker pull registry.example/app:1", "skopeo inspect docker://registry.example/app:1", "docker compose config", "echo 'docker push registry.example/app:1'"]
+    },
+    {
+      "id": "container-secret-or-insecure-transport",
+      "description": "Block command forms that expose registry/build secrets or bypass transport validation.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "deny",
+      "reason": "Credentials must not be passed in visible arguments and registry transport validation must not be bypassed.",
+      "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl", "buildah", "skopeo"], "pattern": "(?:^login\\b(?=[^;|]*(?:--password(?:=|\\s+)|\\s-p(?:\\s+|$)))|^build\\b[^;|]*--build-arg(?:=|\\s+)[A-Za-z0-9_]*(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY)[A-Za-z0-9_]*=|--tls-verify(?:=|\\s+)false\\b|--insecure-policy\\b)"},
+      "must_match": ["docker login registry.example --password not-a-real-secret", "podman login -p synthetic-password registry.example", "docker build --build-arg API_TOKEN=synthetic .", "skopeo copy --tls-verify=false docker://a/x docker://b/x", "buildah push --tls-verify=false app registry.example/app"],
+      "must_not_match": ["docker login registry.example --password-stdin", "docker build --secret id=npmrc,src=.npmrc .", "skopeo inspect docker://registry.example/app:1", "podman login --help", "grep -R -- '--tls-verify=false' docs"]
+    },
+    {
+      "id": "container-unreviewed-remote-build-context",
+      "description": "Warn on direct remote container build contexts.",
+      "risk_category": "untrusted_remote_content",
+      "operation_class": "mutate",
+      "rollout_mode": "warn",
+      "reason": "A remote build context can execute unreviewed build instructions; fetch and review an immutable source first.",
+      "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl", "buildah"], "pattern": "^(?:build|bud)\\b[^;|]*(?:https?://|git://|git@)"},
+      "must_match": ["docker build https://example.invalid/repository.git", "podman build git://example.invalid/repo", "buildah bud https://example.invalid/context.tar.gz"],
+      "must_not_match": ["docker build .", "podman build ./containers/app", "docker image inspect https-example", "echo 'docker build https://example.invalid/repo'"]
+    }
+  ],
+  "classifications": [
+    {"id": "container-observe", "operation_class": "observe", "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl", "skopeo"], "pattern": "^(?:image\\s+)?(?:inspect|history|images|image\\s+ls|ps|version|info)(?:\\s|$)|^compose\\s+config(?:\\s|$)"}},
+    {"id": "container-validate", "operation_class": "validate", "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl", "buildah"], "pattern": "^(?:build|bud)(?:\\s|$)|^compose\\s+config(?:\\s|$)"}},
+    {"id": "container-local-mutate", "operation_class": "mutate", "matching_strategy": {"type": "command_regex", "executables": ["docker", "podman", "nerdctl"], "pattern": "^(?:run|create|start|stop|rm|compose\\s+(?:up|down|run))(?:\\s|$)"}}
+  ]
+}

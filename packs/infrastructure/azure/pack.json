@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "azure",
+  "type": "infrastructure",
+  "description": "Azure CLI and structured-tool controls with explicit subscription lifecycle mapping.",
+  "file_detectors": ["azure.yaml", "bicepconfig.json", "main.bicep", "azuredeploy.json"],
+  "directory_detectors": [".azure", "infra/azure", "infrastructure/azure"],
+  "explicit_exclusions": ["**/vendor/**", "**/dist/**", "**/generated/**", "**/.terraform/**"],
+  "dependent_packs": ["sensitive-output", "secrets-pki"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-azure/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": ["structured-tool-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Azure CLI command groups evolve; enforcement covers conservative high-confidence forms and never contacts Azure during detection or tests."]
+}

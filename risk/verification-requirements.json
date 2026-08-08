@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "requirements": [
+    {
+      "id": "high-risk-change",
+      "risk_class": "high",
+      "minimum_model_tier": "deep",
+      "required_reviews": ["independent correctness review", "security and compatibility review"],
+      "required_verification": ["affected narrow tests", "repository static checks", "applicable native semantic validator", "final diff review"],
+      "prohibited_autonomous_actions": ["production mutation", "persistent-data destruction", "package publication", "guardrail weakening"]
+    },
+    {
+      "id": "ordinary-source-change",
+      "risk_class": "normal",
+      "minimum_model_tier": "balanced",
+      "required_reviews": ["self-review"],
+      "required_verification": ["affected narrow tests", "applicable formatting and static checks"],
+      "prohibited_autonomous_actions": ["publication"]
+    }
+  ]
+}

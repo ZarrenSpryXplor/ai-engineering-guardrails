@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"helm-chart-change","tier":"deep","reasoning":"high","write":true},{"id":"helm-render-review","tier":"balanced","reasoning":"medium","write":false}],"escalate_on":["CRD lifecycle","chart hook change","remote release mutation"]}

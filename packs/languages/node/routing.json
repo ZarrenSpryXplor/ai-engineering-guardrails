@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"node-implementation","tier":"balanced","reasoning":"medium","write":true},{"id":"node-contract-change","tier":"deep","reasoning":"high","write":false}],"escalate_on":["package-manager ambiguity","public contract change","authentication"]}

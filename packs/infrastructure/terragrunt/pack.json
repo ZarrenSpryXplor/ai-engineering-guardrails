@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "terragrunt",
+  "type": "infrastructure",
+  "description": "Terragrunt units, stacks, and run-all workflows.",
+  "file_detectors": ["terragrunt.hcl", "terragrunt.stack.hcl", ".terragrunt-version"],
+  "directory_detectors": [".terragrunt-cache"],
+  "explicit_exclusions": ["**/.terragrunt-cache/**", "**/vendor/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-terragrunt/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Terragrunt may orchestrate Terraform or OpenTofu; the underlying engine must be determined from repository evidence."]
+}

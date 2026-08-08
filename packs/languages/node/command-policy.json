@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "node-global-or-unpinned-execution",
+      "description": "Block global package installation and unpinned remote package execution.",
+      "risk_category": "global_or_unreviewed_code_execution",
+      "operation_class": "destructive",
+      "reason": "Use repository-local pinned tools rather than global or unpinned remote execution.",
+      "matching_strategy": {"type": "command_regex", "executables": ["npm", "pnpm", "yarn", "npx"], "patterns_by_executable": {"npm":"(?:\\binstall\\b[^;|]*(?:--global|-g)(?:\\s|$)|^exec\\s+[^@\\s]+(?:\\s|$))","pnpm":"(?:\\b(?:install|add)\\b[^;|]*(?:--global|-g)(?:\\s|$)|^dlx\\s+[^@\\s]+(?:\\s|$))","yarn":"(?:\\b(?:global\\s+add|add\\b[^;|]*(?:--global|-g))(?:\\s|$)|^dlx\\s+[^@\\s]+(?:\\s|$))","npx":"^[^@\\s]+(?:\\s|$)"}},
+      "must_match": ["npm install -g typescript", "pnpm add --global eslint", "pnpm dlx create-app", "npx create-app"],
+      "must_not_match": ["npm ci", "pnpm install --frozen-lockfile", "yarn install --immutable", "npm run test", "npx tool@1.2.3 --help", "echo 'npm install -g x'"]
+    },
+    {
+      "id": "node-forced-audit-remediation",
+      "description": "Block forceful npm audit lockfile remediation.",
+      "risk_category": "unbounded_dependency_change",
+      "operation_class": "destructive",
+      "reason": "Forced audit remediation can introduce breaking, unrelated dependency changes.",
+      "matching_strategy": {"type": "command_regex", "executables": ["npm"], "pattern": "audit\\s+fix\\b[^;|]*--force"},
+      "must_match": ["npm audit fix --force", "npm audit fix --omit=dev --force"],
+      "must_not_match": ["npm audit", "npm audit fix", "npm test", "grep -R 'npm audit fix --force' docs"]
+    }
+  ]
+}

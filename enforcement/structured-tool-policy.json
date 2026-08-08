@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "guardrail-waiver-storage-write",
+      "description": "Protect managed guardrail runtime, waiver storage, state, and target mappings from agent tool writes.",
+      "provider_patterns": ["*"],
+      "tool_patterns": ["write", "edit", "apply_patch", "write_file", "edit_file"],
+      "operation_class": "guardrail-modification",
+      "target_fields": ["path", "file_path", "target", "filename"],
+      "never_log_fields": ["content", "patch", "new_string", "old_string"],
+      "rollout_mode": "deny",
+      "reason": "Managed guardrail runtime, waivers, state, and target mappings may only be changed by the explicit guardrail maintenance workflow.",
+      "conditions": {
+        "target_path_prefixes": [
+          ".ai-guardrails/runtime",
+          ".ai-guardrails/waivers",
+          ".ai-guardrails/state.json",
+          ".ai-guardrails/targets.json"
+        ]
+      },
+      "positive_fixtures": [
+        {"tool_name": "write_file", "arguments": {"path": ".ai-guardrails/waivers/example.json"}},
+        {"tool_name": "edit_file", "arguments": {"path": ".ai-guardrails/state.json"}},
+        {"tool_name": "apply_patch", "arguments": {"path": ".ai-guardrails/targets.json"}}
+      ],
+      "negative_fixtures": [
+        {"tool_name": "write_file", "arguments": {"path": "src/example.py"}}
+      ]
+    }
+  ]
+}

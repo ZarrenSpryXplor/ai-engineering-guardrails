@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "python",
+  "type": "language",
+  "description": "Python projects using existing packaging, environment, test, lint, and type-check tooling.",
+  "file_detectors": ["pyproject.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", "Pipfile.lock", "requirements*.txt", "setup.py", "setup.cfg", "tox.ini", "noxfile.py", "pytest.ini"],
+  "directory_detectors": [],
+  "explicit_exclusions": ["**/.venv/**", "**/.tox/**", "**/.nox/**", "**/site-packages/**", "**/vendor/**"],
+  "dependent_packs": ["dependency-management", "package-publication", "database-migrations", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-python/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Multiple Python lock formats are reported as ambiguity; detection does not silently migrate managers."]
+}

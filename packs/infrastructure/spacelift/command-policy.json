@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "spacelift-cli-mutation",
+      "description": "Block mutating spacectl stack, run, task, profile, and resource operations.",
+      "risk_category": "remote_platform_mutation",
+      "operation_class": "destructive",
+      "reason": "Spacelift access is read-only for agents; remote runs, tasks, profiles, and resources require external authority.",
+      "matching_strategy": {"type": "command_regex", "executables": ["spacectl"], "pattern": "(?:^stack\\s+(?:deploy|confirm|task)|^run\\s+(?:confirm|discard|cancel)|^task\\s+(?:create|run)|^profile\\s+(?:export-token|login|logout|select)|^(?:provider|module|blueprint|template|policy|space|context|workerpool)\\s+(?:create|update|delete|publish|deploy))"},
+      "must_match": ["spacectl stack deploy --id payments", "spacectl stack confirm --id payments", "spacectl stack task --id payments --command whoami", "spacectl run discard --id run-1", "spacectl profile export-token", "spacectl profile login"],
+      "must_not_match": ["spacectl whoami", "spacectl version", "spacectl stack list", "spacectl run list --stack payments", "spacectl profile current", "echo 'spacectl stack deploy --id payments'"]
+    },
+    {
+      "id": "spacelift-graphql-mutation",
+      "description": "Block GraphQL mutation documents sent through spacectl api.",
+      "risk_category": "remote_platform_mutation",
+      "operation_class": "destructive",
+      "reason": "GraphQL mutations can change Spacelift resources and runs; only read-only queries are permitted.",
+      "matching_strategy": {"type": "command_regex", "executables": ["spacectl"], "pattern": "^api\\b[^;|]*(?:^|[\\s'\"{])mutation(?:\\s|[({])", "flags": ["ignore_case", "dotall"]},
+      "must_match": ["spacectl api --query 'mutation { stackDelete(id: \"x\") { id } }'", "spacectl api 'mutation Remove($id: ID!) { stackDelete(id: $id) { id } }'"],
+      "must_not_match": ["spacectl api --query 'query { stacks { id } }'", "spacectl api '{ viewer { id } }'", "grep -R 'mutation {' docs"]
+    }
+  ],
+  "structured_tool_rules": [
+    {
+      "id": "spacelift-mcp-mutate",
+      "provider_patterns": ["spacelift", "*spacelift*"],
+      "tool_patterns": ["mutate", "trigger_stack_run", "confirm_stack_run", "discard_stack_run", "local_preview", "triggerStackRun", "confirmStackRun", "discardStackRun", "localPreview"],
+      "operation_class": "mutate",
+      "target_fields": ["stack_id", "stackId", "run_id", "runId", "project", "space"],
+      "never_log_fields": ["token", "authorization", "headers", "api_key", "secret", "query", "variables", "workspace"],
+      "reason": "Spacelift MCP mutation and run-control tools are denied to agents.",
+      "positive_fixtures": [
+        {"tool_name":"mcp__spacelift__mutate","tool_input":{"operation":"mutation X { stackDelete(id: \"x\") { id } }"}},
+        {"toolName":"spacelift.trigger_stack_run","toolInput":{"stack_id":"stack-1"}},
+        {"tool":{"name":"spacelift__local_preview"},"arguments":{"workspace":"."}},
+        {"tool_name":"mcp__spacelift__confirm_stack_run","tool_input":{"run_id":"run-1"}},
+        {"tool_name":"mcp__spacelift__discard_stack_run","tool_input":{"run_id":"run-1"}}
+      ],
+      "negative_fixtures": [
+        {"tool_name":"mcp__spacelift__discover","tool_input":{"type":"Stack"}},
+        {"toolName":"spacelift.query","toolInput":{"query":"query { stacks { id } }"}},
+        {"tool":{"name":"spacelift__provider"},"arguments":{"provider":"aws"}},
+        {"tool_name":"mcp__spacelift__list_stacks","tool_input":{}},
+        {"tool_name":"mcp__spacelift__get_run","tool_input":{"run_id":"run-1"}},
+        {"tool_name":"mcp__spacelift__get_run_logs","tool_input":{"run_id":"run-1"}},
+        {"tool_name":"mcp__spacelift__get_run_changes","tool_input":{"run_id":"run-1"}},
+        {"tool_name":"mcp__spacelift__list_resources","tool_input":{"stack_id":"stack-1"}},
+        {"tool_name":"mcp__spacelift__get_module","tool_input":{"module_id":"module-1"}},
+        {"tool_name":"mcp__spacelift__get_audit_trail","tool_input":{}}
+      ]
+    },
+    {
+      "id": "spacelift-mcp-intent-write-scope",
+      "provider_patterns": ["spacelift", "*spacelift*"],
+      "tool_patterns": ["intent"],
+      "operation_class": "mutate",
+      "target_fields": ["project", "resource", "resource_id", "stack_id"],
+      "never_log_fields": ["token", "authorization", "credentials", "config", "source", "workspace"],
+      "reason": "The whole Spacelift Intent tool requires write scope and is denied to agents, including read and status verbs exposed through that write-capable surface.",
+      "positive_fixtures": [
+        {"tool_name":"mcp__spacelift__intent","tool_input":{"operation":"delete","resource_id":"r-1"}},
+        {"tool_name":"mcp__spacelift__intent","tool_input":{"operation":"read","resource_id":"r-1"}},
+        {"tool_name":"mcp__spacelift__intent","tool_input":{"operation":"status","project":"p"}}
+      ],
+      "negative_fixtures": [
+        {"tool_name":"mcp__spacelift__provider","tool_input":{"provider":"aws"}},
+        {"tool_name":"mcp__spacelift__query","tool_input":{"query":"query { stacks { id } }"}}
+      ]
+    },
+    {
+      "id": "spacelift-mcp-graphql-mutation",
+      "provider_patterns": ["spacelift", "*spacelift*"],
+      "tool_patterns": ["query", "api", "graphql"],
+      "operation_class": "mutate",
+      "target_fields": ["stack_id", "run_id"],
+      "never_log_fields": ["token", "authorization", "headers", "query", "variables"],
+      "argument_conditions": {"graphql_fields": ["query", "document", "operation"]},
+      "reason": "A GraphQL mutation document cannot be treated as read-only.",
+      "positive_fixtures": [{"tool_name":"mcp__spacelift__query","tool_input":{"query":"mutation { stackDelete(id: \"x\") { id } }"}}],
+      "negative_fixtures": [{"tool_name":"mcp__spacelift__query","tool_input":{"query":"query { stacks { id } }"}}]
+    }
+  ],
+  "classifications": [
+    {"id":"spacelift-observe","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["spacectl"],"pattern":"^(?:whoami|version)(?:\\s|$)|^(?:stack|run|resource|module|audit-trail)\\s+(?:list|show|details|logs|changes|get)(?:\\s|$)|^api\\b[^;|]*(?:query|\\{)"}},
+    {"id":"spacelift-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["spacectl"],"pattern":"^(?:stack|run|task|provider|module|blueprint|template|policy|space|context|workerpool)\\s+(?:deploy|confirm|discard|cancel|create|update|delete|publish)(?:\\s|$)"}}
+  ],
+  "structured_tools": {"strict_allowlist": false}
+}

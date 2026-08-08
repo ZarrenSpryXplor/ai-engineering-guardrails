@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "source-control-self-approval-or-merge",
+      "description": "Block PR approval and merge operations.",
+      "risk_category": "review_boundary_bypass",
+      "operation_class": "privilege-escalation",
+      "rollout_mode": "deny",
+      "reason": "Agent-authored work must remain subject to an independent human-controlled review and merge boundary.",
+      "matching_strategy": {"type": "command_regex", "executables": ["gh", "az"], "patterns_by_executable": {"gh": "^pr\\s+(?:merge\\b|review\\b[^;|]*(?:--approve\\b|-a(?:\\s|$)))", "az": "^repos\\s+pr\\s+(?:set-vote\\b[^;|]*(?:approve|10)|update\\b[^;|]*--status(?:=|\\s+)completed\\b)"}},
+      "must_match": ["gh pr merge 42 --squash", "gh pr review 42 --approve", "az repos pr set-vote --id 42 --vote approve", "az repos pr update --id 42 --status completed"],
+      "must_not_match": ["gh pr view 42", "gh pr checks 42", "gh pr review 42 --comment -b 'needs tests'", "az repos pr show --id 42", "echo 'gh pr merge 42'"]
+    },
+    {
+      "id": "source-control-protection-or-secret-change",
+      "description": "Block branch/ruleset, CI permission, and repository or environment secret changes.",
+      "risk_category": "repository_control_weakening",
+      "operation_class": "guardrail-modification",
+      "rollout_mode": "deny",
+      "reason": "Repository protection, CI identity, and secret configuration changes require a separately authorised workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["gh", "az"], "patterns_by_executable": {"gh": "^(?:secret\\s+(?:set|delete)|api\\b[^;|]*(?:-X|--method)(?:=|\\s+)(?:PUT|PATCH|DELETE)\\b[^;|]*(?:branches/.*/protection|rulesets|actions/secrets|environments))", "az": "^(?:repos\\s+policy\\s+(?:update|delete)|devops\\s+security\\s+permission\\s+update|pipelines\\s+variable-group\\s+variable\\s+(?:create|update|delete))"}},
+      "must_match": ["gh secret set DEPLOY_TOKEN", "gh secret delete DEPLOY_TOKEN", "gh api -X DELETE repos/org/repo/branches/main/protection", "gh api --method PATCH repos/org/repo/rulesets/1", "az repos policy update --id 1 --blocking false", "az devops security permission update --namespace-id synthetic --subject synthetic --allow-bit 1"],
+      "must_not_match": ["gh secret list", "gh api repos/org/repo/branches/main/protection", "gh repo view", "az repos policy list", "az devops project show --project example", "grep -R 'gh secret set' docs"]
+    },
+    {
+      "id": "source-control-release-or-deployment",
+      "description": "Block release publication and explicit production deployment triggers.",
+      "risk_category": "release_or_production_deployment",
+      "operation_class": "publish",
+      "rollout_mode": "deny",
+      "reason": "Release publication and production deployment are human-controlled delivery operations.",
+      "matching_strategy": {"type": "command_regex", "executables": ["gh", "az"], "patterns_by_executable": {"gh": "^(?:release\\s+(?:create|upload|delete)|workflow\\s+run\\b[^;|]*(?:prod|production|deploy|release))", "az": "^pipelines\\s+(?:run\\b[^;|]*(?:prod|production|deploy|release)|release\\s+create|runs\\s+delete)"}},
+      "must_match": ["gh release create v1.0", "gh release upload v1.0 artifact.zip", "gh workflow run deploy-production.yml", "az pipelines run --name production-deploy", "az pipelines release create --definition-id 4", "az pipelines runs delete --id 12"],
+      "must_not_match": ["gh release view v1.0", "gh workflow list", "gh run view 12", "az pipelines list", "az pipelines runs show --id 12", "echo 'gh release create v1.0'"]
+    }
+  ],
+  "classifications": [
+    {"id": "source-control-observe", "operation_class": "observe", "matching_strategy": {"type": "command_regex", "executables": ["gh", "az"], "patterns_by_executable": {"gh": "^(?:pr|run|workflow|release|repo|secret)\\s+(?:view|list|checks|status)(?:\\s|$)|^api\\s+(?!.*(?:-X|--method))", "az": "^(?:repos\\s+pr|repos\\s+policy|pipelines|devops\\s+project)\\s+(?:show|list|runs\\s+show)(?:\\s|$)"}}},
+    {"id": "source-control-review-comment", "operation_class": "mutate", "matching_strategy": {"type": "command_regex", "executables": ["gh"], "pattern": "^pr\\s+(?:comment|review\\b[^;|]*(?:--comment|--request-changes))(?:\\s|$)"}}
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "terraform",
+  "type": "infrastructure",
+  "description": "Terraform configuration, plans, state-sensitive workflows, and workspaces.",
+  "file_detectors": ["*.tf", "*.tf.json", ".terraform.lock.hcl", "terraform.rc", ".terraformrc"],
+  "directory_detectors": [".terraform"],
+  "explicit_exclusions": ["**/.terraform/**", "**/vendor/**", "**/examples/generated/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-terraform/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Terraform source filenames are authoritative configuration, but state and cache paths are excluded."]
+}

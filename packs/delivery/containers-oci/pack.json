@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "containers-oci",
+  "type": "delivery",
+  "description": "Local container and OCI build, inspection, and publication safety for Docker-compatible tooling.",
+  "file_detectors": ["Dockerfile", "Dockerfile.*", "Containerfile", "Containerfile.*", "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml", ".dockerignore", ".containerignore"],
+  "directory_detectors": ["docker", "containers"],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/generated/**"],
+  "dependent_packs": ["package-publication", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-containers-oci/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": [],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Docker, Podman, Buildah, Skopeo, and nerdctl flags vary; rules cover only high-confidence common forms and never install tooling."]
+}

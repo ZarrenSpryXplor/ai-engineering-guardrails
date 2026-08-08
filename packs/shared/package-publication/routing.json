@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"release-candidate-preparation","tier":"balanced","reasoning":"medium","write":true}],"escalate_on":["publication request","signing credential access","hosted release mutation"]}

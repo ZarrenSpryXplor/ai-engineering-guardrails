@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-guardrails/waiver.schema.json",
+  "type": "object",
+  "required": ["id", "rule_id", "repository_scope", "target_scope", "command_tool_call_digest", "reason", "change_reference", "created_by", "created_at", "expires_at", "maximum_uses", "remaining_uses"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^waiver-[0-9a-f]{32}$"},
+    "rule_id": {"type": "string"},
+    "repository_scope": {"type": "string"},
+    "target_scope": {"type": "string"},
+    "command_tool_call_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "reason": {"type": "string", "minLength": 1},
+    "change_reference": {"type": "string", "minLength": 1},
+    "created_by": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "maximum_uses": {"type": "integer", "minimum": 1, "maximum": 10},
+    "remaining_uses": {"type": "integer", "minimum": 0, "maximum": 10}
+  },
+  "additionalProperties": false
+}

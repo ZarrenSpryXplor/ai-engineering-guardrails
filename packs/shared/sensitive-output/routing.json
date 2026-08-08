@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"sensitive-log-summary","tier":"balanced","reasoning":"medium","write":false}],"escalate_on":["credential exposure","private key","production data"]}

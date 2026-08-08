@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "rules": [],
+  "classifications": [
+    {"id": "api-schema-validate", "operation_class": "validate", "matching_strategy": {"type": "command_regex", "executables": ["buf", "protoc", "spectral", "graphql-inspector", "openapi-generator", "asyncapi"], "patterns_by_executable": {"buf": "^(?:lint|breaking)(?:\\s|$)", "protoc": "^(?=.*--descriptor_set_out)(?=.*\\.proto)", "spectral": "^lint(?:\\s|$)", "graphql-inspector": "^(?:diff|validate)(?:\\s|$)", "openapi-generator": "^validate(?:\\s|$)", "asyncapi": "^validate(?:\\s|$)"}}}
+  ]
+}

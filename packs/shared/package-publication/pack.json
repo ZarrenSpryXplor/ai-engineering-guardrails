@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "package-publication",
+  "type": "shared",
+  "description": "Human-controlled publication boundary for packages and releases.",
+  "file_detectors": [],
+  "directory_detectors": [],
+  "explicit_exclusions": [],
+  "dependent_packs": [],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-package-publication/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Publication is denied even when preparing or finishing a release is requested."]
+}

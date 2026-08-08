@@ -1,0 +1,12 @@
+{
+  "_generated": "GENERATED — DO NOT EDIT. Canonical source: enforcement policies and adapters/cursor/.",
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "__WORKSTATION_GUARDRAILS_COMMAND__",
+        "matcher": ".*"
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,17 @@
+{
+  "_generated": "GENERATED — DO NOT EDIT. Canonical source: adapters/cursor/cli-permissions.recommended.json.",
+  "description": "Recommendation for Cursor CLI only; not an automatically installed IDE-wide policy.",
+  "permissions": {
+    "allow": [
+      "Shell(git status)",
+      "Shell(git diff)",
+      "Read(**/*.md)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Write(**/*.key)",
+      "Write(**/.env*)",
+      "Shell(rm:-rf /)"
+    ]
+  }
+}

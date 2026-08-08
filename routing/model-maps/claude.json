@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "product": "claude",
+  "tiers": {
+    "economy": {
+      "model": "haiku",
+      "availability": "unverified"
+    },
+    "balanced": {
+      "model": "sonnet",
+      "availability": "unverified"
+    },
+    "deep": {
+      "model": "opus",
+      "availability": "unverified"
+    }
+  },
+  "reasoning_field": "effort",
+  "global_subagent_model_environment_variable": false,
+  "main_session_unchanged": true,
+  "documentation": "https://code.claude.com/docs/en/sub-agents"
+}

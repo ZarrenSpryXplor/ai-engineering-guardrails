@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"container-config","class":"validate","selection":"repository-native","commands":["docker compose config"]},{"id":"container-build","class":"validate","selection":"reviewed-local-context","commands":["docker build <local-context>"]}],"network_tests_forbidden":true,"publication_forbidden":true}

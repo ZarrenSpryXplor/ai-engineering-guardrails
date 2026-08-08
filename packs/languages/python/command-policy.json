@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "python-system-or-insecure-install",
+      "description": "Block Python install flags that bypass system or transport safety.",
+      "risk_category": "global_tooling_or_transport_bypass",
+      "operation_class": "privilege-escalation",
+      "reason": "Python installation must not bypass system-package or TLS protections.",
+      "matching_strategy": {"type": "command_regex", "executables": ["pip", "pip3", "python", "python3", "py", "uv"], "pattern": "(?:--break-system-packages|--trusted-host|--cert\\s+/dev/null)"},
+      "must_match": ["pip install --break-system-packages demo", "python -m pip install --trusted-host registry.invalid demo", "uv pip install --break-system-packages demo"],
+      "must_not_match": ["python -m venv .venv", "uv sync --frozen", "pytest", "echo 'pip install --break-system-packages demo'"]
+    },
+    {
+      "id": "python-publication",
+      "description": "Block Python package publication.",
+      "risk_category": "external_publication",
+      "operation_class": "publish",
+      "reason": "Python package publication is a human-controlled operation.",
+      "matching_strategy": {"type": "command_regex", "executables": ["twine", "python", "python3", "uv", "poetry", "pdm"], "pattern": "(?:^upload(?:\\s|$)|^-m\\s+twine\\s+upload(?:\\s|$)|^publish(?:\\s|$))"},
+      "must_match": ["twine upload dist/*", "python -m twine upload dist/a.whl", "uv publish", "poetry publish"],
+      "must_not_match": ["twine check dist/*", "uv build", "poetry build", "python -m build"]
+    }
+  ]
+}

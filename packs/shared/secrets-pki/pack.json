@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "secrets-pki",
+  "type": "shared",
+  "description": "Metadata-only secret and certificate handling across vaults, Kubernetes, PEM, PKCS#12, JKS, and TLS tooling.",
+  "file_detectors": ["openssl.cnf", "openssl.conf", ".sops.yaml", "cert-manager.yaml", "cert-manager.yml"],
+  "directory_detectors": ["pki", "certificates", "certs", "security/certificates"],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/generated/**", "**/tests/fixtures/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-secrets-pki/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": ["structured-tool-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Private-key and keystore formats vary; only metadata-oriented operations and high-confidence exposure forms are classified."]
+}

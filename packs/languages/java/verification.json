@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"java-targeted-test","class":"test","selection":"affected-module-first","commands":["./mvnw -pl <module> test","./gradlew :<module>:test"]},{"id":"java-broad-check","class":"verify","selection":"repository-defined","commands":["./mvnw verify","./gradlew check"]}]}

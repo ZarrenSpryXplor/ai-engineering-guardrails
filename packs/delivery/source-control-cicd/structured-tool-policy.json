@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "source-control-structured-merge-approval-release",
+      "provider_patterns": ["github", "*github*", "azure-devops", "*azure*devops*"],
+      "tool_patterns": ["merge_pull_request", "mergePullRequest", "approve_pull_request", "approvePullRequest", "create_release", "createRelease", "trigger_deployment", "triggerDeployment", "delete_workflow_run", "deleteWorkflowRun"],
+      "operation_class": "publish",
+      "rollout_mode": "deny",
+      "target_fields": ["repository", "repo", "pull_request", "environment", "pipeline"],
+      "never_log_fields": ["token", "authorization", "secret", "body", "content", "variables"],
+      "reason": "Merge, approval, release, deployment, and history deletion require an independent human-controlled delivery workflow.",
+      "positive_fixtures": [{"tool_name":"mcp__github__merge_pull_request","tool_input":{"repository":"org/example","pull_request":42}},{"tool_name":"mcp__azure-devops__trigger_deployment","tool_input":{"environment":"prd"}}],
+      "negative_fixtures": [{"tool_name":"mcp__github__get_pull_request","tool_input":{"repository":"org/example","pull_request":42}},{"tool_name":"mcp__azure-devops__list_pipeline_runs","tool_input":{"pipeline":"build"}}]
+    },
+    {
+      "id": "source-control-structured-secret-or-protection-change",
+      "provider_patterns": ["github", "*github*", "azure-devops", "*azure*devops*"],
+      "tool_patterns": ["get_secret_value", "set_secret", "delete_secret", "update_branch_protection", "delete_branch_protection", "update_ruleset", "getSecretValue", "setSecret", "deleteSecret", "updateBranchProtection", "deleteBranchProtection", "updateRuleset"],
+      "operation_class": "guardrail-modification",
+      "rollout_mode": "deny",
+      "target_fields": ["repository", "repo", "environment", "branch", "ruleset"],
+      "never_log_fields": ["token", "authorization", "secret", "value", "private_key", "credential"],
+      "reason": "Repository protection and secret operations are protected governance changes.",
+      "positive_fixtures": [{"tool_name":"mcp__github__set_secret","tool_input":{"repository":"org/example","name":"DEPLOY_TOKEN","value":"synthetic"}},{"tool_name":"mcp__github__update_branch_protection","tool_input":{"branch":"main"}}],
+      "negative_fixtures": [{"tool_name":"mcp__github__list_secrets","tool_input":{"repository":"org/example"}},{"tool_name":"mcp__github__get_branch_protection","tool_input":{"branch":"main"}}]
+    }
+  ]
+}

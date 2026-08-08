@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "kustomize",
+  "type": "infrastructure",
+  "description": "Kustomize bases, components, and overlays.",
+  "file_detectors": ["kustomization.yaml", "kustomization.yml", "Kustomization"],
+  "directory_detectors": ["bases", "base", "overlays", "components"],
+  "explicit_exclusions": ["**/vendor/**", "**/dist/**"],
+  "dependent_packs": ["kubernetes", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-kustomize/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Both standalone kustomize and kubectl kustomize are supported when already available."]
+}

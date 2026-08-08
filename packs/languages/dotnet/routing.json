@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"dotnet-implementation","tier":"balanced","reasoning":"medium","write":true},{"id":"dotnet-framework-change","tier":"deep","reasoning":"high","write":false}],"escalate_on":["target framework change","public API change","migration execution"]}

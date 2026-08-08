@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"dependency-diff","class":"validate","selection":"manifest-and-lock","commands":["git diff -- <manifest> <lockfile>"]},{"id":"dependency-targeted-test","class":"test","selection":"affected-module","commands":["<repository-test-command>"]}]}

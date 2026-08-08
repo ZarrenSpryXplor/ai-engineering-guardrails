@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"kustomize-source-change","tier":"balanced","reasoning":"medium","write":true},{"id":"kustomize-render","tier":"economy","reasoning":"low","write":false}],"escalate_on":["resource identity change","CRD change","remote apply"]}

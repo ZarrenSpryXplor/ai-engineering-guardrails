@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"prometheus-config","class":"validate","selection":"repository-native","commands":["promtool check config <file>"]},{"id":"collector-config","class":"validate","selection":"repository-native","commands":["repository-provided OpenTelemetry collector validation command"]}],"network_tests_forbidden":true,"remote_mutation_forbidden":true}

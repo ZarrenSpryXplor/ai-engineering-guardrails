@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "id": "opa-validator",
+      "kind": "external-validator",
+      "source": "https://www.openpolicyagent.org/docs/latest/",
+      "version": "pin-an-approved-version",
+      "digest": null,
+      "allowed_tools": ["opa test"],
+      "denied_tools": [],
+      "observed_tools": ["opa test"],
+      "executable_files": [],
+      "credential_class": "none",
+      "expected_network_destinations": []
+    },
+    {
+      "id": "spacelift-read-only-mcp",
+      "kind": "mcp-server",
+      "source": "https://app.spacelift.io/mcp",
+      "version": null,
+      "digest": null,
+      "allowed_tools": ["discover", "query", "provider"],
+      "denied_tools": ["mutate", "intent"],
+      "observed_tools": ["discover", "query", "provider", "mutate", "intent"],
+      "executable_files": [],
+      "credential_class": "read-only",
+      "expected_network_destinations": ["app.spacelift.io"]
+    }
+  ]
+}

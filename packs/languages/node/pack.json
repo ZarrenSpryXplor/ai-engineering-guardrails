@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "node",
+  "type": "language",
+  "description": "Node.js, JavaScript, and TypeScript projects using npm, pnpm, Yarn, or workspace tools.",
+  "file_detectors": ["package.json", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", ".yarnrc.yml", "turbo.json", "nx.json", "lerna.json", "tsconfig*.json", "eslint.config.*", ".eslintrc*", "vite.config.*", "webpack.config.*"],
+  "directory_detectors": [],
+  "explicit_exclusions": ["**/node_modules/**", "**/.yarn/cache/**", "**/.next/**", "**/vendor/**"],
+  "dependent_packs": ["dependency-management", "package-publication", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-node/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Package-manager precedence is packageManager, repository configuration, lockfile, then explicit override."]
+}

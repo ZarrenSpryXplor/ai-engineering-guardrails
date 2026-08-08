@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "capability_tiers": [
+    "economy",
+    "balanced",
+    "deep"
+  ],
+  "reasoning_tiers": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "agent_output_limit_bytes": 16384,
+  "task_classes": [
+    {
+      "id": "discovery",
+      "description": "File, symbol, ownership, and repository-structure discovery.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "documentation_lookup",
+      "description": "Bounded lookup and comparison of authoritative documentation.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "log_summarisation",
+      "description": "Deterministic summarisation of bounded logs without remediation decisions.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "test_output_summarisation",
+      "description": "Summarisation and classification of bounded test output.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "repetitive_classification",
+      "description": "Repetitive classification with explicit categories and bounded input.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "bounded_text_processing",
+      "description": "High-volume text processing with a fixed transformation and bounded source set.",
+      "risk": "low",
+      "baseline_tier": "economy",
+      "read_only": true
+    },
+    {
+      "id": "implementation",
+      "description": "Ordinary bounded implementation after scope and expected behaviour are known.",
+      "risk": "ordinary",
+      "baseline_tier": "balanced",
+      "read_only": false
+    },
+    {
+      "id": "debugging",
+      "description": "Ordinary diagnosis and repair requiring interpretation of repository evidence.",
+      "risk": "ordinary",
+      "baseline_tier": "balanced",
+      "read_only": false
+    },
+    {
+      "id": "code_review",
+      "description": "Ordinary code review for correctness, regressions, security, and compatibility.",
+      "risk": "ordinary",
+      "baseline_tier": "balanced",
+      "read_only": true
+    },
+    {
+      "id": "interpreted_test_analysis",
+      "description": "Test analysis where failures or coverage require engineering judgement.",
+      "risk": "ordinary",
+      "baseline_tier": "balanced",
+      "read_only": true
+    },
+    {
+      "id": "contextual_documentation",
+      "description": "Documentation changes that require repository and behaviour context.",
+      "risk": "ordinary",
+      "baseline_tier": "balanced",
+      "read_only": false
+    },
+    {
+      "id": "architecture",
+      "description": "Architecture and cross-subsystem design decisions.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": true
+    },
+    {
+      "id": "security_sensitive",
+      "description": "Security-sensitive design, implementation, or review.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "authentication_authorisation",
+      "description": "Authentication, authorisation, identity, and permission-boundary changes.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "cryptography",
+      "description": "Cryptographic choices, protocols, key handling, or implementations.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "distributed_systems",
+      "description": "Distributed-systems correctness, consistency, ordering, and recovery.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "complex_concurrency",
+      "description": "Complex concurrency, synchronisation, race, and deadlock behaviour.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "production_infrastructure",
+      "description": "Production infrastructure or environment changes.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "destructive_data_migration",
+      "description": "Persistent-data migrations with destructive or irreversible potential.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    },
+    {
+      "id": "public_contract_change",
+      "description": "Changes to public APIs, schemas, protocols, or compatibility guarantees.",
+      "risk": "high",
+      "baseline_tier": "deep",
+      "read_only": false
+    }
+  ]
+}

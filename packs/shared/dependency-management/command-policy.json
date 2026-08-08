@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "dependency-global-cache-destruction",
+      "description": "Block deletion or full clearing of common machine-global dependency caches.",
+      "risk_category": "global_developer_state_loss",
+      "operation_class": "destructive",
+      "reason": "Do not destroy machine-global dependency caches as a repository repair shortcut.",
+      "matching_strategy": {"type": "command_regex", "executables": ["rm", "gradle", "mvn", "dotnet", "npm", "pnpm", "yarn"], "pattern": "(?:-r[fF]?\\s+(?:~|\\$HOME)/(?:\\.m2|\\.gradle|\\.nuget)|nuget\\s+locals\\s+all\\s+--clear|cache\\s+clean\\s+--force|store\\s+prune\\s+--force)"},
+      "must_match": ["rm -rf ~/.m2", "rm -rf $HOME/.gradle", "dotnet nuget locals all --clear", "npm cache clean --force"],
+      "must_not_match": ["rm -rf build", "rm -rf .gradle-test", "npm cache verify", "dotnet restore", "echo 'rm -rf ~/.m2'"]
+    }
+  ]
+}

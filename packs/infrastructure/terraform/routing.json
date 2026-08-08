@@ -1,0 +1,1 @@
+{"schema_version":1,"task_classes":[{"id":"terraform-source-change","tier":"deep","reasoning":"high","write":true},{"id":"terraform-plan-summary","tier":"balanced","reasoning":"medium","write":false}],"escalate_on":["state operation","remote mutation","prd lifecycle","resource deletion"]}

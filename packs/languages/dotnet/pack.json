@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "dotnet",
+  "type": "language",
+  "description": ".NET projects using C#, F#, Visual Basic, solutions, and standard .NET tooling.",
+  "file_detectors": ["*.sln", "*.slnx", "*.csproj", "*.fsproj", "*.vbproj", "global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", "dotnet-tools.json"],
+  "directory_detectors": [],
+  "explicit_exclusions": ["**/bin/**", "**/obj/**", "**/vendor/**"],
+  "dependent_packs": ["dependency-management", "package-publication", "database-migrations", "sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-dotnet/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Project files are build manifests, so matching them is not source-extension-only inference."]
+}

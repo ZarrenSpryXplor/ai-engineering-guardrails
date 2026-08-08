@@ -1,0 +1,17 @@
+{
+  "_generated": "GENERATED — DO NOT EDIT. Canonical source: enterprise/claude/README.md and official Claude managed-settings documentation.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/enterprise/python /enterprise/ai-guardrails/hook_runtime.py --product claude",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ]
+  }
+}

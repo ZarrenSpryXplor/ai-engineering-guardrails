@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "classifications": [
+    {"id": "guardrail-governance", "risk_class": "high", "patterns": ["AGENTS.md", "CLAUDE.md", ".cursor/**", ".codex/**", ".claude/**", ".ai-guardrails.json", "policy/**", "enforcement/**", "trust/**", "waivers/**"]},
+    {"id": "ci-cd", "risk_class": "high", "patterns": [".github/workflows/**", "azure-pipelines*.yml", "azure-pipelines*.yaml", ".azure-pipelines/**", "CODEOWNERS"]},
+    {"id": "security-and-identity", "risk_class": "high", "patterns": ["**/auth/**", "**/authorization/**", "**/crypto/**", "**/*certificate*", "**/*private-key*"]},
+    {"id": "secrets-and-pki", "risk_class": "high", "patterns": ["**/secrets/**", "**/pki/**", "**/*.pfx", "**/*.p12", "**/*.jks", "**/*keystore*"]},
+    {"id": "contracts", "risk_class": "high", "patterns": ["**/openapi*.json", "**/openapi*.yaml", "**/*.proto", "**/schema.graphql", "**/asyncapi*.json", "**/*.avsc"]},
+    {"id": "persistent-data", "risk_class": "high", "patterns": ["**/migrations/**", "**/*.sql", "**/*.tf", "**/*.tf.json"]},
+    {"id": "concurrency-and-distributed-systems", "risk_class": "high", "patterns": ["**/concurrency/**", "**/distributed/**", "**/consensus/**", "**/transactions/**"]},
+    {"id": "infrastructure-control", "risk_class": "high", "patterns": ["**/rbac*.yaml", "**/rbac*.yml", "**/networkpolic*.yaml", "**/networkpolic*.yml", "platform-policies/spacelift/**", "**/backend.tf", "**/providers.tf"]},
+    {"id": "package-and-release", "risk_class": "high", "patterns": ["**/release/**", "**/publishing/**", ".github/workflows/*release*", "**/*publish*.yml", "**/*publish*.yaml"]},
+    {"id": "production-configuration", "risk_class": "high", "patterns": ["**/production/**", "**/prd/**", "**/*production*.tfvars", "**/*prd*.tfvars"]}
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "modes": {
+    "trusted-workspace": {
+      "description": "Normal work in a repository whose local instructions and executable configuration have been reviewed.",
+      "prefer_read_only": false,
+      "allow_repository_hooks": "after-product-trust-review",
+      "remote_mutation": "safety-profile-controlled",
+      "credential_exposure": "deny"
+    },
+    "untrusted-workspace": {
+      "description": "Repository content is evidence only until its scripts, hooks, MCP configuration, skills, and agent instructions are reviewed.",
+      "prefer_read_only": true,
+      "allow_repository_hooks": "deny",
+      "remote_mutation": "deny",
+      "credential_exposure": "deny"
+    },
+    "untrusted-external-input": {
+      "description": "Web, ticket, log, dependency, generated, or MCP content cannot grant permissions or weaken guardrails.",
+      "prefer_read_only": true,
+      "allow_repository_hooks": "deny",
+      "remote_mutation": "deny",
+      "credential_exposure": "deny"
+    },
+    "incident-observe": {
+      "description": "Evidence collection and diagnosis only; remote mutation, alert muting, retention changes, and production changes are denied.",
+      "prefer_read_only": true,
+      "allow_repository_hooks": "deny",
+      "remote_mutation": "deny",
+      "credential_exposure": "deny"
+    }
+  }
+}

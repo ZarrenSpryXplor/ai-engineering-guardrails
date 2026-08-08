@@ -1,0 +1,26 @@
+# GENERATED — DO NOT EDIT
+# Canonical source: enterprise/codex/README.md and official Codex managed-configuration schema.
+# Example for Codex 0.138.0 or later; test every managed client version before deployment.
+allowed_approval_policies = ["untrusted", "on-request"]
+default_permissions = ":workspace"
+allow_managed_hooks_only = true
+
+[allowed_permission_profiles]
+":read-only" = true
+":workspace" = true
+
+[features]
+hooks = true
+
+[hooks]
+managed_dir = "/enterprise/hooks"
+windows_managed_dir = 'C:\enterprise\hooks'
+
+[[hooks.PreToolUse]]
+matcher = ".*"
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "/enterprise/python/bin/python3 /enterprise/hooks/hook_runtime.py --product codex"
+command_windows = 'C:\Python311\python.exe C:\enterprise\hooks\hook_runtime.py --product codex'
+timeout = 10
+statusMessage = "Checking managed workstation guardrails"

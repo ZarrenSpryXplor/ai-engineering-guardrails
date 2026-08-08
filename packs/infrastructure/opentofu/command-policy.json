@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "opentofu-destructive-state-or-apply",
+      "description": "Block OpenTofu destroy, unsafe apply, and destructive state operations.",
+      "risk_category": "infrastructure_destruction",
+      "operation_class": "destructive",
+      "reason": "OpenTofu destruction, auto-approved apply, and destructive state operations require an external human-controlled workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["tofu"], "pattern": "(?:^|\\s)(?:destroy)(?:\\s|$)|^apply\\b[^;|]*(?:-auto-approve|(?:destroy|destroy-plan)[^\\s]*\\.?(?:tfplan|plan)?)(?:\\s|$)|^state\\s+(?:rm|push)(?:\\s|$)|^force-unlock\\b[^;|]*(?:-force|--force)|^workspace\\s+delete(?:\\s|$)"},
+      "must_match": ["tofu destroy", "tofu apply -auto-approve", "tofu apply destroy.plan", "tofu state rm module.db", "tofu state push state.tfstate", "tofu workspace delete old"],
+      "must_not_match": ["tofu fmt -check", "tofu validate", "tofu plan", "tofu apply reviewed.tfplan", "tofu show reviewed.tfplan", "echo 'tofu destroy'"]
+    }
+  ],
+  "classifications": [
+    {"id":"opentofu-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["tofu"],"pattern":"^(?:fmt|validate|providers|plan)(?:\\s|$)|^show\\s+[^-][^\\s]*"}},
+    {"id":"opentofu-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["tofu"],"pattern":"^(?:apply|import|taint|untaint|force-unlock)(?:\\s|$)|^workspace\\s+(?:new|delete)(?:\\s|$)|^state\\s+mv(?:\\s|$)"}}
+  ]
+}

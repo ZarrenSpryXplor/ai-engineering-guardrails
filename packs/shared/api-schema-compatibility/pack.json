@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "api-schema-compatibility",
+  "type": "shared",
+  "description": "Compatibility review for OpenAPI, JSON Schema, Protocol Buffers, GraphQL, AsyncAPI, Avro, and event contracts.",
+  "file_detectors": ["openapi.json", "openapi.yaml", "openapi.yml", "schema.graphql", "schema.graphqls", "asyncapi.json", "asyncapi.yaml", "asyncapi.yml", "buf.yaml", "buf.work.yaml", "buf.gen.yaml"],
+  "directory_detectors": ["proto", "protos", "schemas", "contracts", "api-spec"],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/generated/**", "**/tests/fixtures/**"],
+  "dependent_packs": [],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-api-schema-compatibility/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "structured_tool_policy_fragments": [],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["The standard-library validator checks JSON structure only; semantic compatibility requires a repository-native compiler or compatibility tool."]
+}

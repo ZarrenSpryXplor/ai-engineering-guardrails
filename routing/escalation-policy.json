@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "from_tiers": {
+    "economy": "balanced",
+    "balanced": "deep"
+  },
+  "triggers": [
+    {
+      "id": "conflicting-evidence",
+      "description": "Evidence from authoritative sources or repository behaviour conflicts."
+    },
+    {
+      "id": "ambiguous-requirements",
+      "description": "Material requirements remain ambiguous after bounded investigation."
+    },
+    {
+      "id": "multiple-viable-paths",
+      "description": "More than two plausible implementation paths remain."
+    },
+    {
+      "id": "security-sensitive",
+      "description": "Security-sensitive behaviour or a trust boundary is encountered."
+    },
+    {
+      "id": "public-contract",
+      "description": "A public API, schema, protocol, or compatibility contract may change."
+    },
+    {
+      "id": "production-or-persistent-data",
+      "description": "Production systems, infrastructure, or persistent data are involved."
+    },
+    {
+      "id": "diagnosis-attempts-exhausted",
+      "description": "A bounded diagnosis has failed after two attempts."
+    },
+    {
+      "id": "scope-threshold",
+      "description": "Configured subsystem or file-scope thresholds are crossed."
+    },
+    {
+      "id": "inconsistent-verification",
+      "description": "Verification results are inconsistent or cannot be reproduced."
+    },
+    {
+      "id": "insufficient-capability-or-context",
+      "description": "The current agent cannot establish a reliable answer with its capability or context."
+    }
+  ],
+  "constraints": {
+    "high_risk_minimum_tier": "deep",
+    "economy_may_collect_high_risk_evidence": true,
+    "economy_may_make_high_risk_final_decision": false,
+    "retry_instead_of_escalation_limit": 1,
+    "resume_existing_agent_when_context_is_reusable": true,
+    "stop_agents_when_no_longer_useful": true
+  }
+}

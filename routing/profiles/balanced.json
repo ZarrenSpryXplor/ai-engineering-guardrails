@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "name": "balanced",
+  "description": "Recommended default with economy research, balanced ordinary work, and deep high-risk decisions.",
+  "task_tiers": {
+    "discovery": "economy",
+    "documentation_lookup": "economy",
+    "log_summarisation": "economy",
+    "test_output_summarisation": "economy",
+    "repetitive_classification": "economy",
+    "bounded_text_processing": "economy",
+    "implementation": "balanced",
+    "debugging": "balanced",
+    "code_review": "balanced",
+    "interpreted_test_analysis": "balanced",
+    "contextual_documentation": "balanced",
+    "architecture": "deep",
+    "security_sensitive": "deep",
+    "authentication_authorisation": "deep",
+    "cryptography": "deep",
+    "distributed_systems": "deep",
+    "complex_concurrency": "deep",
+    "production_infrastructure": "deep",
+    "destructive_data_migration": "deep",
+    "public_contract_change": "deep"
+  },
+  "reasoning_by_tier": {
+    "economy": "low",
+    "balanced": "medium",
+    "deep": "high"
+  },
+  "parallelism": {
+    "maximum_read_only_agents": 2,
+    "maximum_writing_agents": 1,
+    "parallel_writing_agents": false
+  },
+  "write_capability_by_tier": {
+    "economy": false,
+    "balanced": true,
+    "deep": true
+  },
+  "escalation": {
+    "maximum_bounded_attempts": 2,
+    "file_scope_threshold": 12,
+    "subsystem_scope_threshold": 2
+  }
+}

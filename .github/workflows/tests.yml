@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Build generated output
+        run: python tools/guardrails.py build
+
+      - name: Check generated output is committed
+        run: git diff --exit-code -- adapters dist
+
+      - name: Validate canonical and generated data
+        run: python tools/guardrails.py validate
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Compile Python sources
+        run: python -m compileall guardrails tools
+
+      - name: Scan repository
+        run: python tools/guardrails.py scan --repo . --format human

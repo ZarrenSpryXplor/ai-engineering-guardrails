@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"helm-lint","class":"validate","selection":"affected-chart","commands":["helm lint <chart>"]},{"id":"helm-render","class":"validate","selection":"exact-values-order","commands":["helm template <release> <chart> -f <values>"]}],"network_tests_forbidden":true}

@@ -1,0 +1,453 @@
+"""Deterministic generation and repository validation."""
+
+from __future__ import annotations
+
+import json
+import shlex
+import shutil
+import subprocess
+import tomllib
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+from . import packs, policy, routing
+from .util import PRODUCTS, ROOT, GuardrailsError, atomic_write, json_bytes, one_newline
+
+
+HOOK_PLACEHOLDER = "__WORKSTATION_GUARDRAILS_COMMAND__"
+GENERATED_ROOTS = (
+    ROOT / "dist/codex",
+    ROOT / "dist/claude",
+    ROOT / "dist/cursor",
+    ROOT / "dist/skills",
+    ROOT / "dist/enterprise",
+)
+
+
+def markdown_header(source: str) -> str:
+    return f"<!-- GENERATED — DO NOT EDIT\nCanonical source: {source}\n-->\n"
+
+
+def adapter_json(source: str, payload: Mapping[str, Any]) -> bytes:
+    value: dict[str, Any] = {
+        "_generated": f"GENERATED — DO NOT EDIT. Canonical source: {source}."
+    }
+    value.update(payload)
+    return json_bytes(value)
+
+
+def render_policy(product: str, manifest: Mapping[str, Any], manifest_path: Path) -> str:
+    sections = [
+        (manifest_path.parent / entry["path"]).read_text(encoding="utf-8").strip()
+        for entry in manifest["fragments"]
+        if product in entry["products"] and entry["load"] == "always"
+    ]
+    if not sections:
+        raise GuardrailsError(f"generated {product} policy would be empty")
+    output = one_newline(
+        markdown_header("policy/manifest.json and policy/fragments/")
+        + "\n# Workstation AI Guardrails\n\n"
+        + "\n\n".join(sections)
+    )
+    limit = manifest["output_limits_bytes"][product]
+    if len(output.encode("utf-8")) > limit:
+        raise GuardrailsError(f"generated {product} policy exceeds configured {limit}-byte limit")
+    return output
+
+
+def render_claude_rule(entry: Mapping[str, Any], manifest_path: Path) -> str:
+    source = manifest_path.parent / entry["path"]
+    return one_newline(
+        markdown_header(f"policy/{entry['path']}") + "\n" + source.read_text(encoding="utf-8").strip()
+    )
+
+
+def render_skill(skill_file: Path, canonical_prefix: str = "skills") -> str:
+    fields, body = policy.parse_skill(skill_file)
+    return one_newline(
+        "---\n"
+        f"name: {fields['name']}\n"
+        f"description: {fields['description']}\n"
+        "---\n\n"
+        "<!-- GENERATED — DO NOT EDIT\n"
+        f"Canonical source: {canonical_prefix}/{fields['name']}/SKILL.md\n"
+        "-->\n\n"
+        f"{body}"
+    )
+
+
+def _matches_codex_prefix(command: str, pattern: Sequence[Any]) -> bool:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    if len(tokens) < len(pattern):
+        return False
+    for token, expected in zip(tokens, pattern):
+        if isinstance(expected, str) and token != expected:
+            return False
+        if isinstance(expected, list) and token not in expected:
+            return False
+        if not isinstance(expected, (str, list)):
+            raise GuardrailsError("invalid codex_prefixes pattern in command policy")
+    return True
+
+
+def _starlark_list(values: Sequence[str], indent: str) -> str:
+    return "[\n" + "".join(f"{indent}{json.dumps(value, ensure_ascii=False)},\n" for value in values) + indent[:-4] + "]"
+
+
+def codex_rules(command_policy: Mapping[str, Any]) -> str:
+    sections = [
+        "# GENERATED — DO NOT EDIT",
+        "# Canonical sources: enforcement/command-policy.json and pack command-policy fragments.",
+        "# These experimental prefix rules are defence in depth. The shared hook handles",
+        "# wrappers and flag orderings that prefix matching cannot safely express.",
+    ]
+    generated = 0
+    for rule in command_policy["rules"]:
+        if rule.get("rollout_mode", "deny") != "deny":
+            continue
+        prefixes = rule.get("codex_prefixes", [])
+        if not isinstance(prefixes, list):
+            raise GuardrailsError(f"rule {rule['id']} has invalid codex_prefixes")
+        for pattern in prefixes:
+            if not isinstance(pattern, list) or not pattern:
+                raise GuardrailsError(f"rule {rule['id']} has an empty Codex prefix")
+            matches = [example for example in rule["must_match"] if _matches_codex_prefix(example, pattern)]
+            non_matches = [example for example in rule["must_not_match"] if not _matches_codex_prefix(example, pattern)]
+            if not matches or not non_matches:
+                raise GuardrailsError(f"rule {rule['id']} lacks Codex prefix match or non-match examples")
+            sections.extend(
+                [
+                    "",
+                    f"# {rule['id']}: {rule['description']}",
+                    "prefix_rule(",
+                    f"    pattern = {json.dumps(pattern, ensure_ascii=False)},",
+                    '    decision = "forbidden",',
+                    f"    justification = {json.dumps(rule['reason'], ensure_ascii=False)},",
+                    f"    match = {_starlark_list(matches, '        ')},",
+                    f"    not_match = {_starlark_list(non_matches, '        ')},",
+                    ")",
+                ]
+            )
+            generated += 1
+    if generated == 0:
+        raise GuardrailsError("Codex defence-in-depth rules would be empty")
+    return one_newline("\n".join(sections))
+
+
+def _hook_payload(product: str) -> dict[str, Any]:
+    if product == "cursor":
+        return {
+            "version": 1,
+            "hooks": {"preToolUse": [{"command": HOOK_PLACEHOLDER, "matcher": ".*"}]},
+        }
+    event = "PreToolUse"
+    hook = {
+        "type": "command",
+        "command": HOOK_PLACEHOLDER,
+        "timeout": 10,
+        "statusMessage": "Checking tool request against workstation guardrails",
+    }
+    return {"hooks": {event: [{"matcher": ".*", "hooks": [hook]}]}}
+
+
+def _enterprise_artifacts(selected: set[str]) -> dict[Path, bytes]:
+    artifacts: dict[Path, bytes] = {}
+    if "codex" in selected:
+        artifacts[ROOT / "dist/enterprise/codex/requirements.toml"] = one_newline(
+            "# GENERATED — DO NOT EDIT\n"
+            "# Canonical source: enterprise/codex/README.md and official Codex managed-configuration schema.\n"
+            "# Example for Codex 0.138.0 or later; test every managed client version before deployment.\n"
+            'allowed_approval_policies = ["untrusted", "on-request"]\n'
+            'default_permissions = ":workspace"\n'
+            "allow_managed_hooks_only = true\n\n"
+            "[allowed_permission_profiles]\n"
+            '":read-only" = true\n'
+            '":workspace" = true\n\n'
+            "[features]\n"
+            "hooks = true\n\n"
+            "[hooks]\n"
+            'managed_dir = "/enterprise/hooks"\n'
+            "windows_managed_dir = 'C:\\enterprise\\hooks'\n\n"
+            "[[hooks.PreToolUse]]\n"
+            'matcher = ".*"\n'
+            "[[hooks.PreToolUse.hooks]]\n"
+            'type = "command"\n'
+            'command = "/enterprise/python/bin/python3 /enterprise/hooks/hook_runtime.py --product codex"\n'
+            "command_windows = 'C:\\Python311\\python.exe C:\\enterprise\\hooks\\hook_runtime.py --product codex'\n"
+            "timeout = 10\n"
+            'statusMessage = "Checking managed workstation guardrails"\n'
+        ).encode("utf-8")
+        artifacts[ROOT / "dist/enterprise/codex/README.md"] = one_newline(
+            markdown_header("enterprise/codex/ and official Codex managed-configuration documentation")
+            + "\n# Codex enterprise template\n\n"
+            "This Codex 0.138+ example uses managed permission profiles. Endpoint management must distribute the immutable runtime to the absolute managed directory; `requirements.toml` does not distribute scripts. Legacy fleets that still configure `sandbox_mode` require the separately documented `allowed_sandbox_modes` form. Test keys and precedence across the managed client fleet."
+        ).encode("utf-8")
+    if "claude" in selected:
+        artifacts[ROOT / "dist/enterprise/claude/managed-settings.json"] = adapter_json(
+            "enterprise/claude/README.md and official Claude managed-settings documentation",
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": ".*",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "/enterprise/python /enterprise/ai-guardrails/hook_runtime.py --product claude",
+                                    "timeout": 10,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+        artifacts[ROOT / "dist/enterprise/claude/README.md"] = one_newline(
+            markdown_header("enterprise/claude/ and official Claude settings documentation")
+            + "\n# Claude Code enterprise template\n\n"
+            "Deploy through the documented managed-settings mechanism and an endpoint-managed absolute runtime path. Merge with organisation permissions; do not weaken existing deny rules or set a global subagent model environment variable."
+        ).encode("utf-8")
+    if "cursor" in selected:
+        artifacts[ROOT / "dist/enterprise/cursor/team-rules.md"] = one_newline(
+            markdown_header("enterprise/cursor/ and official Cursor Team Rules documentation")
+            + "\n# Workstation AI Guardrails team-rule text\n\n"
+            "Use the generated global behavioural policy as organisation-reviewed Team Rule text. Native hooks remain the deterministic control. This file is guidance for the documented administration UI, not a fabricated managed settings format."
+        ).encode("utf-8")
+        artifacts[ROOT / "dist/enterprise/cursor/README.md"] = one_newline(
+            markdown_header("enterprise/cursor/ and official Cursor rules and hooks documentation")
+            + "\n# Cursor enterprise guidance\n\n"
+            "Configure Team Rules and native hooks through documented enterprise administration. Confirm plan and organisation model availability. Cursor User Rules, CLI permissions, project rules, and IDE hooks have different scopes."
+        ).encode("utf-8")
+    artifacts[ROOT / "dist/enterprise/spacelift/README.md"] = one_newline(
+        markdown_header("enterprise/spacelift/ and platform-policies/spacelift/")
+        + "\n# Spacelift enterprise examples\n\n"
+        "Use Spaces/RBAC and Login, Approval, Plan, Push, Trigger, and Notification Policies. Review copies of the Rego v1 source, tests, and synthetic configuration are generated under `policies/`; they are never attached or deployed by this repository. The unified MCP endpoint is `/mcp`; no removed `/intent/mcp` endpoint is generated."
+    ).encode("utf-8")
+    spacelift_root = ROOT / "platform-policies/spacelift"
+    for source in sorted(spacelift_root.rglob("*.rego")):
+        if source.is_symlink():
+            raise GuardrailsError(f"Spacelift policy source must not be a symbolic link: {source}")
+        relative = source.relative_to(spacelift_root)
+        artifacts[ROOT / "dist/enterprise/spacelift/policies" / relative] = one_newline(
+            "# GENERATED — DO NOT EDIT\n"
+            f"# Canonical source: platform-policies/spacelift/{relative.as_posix()}\n\n"
+            + source.read_text(encoding="utf-8").strip()
+        ).encode("utf-8")
+    fixture = json.loads((spacelift_root / "fixtures/guardrails.json").read_text(encoding="utf-8"))
+    fixture["_generated"] = (
+        "GENERATED — DO NOT EDIT. Canonical source: "
+        "platform-policies/spacelift/fixtures/guardrails.json."
+    )
+    artifacts[ROOT / "dist/enterprise/spacelift/policies/fixtures/guardrails.json"] = json_bytes(fixture)
+    return artifacts
+
+
+def build_artifacts(
+    products: Sequence[str] = PRODUCTS,
+    *,
+    manifest_path: Path = policy.MANIFEST_PATH,
+    skills_root: Path | None = None,
+) -> dict[Path, bytes]:
+    selected = set(products)
+    unknown = sorted(selected - set(PRODUCTS))
+    if unknown:
+        raise GuardrailsError(f"unknown product: {unknown[0]}")
+    manifest = policy.load_manifest(manifest_path)
+    skills = policy.discover_skills(skills_root or policy.SKILLS_ROOT)
+    routing.load_config()
+    command_policy = policy.load_enforcement_policy()
+    artifacts: dict[Path, bytes] = {}
+    if "codex" in selected:
+        artifacts[ROOT / "dist/codex/AGENTS.md"] = render_policy("codex", manifest, manifest_path).encode("utf-8")
+        rules = codex_rules(command_policy).encode("utf-8")
+        artifacts[ROOT / "dist/codex/rules/workstation-guardrails.rules"] = rules
+        artifacts[ROOT / "adapters/codex/workstation-guardrails.rules"] = rules
+        hooks = adapter_json("enforcement policies and adapters/codex/", _hook_payload("codex"))
+        artifacts[ROOT / "dist/codex/hooks.json"] = hooks
+        artifacts[ROOT / "adapters/codex/hooks.fragment.json"] = hooks
+    if "claude" in selected:
+        total = 0
+        for entry in manifest["fragments"]:
+            if "claude" not in entry["products"] or entry["load"] != "always":
+                continue
+            rendered = render_claude_rule(entry, manifest_path).encode("utf-8")
+            total += len(rendered)
+            name = Path(entry["path"]).name
+            artifacts[ROOT / "dist/claude/rules" / f"workstation-guardrails-{name}"] = rendered
+        if total == 0 or total > manifest["output_limits_bytes"]["claude"]:
+            raise GuardrailsError("generated claude policy is empty or exceeds configured limit")
+        settings = adapter_json("enforcement policies and adapters/claude/", _hook_payload("claude"))
+        artifacts[ROOT / "dist/claude/settings.fragment.json"] = settings
+        artifacts[ROOT / "adapters/claude/settings.fragment.json"] = settings
+    if "cursor" in selected:
+        artifacts[ROOT / "dist/cursor/user-rules.md"] = render_policy("cursor", manifest, manifest_path).encode("utf-8")
+        hooks = adapter_json("enforcement policies and adapters/cursor/", _hook_payload("cursor"))
+        artifacts[ROOT / "dist/cursor/hooks.json"] = hooks
+        artifacts[ROOT / "adapters/cursor/hooks.fragment.json"] = hooks
+        permissions = adapter_json(
+            "adapters/cursor/cli-permissions.recommended.json",
+            {
+                "description": "Recommendation for Cursor CLI only; not an automatically installed IDE-wide policy.",
+                "permissions": {
+                    "allow": ["Shell(git status)", "Shell(git diff)", "Read(**/*.md)"],
+                    "deny": ["Read(.env*)", "Write(**/*.key)", "Write(**/.env*)", "Shell(rm:-rf /)"],
+                },
+            },
+        )
+        artifacts[ROOT / "dist/cursor/cli-permissions.recommended.json"] = permissions
+        artifacts[ROOT / "adapters/cursor/cli-permissions.recommended.json"] = permissions
+    for product_name in sorted(selected):
+        for filename, data in routing.render_agents(product_name).items():
+            artifacts[ROOT / "dist" / product_name / "agents" / filename] = data
+    for skill_file in skills:
+        rendered = render_skill(skill_file).encode("utf-8")
+        skill_name = skill_file.parent.name
+        artifacts[ROOT / "dist/skills" / skill_name / "SKILL.md"] = rendered
+        for product_name in sorted(selected):
+            artifacts[ROOT / "dist" / product_name / "skills" / skill_name / "SKILL.md"] = rendered
+    artifacts.update(_enterprise_artifacts(selected))
+    for path, data in artifacts.items():
+        if not data.strip():
+            raise GuardrailsError(f"generated output would be empty: {path.relative_to(ROOT)}")
+        if not data.endswith(b"\n") or data.endswith(b"\n\n"):
+            raise GuardrailsError(f"generated output must end with exactly one newline: {path.relative_to(ROOT)}")
+        if b"GENERATED \xe2\x80\x94 DO NOT EDIT" not in data:
+            raise GuardrailsError(f"generated output lacks generated header: {path.relative_to(ROOT)}")
+    return artifacts
+
+
+def _remove_stale_generated(expected: set[Path]) -> int:
+    removed = 0
+    for root in GENERATED_ROOTS:
+        if not root.exists():
+            continue
+        for path in sorted((item for item in root.rglob("*") if item.is_file()), reverse=True):
+            if path in expected:
+                continue
+            try:
+                content = path.read_bytes()
+            except OSError as exc:
+                raise GuardrailsError(f"cannot inspect stale generated file {path}: {exc}") from exc
+            if b"GENERATED \xe2\x80\x94 DO NOT EDIT" not in content:
+                continue
+            path.unlink()
+            removed += 1
+        for directory in sorted((item for item in root.rglob("*") if item.is_dir()), reverse=True):
+            if not any(directory.iterdir()):
+                directory.rmdir()
+    return removed
+
+
+def build(products: Sequence[str] = PRODUCTS) -> None:
+    artifacts = build_artifacts(products)
+    changed = 0
+    for path, data in sorted(artifacts.items(), key=lambda item: item[0].as_posix()):
+        if atomic_write(path, data):
+            print(f"built {path.relative_to(ROOT)}")
+            changed += 1
+    removed = _remove_stale_generated(set(artifacts))
+    print(f"build complete: {changed} changed, {len(artifacts) - changed} unchanged, {removed} stale removed")
+
+
+def validate_codex_rules() -> str:
+    executable = shutil.which("codex")
+    if executable is None:
+        return "skipped (codex executable not available)"
+    rules_path = ROOT / "dist/codex/rules/workstation-guardrails.rules"
+    result = subprocess.run(
+        [executable, "execpolicy", "check", "--rules", str(rules_path), "--", "git", "reset", "--hard"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if result.returncode != 0 or "forbidden" not in result.stdout.lower():
+        raise GuardrailsError("codex execpolicy check did not report the expected forbidden decision")
+    return "passed"
+
+
+def validate_spacelift_policies() -> str:
+    from .scan import validate_spacelift_policy_structure
+
+    validate_spacelift_policy_structure(ROOT / "platform-policies/spacelift")
+    executable = shutil.which("opa")
+    if executable is None:
+        return "skipped semantic Rego execution (opa executable not available); structural checks passed"
+    result = subprocess.run(
+        [executable, "test", str(ROOT / "platform-policies/spacelift")],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise GuardrailsError("OPA semantic policy tests failed; run opa test platform-policies/spacelift for details")
+    return "passed"
+
+
+def validate(
+    products: Sequence[str] = PRODUCTS,
+    *,
+    check_codex: bool = True,
+    require_current: bool = True,
+) -> None:
+    artifacts = build_artifacts(products)
+    for path, expected in artifacts.items():
+        actual = expected
+        if require_current:
+            if not path.is_file():
+                raise GuardrailsError(f"generated file is missing; run build: {path.relative_to(ROOT)}")
+            actual = path.read_bytes()
+            if actual != expected:
+                raise GuardrailsError(f"generated file is stale; run build: {path.relative_to(ROOT)}")
+        text = actual.decode("utf-8")
+        if str(Path.home()) in text or str(ROOT) in text:
+            raise GuardrailsError(f"generated output contains a workstation path: {path.relative_to(ROOT)}")
+        if path.suffix == ".json":
+            try:
+                json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise GuardrailsError(f"generated JSON is invalid: {path.relative_to(ROOT)}: {exc}") from exc
+        if path.suffix == ".toml":
+            try:
+                tomllib.loads(text)
+            except tomllib.TOMLDecodeError as exc:
+                raise GuardrailsError(f"generated TOML is invalid: {path.relative_to(ROOT)}: {exc}") from exc
+        relative = path.relative_to(ROOT)
+        if len(relative.parts) >= 4 and relative.parts[0] == "dist" and relative.parts[2] == "agents":
+            if path.suffix == ".md":
+                fields = routing.frontmatter_fields(text, relative.as_posix())
+                if {"name", "description", "model"} - fields.keys():
+                    raise GuardrailsError(f"generated agent lacks required frontmatter: {relative}")
+    pack_count, _ = packs.validate_packs()
+    policy.validate_canonical_data()
+    from . import enforcement
+
+    policy_data = policy.load_enforcement_policy()
+    examples = enforcement.validate_policy_examples(policy_data)
+    codex = "not requested"
+    if check_codex and "codex" in products:
+        rules_path = ROOT / "dist/codex/rules/workstation-guardrails.rules"
+        rules_are_current = rules_path.is_file() and rules_path.read_bytes() == artifacts[rules_path]
+        codex = (
+            validate_codex_rules()
+            if require_current or rules_are_current
+            else "skipped (computed rules are not written during a dry-run)"
+        )
+    spacelift = validate_spacelift_policies()
+    print(
+        f"validation passed: {len(artifacts)} generated files, {examples} policy fixtures, "
+        f"{pack_count} packs, {len(routing.load_config()['agents'])} routing agents"
+    )
+    if check_codex and "codex" in products:
+        print(f"codex execpolicy check: {codex}")
+    print(f"Spacelift policy validation: {spacelift}")
+
+
+def assert_generated_current(products: Sequence[str] = PRODUCTS) -> None:
+    for path, expected in build_artifacts(products).items():
+        if not path.is_file() or path.read_bytes() != expected:
+            raise GuardrailsError(f"generated output is stale: {path.relative_to(ROOT)}")

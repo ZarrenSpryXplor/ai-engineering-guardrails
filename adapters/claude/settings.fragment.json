@@ -1,0 +1,18 @@
+{
+  "_generated": "GENERATED — DO NOT EDIT. Canonical source: enforcement policies and adapters/claude/.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "__WORKSTATION_GUARDRAILS_COMMAND__",
+            "statusMessage": "Checking tool request against workstation guardrails",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ]
+  }
+}

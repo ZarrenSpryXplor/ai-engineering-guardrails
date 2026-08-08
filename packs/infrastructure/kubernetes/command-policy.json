@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "kubernetes-high-impact-operation",
+      "description": "Block high-confidence destructive or validation-bypassing kubectl operations.",
+      "risk_category": "cluster_destruction",
+      "operation_class": "destructive",
+      "reason": "This kubectl operation can destroy a broad or foundational cluster scope or bypass validation.",
+      "matching_strategy": {"type": "command_regex", "executables": ["kubectl"], "pattern": "(?:\\bdelete\\s+(?:namespace|namespaces|ns|customresourcedefinition|customresourcedefinitions|crd|crds)(?:\\s|$)|\\bdelete\\b[^;|]*(?:--all(?:=true)?\\b|--all-namespaces\\b|-A(?:\\s|$)|--force\\b|--grace-period(?:=|\\s+)0\\b)|\\bapply\\b[^;|]*--prune\\b|\\breplace\\b[^;|]*--force\\b|\\b(?:apply|create|replace)\\b[^;|]*--validate(?:=|\\s+)false\\b|\\bdelete\\b[^;|]*\\$\\([^)]*api-resources)"},
+      "must_match": ["kubectl delete namespace payments", "kubectl delete crd widgets.example.io", "kubectl delete pods --all", "kubectl delete pods -A", "kubectl delete pod one --force", "kubectl delete pod one --grace-period=0", "kubectl apply --prune -f manifests", "kubectl replace --force -f pod.yaml", "kubectl apply --validate=false -f manifest.yaml", "kubectl delete $(kubectl api-resources --verbs=list -o name) --all"],
+      "must_not_match": ["kubectl get pods", "kubectl describe deployment example", "kubectl logs example", "kubectl diff -f manifest.yaml", "kubectl delete pod one-pod --context dev --namespace app", "kubectl rollout status deployment/example", "kubectl kustomize overlays/dev", "echo 'kubectl delete namespace example'"]
+    },
+    {
+      "id": "kubernetes-sensitive-read",
+      "description": "Block raw kubeconfig and Kubernetes Secret value extraction.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "reason": "Raw kubeconfig or Secret data can expose credentials and must not be returned to an agent.",
+      "matching_strategy": {"type": "command_regex", "executables": ["kubectl"], "pattern": "(?:\\bconfig\\s+view\\b[^;|]*--raw\\b|\\b(?:get|describe)\\s+(?:secret|secrets)\\b[^;|]*(?:-o|--output)(?:=|\\s+)(?:json|yaml|go-template|jsonpath)|\\bget\\s+(?:secret|secrets)\\b[^;|]*\\.data)"},
+      "must_match": ["kubectl config view --raw", "kubectl get secret registry -o yaml", "kubectl get secret registry -o jsonpath='{.data.password}'"],
+      "must_not_match": ["kubectl config current-context", "kubectl get secrets", "kubectl get secret registry -o name", "kubectl auth can-i get secrets"]
+    }
+  ],
+  "classifications": [
+    {"id":"kubernetes-observe","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["kubectl"],"pattern":"(?:^|\\s)(?:get|describe|logs|events|top|explain|api-resources|api-versions|version)(?:\\s|$)|auth\\s+can-i|config\\s+current-context|rollout\\s+(?:status|history)"}},
+    {"id":"kubernetes-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["kubectl"],"pattern":"(?:^|\\s)(?:diff|kustomize)(?:\\s|$)|\\b(?:apply|create)\\b[^;|]*--dry-run(?:=|\\s+)(?:client|server)"}},
+    {"id":"kubernetes-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["kubectl"],"pattern":"(?:^|\\s)(?:apply|create|patch|replace|edit|label|annotate|set|scale|autoscale|exec|cp|port-forward)(?:\\s|$)|rollout\\s+(?:restart|undo)|\\bdelete\\s+(?:pod|pods)\\b|(?:^|\\s)(?:cordon|uncordon|drain)(?:\\s|$)"}}
+  ]
+}

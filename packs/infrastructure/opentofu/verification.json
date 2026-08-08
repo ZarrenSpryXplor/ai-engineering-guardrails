@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"opentofu-format","class":"validate","selection":"affected-root","commands":["tofu fmt -check"]},{"id":"opentofu-validate","class":"validate","selection":"affected-root","commands":["tofu validate"]},{"id":"opentofu-plan","class":"validate","selection":"mapped-target-only","commands":["tofu plan"]}],"network_tests_forbidden":true}

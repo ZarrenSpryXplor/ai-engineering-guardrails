@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "spacelift",
+  "type": "infrastructure",
+  "description": "Read-first Spacelift CLI, GraphQL, and MCP workflows.",
+  "file_detectors": [".spacelift/config.yml", ".spacelift/config.yaml", "spacelift.yml", "spacelift.yaml", "*.spacelift.tf"],
+  "directory_detectors": [".spacelift"],
+  "explicit_exclusions": ["**/.terraform/**", "**/vendor/**", "**/dist/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-spacelift/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Current hosted MCP uses read-scoped discover, query, and provider plus write-scoped mutate and intent; legacy action-style tool names remain recognized defensively."]
+}

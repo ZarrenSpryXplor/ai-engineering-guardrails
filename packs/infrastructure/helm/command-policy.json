@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "helm-destructive-or-insecure",
+      "description": "Block Helm uninstall and high-confidence unsafe mutation or transport options.",
+      "risk_category": "release_destruction_or_transport_bypass",
+      "operation_class": "destructive",
+      "reason": "This Helm operation removes a release, takes ownership, or bypasses transport or validation safety.",
+      "matching_strategy": {"type": "command_regex", "executables": ["helm"], "pattern": "(?:^(?:uninstall|delete)(?:\\s|$)|^upgrade\\b[^;|]*--take-ownership\\b|(?:--insecure-skip-tls-verify|--plain-http|--skip-schema-validation)(?:\\s|$)|^plugin\\s+install(?:\\s|$))"},
+      "must_match": ["helm uninstall payments", "helm delete payments", "helm upgrade payments ./chart --take-ownership", "helm repo add bad http://example.invalid --plain-http", "helm upgrade app ./chart --skip-schema-validation", "helm plugin install https://example.invalid/plugin"],
+      "must_not_match": ["helm template payments ./chart", "helm status payments", "helm lint ./chart", "helm show values ./chart", "helm verify chart.tgz", "echo 'helm uninstall payments'"]
+    },
+    {
+      "id": "helm-command-line-credentials",
+      "description": "Block repository credentials passed on a Helm command line.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "reason": "Repository credentials must not be exposed in agent-visible command arguments.",
+      "matching_strategy": {"type": "command_regex", "executables": ["helm"], "pattern": "(?:--username|--password)(?:=|\\s+)"},
+      "must_match": ["helm repo add private https://charts.invalid --username alice --password secret", "helm pull repo/chart --password=secret"],
+      "must_not_match": ["helm repo list", "helm search repo app", "helm pull repo/chart", "grep -R -- '--password' docs"]
+    }
+  ],
+  "classifications": [
+    {"id":"helm-observe-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["helm"],"pattern":"^(?:lint|template|show|search|list|status|history|get|verify)(?:\\s|$)|^dependency\\s+list(?:\\s|$)"}},
+    {"id":"helm-mutate","operation_class":"mutate","matching_strategy":{"type":"command_regex","executables":["helm"],"pattern":"^(?:install|upgrade|rollback|test|push)(?:\\s|$)|^(?:registry\\s+login|repo\\s+add|plugin\\s+install)(?:\\s|$)"}}
+  ]
+}

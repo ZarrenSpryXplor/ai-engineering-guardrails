@@ -1,0 +1,1 @@
+{"schema_version":1,"checks":[{"id":"kustomize-build","class":"validate","selection":"affected-overlay","commands":["kustomize build <overlay>","kubectl kustomize <overlay>"]}],"network_tests_forbidden":true}

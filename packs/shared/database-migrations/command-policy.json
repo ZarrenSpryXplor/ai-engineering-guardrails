@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "database-migration-execution",
+      "description": "Block common migration commands that execute against a database.",
+      "risk_category": "persistent_data_mutation",
+      "operation_class": "destructive",
+      "reason": "Migration execution against a database is separate from source authoring and requires external authority.",
+      "matching_strategy": {"type": "command_regex", "executables": ["dotnet", "alembic", "django-admin", "python", "python3", "prisma", "sequelize", "typeorm", "flyway", "liquibase"], "patterns_by_executable": {"dotnet":"ef\\s+database\\s+(?:update|drop)","alembic":"^upgrade(?:\\s|$)","django-admin":"^migrate(?:\\s|$)","python":"manage\\.py\\s+migrate(?:\\s|$)","python3":"manage\\.py\\s+migrate(?:\\s|$)","prisma":"^(?:migrate\\s+(?:deploy|reset)|db\\s+push\\b[^;|]*--accept-data-loss)(?:\\s|$)","sequelize":"^(?:db:migrate|db:migrate:undo|db:drop)(?:\\s|$)","typeorm":"^migration:(?:run|revert)(?:\\s|$)","flyway":"^(?:migrate|clean|repair)(?:\\s|$)","liquibase":"^(?:update|drop-all|rollback)(?:\\s|$)"}},
+      "must_match": ["dotnet ef database update", "alembic upgrade head", "python manage.py migrate", "prisma migrate deploy", "prisma db push --accept-data-loss", "typeorm migration:run", "flyway migrate", "flyway clean", "liquibase update"],
+      "must_not_match": ["dotnet ef migrations add AddIndex", "alembic revision -m add_index", "python manage.py makemigrations", "prisma migrate diff", "typeorm migration:generate AddIndex", "flyway info", "liquibase validate", "grep -R 'alembic upgrade head' docs"]
+    }
+  ],
+  "classifications": [
+    {"id":"database-inspect","operation_class":"observe","remote":true,"matching_strategy":{"type":"command_regex","executables":["psql","mysql","sqlcmd","flyway","liquibase"],"patterns_by_executable":{"psql":"^(?:-c\\s+)?(?:SELECT|SHOW|EXPLAIN)\\b","mysql":"^(?:-e|--execute)\\s+(?:SELECT|SHOW|EXPLAIN)\\b","sqlcmd":"^(?:-Q|-q)\\s+(?:SELECT|EXEC\\s+sp_help)\\b","flyway":"^(?:info|validate)(?:\\s|$)","liquibase":"^(?:status|validate|history)(?:\\s|$)"}}},
+    {"id":"database-mutate","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["dotnet","alembic","django-admin","python","python3","prisma","sequelize","typeorm","flyway","liquibase"],"pattern":"(?:database\\s+update|upgrade|migrate|db\\s+push|migration:run|update)(?:\\s|$)"}}
+  ]
+}

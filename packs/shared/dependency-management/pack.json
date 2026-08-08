@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "dependency-management",
+  "type": "shared",
+  "description": "Cross-language dependency and lockfile preservation.",
+  "file_detectors": [],
+  "directory_detectors": [],
+  "explicit_exclusions": ["**/vendor/**", "**/node_modules/**"],
+  "dependent_packs": [],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-dependency-management/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Loaded as a dependency of language packs rather than detected independently."]
+}

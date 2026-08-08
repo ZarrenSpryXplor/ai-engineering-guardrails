@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "product": "cursor",
+  "tiers": {
+    "economy": {
+      "model": "inherit",
+      "availability": "unverified"
+    },
+    "balanced": {
+      "model": "inherit",
+      "availability": "unverified"
+    },
+    "deep": {
+      "model": "inherit",
+      "availability": "unverified"
+    }
+  },
+  "reasoning_field": "model_parameter_when_explicit",
+  "supports_explicit_model_ids": true,
+  "supports_provider_or_family_override": true,
+  "fallback": "Cursor may select a compatible model when plan or organisation restrictions make an explicit ID unavailable.",
+  "main_session_unchanged": true,
+  "documentation": "https://cursor.com/docs/subagents.md"
+}

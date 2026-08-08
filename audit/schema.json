@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-guardrails/audit-event.schema.json",
+  "type": "object",
+  "required": ["timestamp", "product", "session_id_hash", "event_type", "tool_category", "rule_id", "decision", "operation_class", "target_lifecycle", "request_digest", "waiver_id", "policy_digest"],
+  "properties": {
+    "timestamp": {"type": "string", "format": "date-time"},
+    "product": {"enum": ["codex", "claude", "cursor", "unknown"]},
+    "session_id_hash": {"type": ["string", "null"]},
+    "event_type": {"type": "string"},
+    "tool_category": {"type": "string"},
+    "rule_id": {"type": ["string", "null"]},
+    "decision": {"enum": ["no-decision", "warn", "deny"]},
+    "operation_class": {"type": ["string", "null"]},
+    "target_lifecycle": {"enum": ["dev", "tst", "int", "prd", "unknown", "not-applicable"]},
+    "request_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "waiver_id": {"type": ["string", "null"]},
+    "policy_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

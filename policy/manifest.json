@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "products": [
+    "codex",
+    "claude",
+    "cursor"
+  ],
+  "output_limits_bytes": {
+    "codex": 32768,
+    "claude": 65536,
+    "cursor": 50000
+  },
+  "fragments": [
+    {
+      "id": "operating-principles",
+      "path": "fragments/00-operating-principles.md",
+      "order": 0,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Core evidence, scope, and completion expectations.",
+      "classification": "behavioural_guidance",
+      "load": "always",
+      "enforcement_ids": [],
+      "risk_ids": ["ordinary-source-change"]
+    },
+    {
+      "id": "investigation-and-scope",
+      "path": "fragments/10-investigation-and-scope.md",
+      "order": 10,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Repository investigation and change-scope controls.",
+      "classification": "behavioural_guidance",
+      "load": "always",
+      "enforcement_ids": [],
+      "risk_ids": ["ordinary-source-change"]
+    },
+    {
+      "id": "maintainability",
+      "path": "fragments/15-maintainability.md",
+      "order": 15,
+      "products": ["codex", "claude", "cursor"],
+      "description": "KISS, DRY, YAGNI, and Rule-of-Three design constraints.",
+      "classification": "behavioural_guidance",
+      "load": "always",
+      "enforcement_ids": [],
+      "risk_ids": ["high-risk-change"]
+    },
+    {
+      "id": "change-safety",
+      "path": "fragments/20-change-safety.md",
+      "order": 20,
+      "products": ["codex", "claude", "cursor"],
+      "description": "High-risk action and compatibility safeguards.",
+      "classification": "deterministic_enforcement_guidance",
+      "load": "always",
+      "enforcement_ids": ["recursive-delete-protected-root"],
+      "risk_ids": ["persistent-data", "contracts"]
+    },
+    {
+      "id": "git",
+      "path": "fragments/30-git.md",
+      "order": 30,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Source-control safety and review expectations.",
+      "classification": "deterministic_enforcement_guidance",
+      "load": "always",
+      "enforcement_ids": ["git-reset-hard", "git-clean-force-directories", "git-force-push"],
+      "risk_ids": ["ci-cd"]
+    },
+    {
+      "id": "security-and-secrets",
+      "path": "fragments/40-security-and-secrets.md",
+      "order": 40,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Credential handling and security-control preservation.",
+      "classification": "deterministic_enforcement_guidance",
+      "load": "always",
+      "enforcement_ids": ["powershell-download-execute"],
+      "risk_ids": ["secrets-and-pki", "security-and-identity"]
+    },
+    {
+      "id": "dependencies-and-supply-chain",
+      "path": "fragments/50-dependencies.md",
+      "order": 50,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Dependency and supply-chain change discipline.",
+      "classification": "deterministic_enforcement_guidance",
+      "load": "always",
+      "enforcement_ids": ["download-execute-pipeline", "prohibited-publication"],
+      "risk_ids": ["package-and-release"]
+    },
+    {
+      "id": "infrastructure-posture",
+      "path": "fragments/55-infrastructure-posture.md",
+      "order": 55,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Concise lifecycle and remote-operation posture.",
+      "classification": "deterministic_enforcement_guidance",
+      "load": "always",
+      "enforcement_ids": ["infrastructure-destroy", "kubernetes-namespace-delete"],
+      "risk_ids": ["infrastructure-control", "production-configuration"]
+    },
+    {
+      "id": "testing-and-verification",
+      "path": "fragments/60-testing-and-verification.md",
+      "order": 60,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Proportionate verification and truthful results.",
+      "classification": "behavioural_guidance",
+      "load": "always",
+      "enforcement_ids": [],
+      "risk_ids": ["ordinary-source-change"]
+    },
+    {
+      "id": "reporting",
+      "path": "fragments/70-reporting.md",
+      "order": 70,
+      "products": ["codex", "claude", "cursor"],
+      "description": "Clear handoff of results, assumptions, and limitations.",
+      "classification": "behavioural_guidance",
+      "load": "always",
+      "enforcement_ids": [],
+      "risk_ids": []
+    }
+  ]
+}

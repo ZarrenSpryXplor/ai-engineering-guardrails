@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "database-migrations",
+  "type": "shared",
+  "description": "Migration authoring separated from database execution.",
+  "file_detectors": ["alembic.ini", "flyway.conf", "liquibase.properties", "schema.prisma", "ormconfig.json", "ormconfig.js", "ormconfig.ts"],
+  "directory_detectors": ["migrations", "db/migrate", "prisma/migrations", "alembic/versions"],
+  "explicit_exclusions": ["**/generated/**", "**/vendor/**", "**/node_modules/**", "**/dist/**", "**/tests/fixtures/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-database-migrations/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": ["Creating migration source is distinct from applying it to a database; SQL matching is intentionally conservative and is not a SQL parser."]
+}
