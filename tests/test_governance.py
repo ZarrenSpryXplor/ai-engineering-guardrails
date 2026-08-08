@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guardrails import cli, enforcement, policy, scan, state
-from guardrails.util import GuardrailsError
+from ai_engineering_guardrails import cli, enforcement, policy, scan, state
+from ai_engineering_guardrails.util import GuardrailsError
 
 
 class TtyBuffer(io.StringIO):
@@ -55,7 +55,7 @@ class WaiverTests(unittest.TestCase):
         identifier = "waiver-00000000000000000000000000000001"
         input_stream = TtyBuffer(f"CREATE WAIVER {identifier}\n")
         output_stream = TtyBuffer()
-        with mock.patch("guardrails.state.uuid.uuid4", return_value=mock.Mock(hex=identifier.removeprefix("waiver-"))):
+        with mock.patch("ai_engineering_guardrails.state.uuid.uuid4", return_value=mock.Mock(hex=identifier.removeprefix("waiver-"))):
             return state.create_waiver(
                 self.home,
                 rule=rule or {},
@@ -83,7 +83,7 @@ class WaiverTests(unittest.TestCase):
                 input_stream=io.StringIO(),
                 output_stream=io.StringIO(),
             )
-        with mock.patch("guardrails.state.uuid.uuid4", return_value=mock.Mock(hex="0" * 32)):
+        with mock.patch("ai_engineering_guardrails.state.uuid.uuid4", return_value=mock.Mock(hex="0" * 32)):
             with self.assertRaisesRegex(GuardrailsError, "did not match"):
                 state.create_waiver(
                     self.home,
@@ -199,7 +199,7 @@ class WaiverTests(unittest.TestCase):
             metadata=runtime_metadata(self.home),
         )
         self.create(digest=initial.request_digest)
-        with mock.patch("guardrails.enforcement._atomic_json", side_effect=OSError("synthetic")):
+        with mock.patch("ai_engineering_guardrails.enforcement._atomic_json", side_effect=OSError("synthetic")):
             decision = enforcement.evaluate_request(
                 self.payload,
                 policy_data=self.policy,

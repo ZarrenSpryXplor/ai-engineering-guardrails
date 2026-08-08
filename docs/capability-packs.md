@@ -4,7 +4,7 @@ Capability packs keep stack-specific material out of always-loaded global policy
 
 ## Supported packs
 
-Language packs cover Java with Maven/Gradle, .NET, Python, and Node/JavaScript/TypeScript. Infrastructure packs cover Kubernetes, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, Spacelift, and Azure. Delivery/operations/shared packs cover containers/OCI, GitHub/Azure DevOps source control and CI/CD, databases and migrations, observability, API/schema compatibility, secrets/PKI, dependency management, package publication, and sensitive output.
+Language packs cover Java with Maven/Gradle, .NET, Python, and Node/JavaScript/TypeScript. Infrastructure packs cover Ansible, Kubernetes, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, Spacelift, and Azure. Delivery/operations/shared packs cover containers/OCI, GitHub/Azure DevOps source control and CI/CD, databases and migrations, observability, API/schema compatibility, secrets/PKI, dependency management, package publication, and sensitive output.
 
 This list is not universal protection for every adjacent CLI, cloud provider, controller, package plugin, database framework, or MCP server. Unknown tools must be assessed and added explicitly.
 
@@ -40,6 +40,8 @@ Lifecycle values are exactly `dev`, `tst`, `int`, and `prd`; they are mappings, 
 `observe` and `validate` are normally allowed. `mutate` is profile/lifecycle restricted. `destructive`, `sensitive-read`, `publish`, `privilege-escalation`, and `guardrail-modification` are denied by default. Production-capable credentials should not be exposed to coding agents because possession enables paths outside local hooks.
 
 Kubernetes and Helm rules distinguish reads/rendering from mutation and high-confidence destructive/bypass/secret cases. Terraform-family rules allow format/validate/plan but deny destroy, dangerous state operations, auto-approved apply, and broad Terragrunt apply/destroy. Containers deny privileged host access, destructive prune, credential exposure, and push. Azure requires explicit mapped context for mutation and denies token/secret/key retrieval, privilege changes, destructive scopes, and protected targets.
+
+Ansible detection uses distinctive configuration and metadata rather than generic YAML files. Local syntax checks are validation; playbook and ad hoc execution, including check mode, are remote mutation because tasks can opt out of check mode. Exact inventory paths can be lifecycle-mapped through `ansible_inventories`. Vault plaintext, broad inventory/configuration output, Galaxy publication/mutation, and transport or signature bypass receive deterministic protection.
 
 ## Adding a pack
 

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "checks": [
+    {"id": "ansible-syntax-check", "class": "validate", "selection": "affected-playbook", "commands": ["ansible-playbook --syntax-check <playbook>"]},
+    {"id": "ansible-repository-lint", "class": "validate", "selection": "configured-and-installed-only", "commands": ["ansible-lint <affected-path>"]},
+    {"id": "ansible-isolated-role-test", "class": "test", "selection": "existing-isolated-molecule-scenario", "commands": ["molecule test -s <scenario>"]}
+  ],
+  "network_tests_forbidden": true,
+  "remote_mutation_forbidden": true,
+  "sensitive_output_forbidden": true
+}

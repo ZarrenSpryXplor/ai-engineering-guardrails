@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guardrails import build, cli, install, packs, state
-from guardrails.util import ROOT, json_bytes
+from ai_engineering_guardrails import build, cli, install, packs, state
+from ai_engineering_guardrails.util import ROOT, json_bytes
 
 
 class ConsumerJourneyTests(unittest.TestCase):
@@ -53,7 +53,7 @@ class ConsumerJourneyTests(unittest.TestCase):
         environment = {"PATH": str(self.bin), "CODEX_HOME": ""}
         with (
             mock.patch.dict(os.environ, environment, clear=False),
-            mock.patch("guardrails.cli.Path.cwd", return_value=self.repo),
+            mock.patch("ai_engineering_guardrails.cli.Path.cwd", return_value=self.repo),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
@@ -197,7 +197,7 @@ class ConsumerJourneyTests(unittest.TestCase):
                 result = cli.main(["install", "--home", str(empty_home), "--dry-run"])
             self.assertEqual(1, result)
             self.assertIn("No supported product was detected", stderr.getvalue())
-            self.assertIn("python tools/guardrails.py install --product codex", stderr.getvalue())
+            self.assertIn("ai-guardrails install --product codex", stderr.getvalue())
             self.assertEqual([empty_bin], list(empty_home.iterdir()))
 
     def test_dry_run_uses_in_memory_build_when_checked_in_output_is_stale(self) -> None:
@@ -205,7 +205,7 @@ class ConsumerJourneyTests(unittest.TestCase):
 
         def render_with_unwritten_change(*args: object, **kwargs: object) -> dict[Path, bytes]:
             artifacts = original_build_artifacts(*args, **kwargs)  # type: ignore[arg-type]
-            policy_path = ROOT / "dist/codex/AGENTS.md"
+            policy_path = Path("dist/codex/AGENTS.md")
             artifacts[policy_path] = artifacts[policy_path].replace(
                 b"# Workstation AI Guardrails\n",
                 b"# Workstation AI Guardrails\n\nIn-memory preview fixture.\n",
@@ -214,7 +214,7 @@ class ConsumerJourneyTests(unittest.TestCase):
             return artifacts
 
         before_preview = self.snapshot()
-        with mock.patch("guardrails.build.build_artifacts", side_effect=render_with_unwritten_change):
+        with mock.patch("ai_engineering_guardrails.build.build_artifacts", side_effect=render_with_unwritten_change):
             result, preview, errors = self.run_cli(
                 ["install", "--home", str(self.home), "--dry-run"]
             )

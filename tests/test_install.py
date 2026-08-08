@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guardrails import build, install as installer, state
-from guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path
+from ai_engineering_guardrails import build, install as installer, packs, state
+from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path
 
 
 class InstallTests(unittest.TestCase):
@@ -330,7 +330,7 @@ class InstallTests(unittest.TestCase):
         self.assertTrue((self.home / ".agents/skills/workstation-azure/SKILL.md").is_file())
         self.assertTrue((self.home / ".agents/skills/workstation-containers-oci/SKILL.md").is_file())
         installed = self.read_state()["products"]["codex"]
-        self.assertEqual(21, len(installed["installed_packs"]))
+        self.assertEqual(len(packs.load_packs()), len(installed["installed_packs"]))
         runtime = self.home / ".ai-guardrails/runtime" / installed["runtime_digest"]
         result = subprocess.run(
             [

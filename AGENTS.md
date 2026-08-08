@@ -1,11 +1,11 @@
 # Repository contribution instructions
 
-- Treat `policy/`, `skills/`, `enforcement/`, `routing/`, `packs/`, `config/`, and `platform-policies/` as canonical sources.
+- Treat `ai_engineering_guardrails/_resources/` as the single canonical resource root for policy, skills, enforcement data, routing, packs, configuration, and platform examples.
 - Treat `dist/` and the generated files under `adapters/` as build output; do not edit them directly.
 - Use Python 3.11+ and its standard library for all implementation and tests. Do not add another implementation language, shell helper, runtime dependency, packaging framework, service, or daemon.
 - Apply KISS, DRY, YAGNI, and the Rule of Three: keep control flow explicit, retain one owner for policy knowledge, and do not add speculative abstractions or extension points.
 - Keep product-specific configuration in adapters. Do not duplicate canonical behavioural policy there.
-- Keep vendor model identifiers in `routing/model-maps/`, never in behavioural policy or portable role instructions.
+- Keep vendor model identifiers in `_resources/routing/model-maps/`, never in behavioural policy or portable role instructions.
 - Keep stack guidance in on-demand capability packs rather than the always-loaded policy. Detectors must be offline, evidence-producing, and fixture-tested.
 - Keep lifecycle target mappings credential-free. Tests must be offline and fixture-based; never contact Kubernetes, Helm or package registries, Terraform backends, databases, observability services, Azure, another cloud API, or Spacelift.
 - Treat Spacelift platform policies as examples only; build and validation must never attach them to an account.

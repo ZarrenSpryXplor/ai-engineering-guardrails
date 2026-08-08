@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "ansible",
+  "type": "infrastructure",
+  "description": "Ansible playbooks, roles, collections, inventories, Vault boundaries, and remote execution.",
+  "file_detectors": ["ansible.cfg", ".ansible-lint", "galaxy.yml", "execution-environment.yml", "molecule/*/molecule.yml", "collections/requirements.yml", "roles/requirements.yml"],
+  "directory_detectors": [],
+  "explicit_exclusions": [".ansible/**", "**/.ansible/**", "collections/ansible_collections/**", "**/collections/ansible_collections/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "generated/**", "**/generated/**"],
+  "dependent_packs": ["sensitive-output"],
+  "conflicting_packs": [],
+  "policy_fragments": ["policy.md"],
+  "skills": ["skills/workstation-ansible/SKILL.md"],
+  "command_policy_fragments": ["command-policy.json"],
+  "verification_definitions": ["verification.json"],
+  "routing_additions": ["routing.json"],
+  "compatibility_notes": [
+    "The repository-selected ansible-core version, collections, inventory plugins, and execution environment remain authoritative.",
+    "Detection uses distinctive Ansible configuration and metadata rather than generic YAML filenames; repositories without those markers can enable the pack explicitly."
+  ]
+}

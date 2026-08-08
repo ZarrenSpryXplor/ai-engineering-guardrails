@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guardrails import build, policy
-from guardrails.util import ROOT, GuardrailsError
+from ai_engineering_guardrails import build, policy
+from ai_engineering_guardrails.util import ROOT, GuardrailsError
 
 
 class BuildTests(unittest.TestCase):
@@ -25,7 +25,7 @@ class BuildTests(unittest.TestCase):
 
     def test_fragment_order_and_product_outputs(self) -> None:
         artifacts = build.build_artifacts()
-        codex = artifacts[ROOT / "dist/codex/AGENTS.md"].decode()
+        codex = artifacts[Path("dist/codex/AGENTS.md")].decode()
         headings = [
             "## Operating principles",
             "## Investigation and scope",
@@ -91,7 +91,7 @@ class BuildTests(unittest.TestCase):
         manifest["fragments"][0]["products"] = ["codex"]
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         cursor = build.build_artifacts(("cursor",), manifest_path=manifest_path)[
-            ROOT / "dist/cursor/user-rules.md"
+            Path("dist/cursor/user-rules.md")
         ].decode()
         self.assertNotIn("## Operating principles", cursor)
         self.assertIn("## Investigation and scope", cursor)

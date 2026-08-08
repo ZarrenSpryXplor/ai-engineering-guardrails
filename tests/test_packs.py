@@ -8,8 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guardrails import install as installer, packs
-from guardrails.util import ROOT, GuardrailsError
+from ai_engineering_guardrails import install as installer, packs
+from ai_engineering_guardrails.resources import RESOURCE_ROOT
+from ai_engineering_guardrails.util import ROOT, GuardrailsError
 
 
 FIXTURES = ROOT / "tests/fixtures/packs"
@@ -62,6 +63,16 @@ class PackDetectionTests(unittest.TestCase):
             self.assertNotIn("java", result.active_packs)
             self.assertNotIn("node", result.active_packs)
 
+    def test_generic_yaml_alone_does_not_detect_ansible(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "site.yml").write_text(
+                "---\n- name: Synthetic example\n  hosts: all\n  tasks: []\n",
+                encoding="utf-8",
+            )
+            result = packs.detect_packs(root)
+            self.assertNotIn("ansible", result.active_packs)
+
     def test_detection_does_not_follow_repository_file_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -75,6 +86,7 @@ class PackDetectionTests(unittest.TestCase):
 
     def test_infrastructure_fixtures(self) -> None:
         expected = {
+            "ansible": ("ansible",),
             "kubernetes": ("kubernetes",),
             "helm-chart": ("helm",),
             "kustomize": ("kustomize", "kubernetes"),
@@ -108,7 +120,14 @@ class PackDetectionTests(unittest.TestCase):
     def test_build_output_vendor_and_fixture_directories_are_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for relative in ("vendor/pom.xml", "build/package.json", "node_modules/package.json", "tests/fixtures/pom.xml"):
+            for relative in (
+                "vendor/pom.xml",
+                "build/package.json",
+                "node_modules/package.json",
+                "tests/fixtures/pom.xml",
+                ".ansible/collections/ansible_collections/example/demo/galaxy.yml",
+                "collections/ansible_collections/example/demo/galaxy.yml",
+            ):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("{}", encoding="utf-8")
@@ -146,13 +165,13 @@ class PackDetectionTests(unittest.TestCase):
 class PackValidationTests(unittest.TestCase):
     def test_all_packs_validate(self) -> None:
         count, examples = packs.validate_packs()
-        self.assertEqual(21, count)
-        self.assertGreater(examples, 350)
+        self.assertEqual(22, count)
+        self.assertGreater(examples, 375)
 
     def test_missing_pack_field_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary) / "languages/java"
-            shutil.copytree(ROOT / "packs/languages/java", destination)
+            shutil.copytree(RESOURCE_ROOT / "packs/languages/java", destination)
             config = json.loads((destination / "pack.json").read_text())
             config.pop("description")
             (destination / "pack.json").write_text(json.dumps(config), encoding="utf-8")
@@ -171,7 +190,7 @@ class PackValidationTests(unittest.TestCase):
                 names.add(name)
 
     def test_lifecycle_vocabulary_is_canonical(self) -> None:
-        targets = json.loads((ROOT / "config/targets.example.json").read_text())
+        targets = json.loads((RESOURCE_ROOT / "config/targets.example.json").read_text())
         values = {value for mapping in targets["classifications"].values() for value in mapping.values()}
         self.assertTrue(values <= {"dev", "tst", "int", "prd"})
         self.assertNotIn("prod", values)
@@ -203,6 +222,16 @@ class PackInstallTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 installer.install(("codex",), self.home, force=False, dry_run=False, pack_ids=("kubernetes",))
         self.assertEqual("mine", (collision / "mine.txt").read_text())
+
+    def test_ansible_pack_installs_portable_skill_and_dependencies(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            installer.install(("codex",), self.home, force=False, dry_run=False, pack_ids=("ansible",))
+        self.assertTrue((self.home / ".agents/skills/workstation-ansible/SKILL.md").is_file())
+        state_data = json.loads((self.home / ".ai-guardrails/state.json").read_text())
+        self.assertEqual(
+            ["ansible", "sensitive-output"],
+            state_data["products"]["codex"]["installed_packs"],
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,2 @@
+include README.md LICENSE
+recursive-include ai_engineering_guardrails/_resources *

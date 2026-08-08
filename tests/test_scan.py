@@ -7,7 +7,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from guardrails import scan
+from ai_engineering_guardrails import scan
 
 
 class ScanTests(unittest.TestCase):

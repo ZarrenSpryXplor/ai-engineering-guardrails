@@ -1,0 +1,7 @@
+# Ansible capability policy
+
+- Inspect the effective configuration, inventory sources, execution environment, requirements, playbooks, roles, variable precedence, plugins, and existing verification before changing source. Preserve collection pins, fully qualified module names, idempotence, handlers, tags, strategy, limits, and privilege boundaries.
+- Treat `ansible-playbook --syntax-check` as local validation. Treat playbook, ad hoc, pull, and console execution, including `--check`, as remote mutation because tasks can disable check mode. Require an explicit inventory mapped to `dev`, `tst`, or `int` before any permitted non-production execution; unknown and `prd` targets remain protected. Deny pull cleanup that discards or purges checkout content.
+- Vault protects data only at rest. Deny Vault view/edit/decrypt, warn before broad inventory or active-configuration output, minimise diff output, preserve `no_log`, and never expose Vault passwords, decrypted values, connection credentials, or private keys.
+- Deny Galaxy publication/import/removal, integration mutation, and certificate/signature-validation bypass. Do not install tools or content globally, fetch unpinned executable content, weaken SSH/TLS validation, or publish collections and roles.
+- Prefer repository-provided syntax, lint, and isolated Molecule checks. Do not install validators automatically, contact managed hosts in tests, or claim check mode proves idempotence or safety.

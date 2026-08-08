@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "ansible-vault-sensitive-read",
+      "description": "Block Ansible Vault operations that reveal decrypted content.",
+      "risk_category": "credential_exposure",
+      "operation_class": "sensitive-read",
+      "reason": "Vault view, edit, and decrypt expose protected plaintext and must remain outside agent-visible execution.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-vault"], "pattern": "^(?:(?:-v{1,6}|--verbose)\\s+)*(?:view|edit|decrypt)(?:\\s|$)"},
+      "must_match": ["ansible-vault view group_vars/all/vault.yml", "ansible-vault -vv view group_vars/all/vault.yml", "ansible-vault --verbose view group_vars/all/vault.yml", "sudo ansible-vault edit group_vars/all/vault.yml", "ansible-vault decrypt protected.yml"],
+      "must_not_match": ["ansible-vault encrypt group_vars/all/vault.yml", "ansible-vault create group_vars/all/vault.yml", "ansible-vault rekey protected.yml", "grep -R 'ansible-vault view' docs"]
+    },
+    {
+      "id": "ansible-galaxy-publication",
+      "description": "Block publishing collections or importing roles into Ansible Galaxy.",
+      "risk_category": "external_publication",
+      "operation_class": "publish",
+      "reason": "Galaxy collection publication and role import are human-controlled publication operations.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-galaxy"], "pattern": "^(?:(?:-v{1,6}|--verbose)\\s+)*(?:collection\\s+publish(?:\\s|$)|role\\s+import(?!.*\\s--status(?:\\s|$))(?:\\s|$))"},
+      "must_match": ["ansible-galaxy collection publish namespace-collection-1.0.0.tar.gz", "ansible-galaxy -vv collection publish namespace-collection-1.0.0.tar.gz", "ansible-galaxy --verbose collection publish namespace-collection-1.0.0.tar.gz", "ansible-galaxy role import example role"],
+      "must_not_match": ["ansible-galaxy collection build", "ansible-galaxy collection list", "ansible-galaxy role import --status example role", "ansible-galaxy role init example", "echo 'ansible-galaxy collection publish artifact.tar.gz'"]
+    },
+    {
+      "id": "ansible-galaxy-remote-removal",
+      "description": "Block removal of a hosted Ansible Galaxy role.",
+      "risk_category": "remote_content_destruction",
+      "operation_class": "destructive",
+      "reason": "Removing hosted Galaxy content is a destructive remote operation requiring an external human workflow.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-galaxy"], "pattern": "^(?:(?:-v{1,6}|--verbose)\\s+)*role\\s+delete(?:\\s|$)"},
+      "must_match": ["ansible-galaxy role delete example role", "ansible-galaxy -v role delete example role", "ansible-galaxy --verbose role delete example role"],
+      "must_not_match": ["ansible-galaxy role list", "ansible-galaxy role remove local-role", "grep -R 'ansible-galaxy role delete' docs"]
+    },
+    {
+      "id": "ansible-galaxy-certificate-bypass",
+      "description": "Block Ansible Galaxy certificate-validation bypass.",
+      "risk_category": "supply_chain_integrity_bypass",
+      "operation_class": "privilege-escalation",
+      "reason": "Ignoring Galaxy TLS certificate errors weakens supply-chain integrity and is not an acceptable installation workaround.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-galaxy"], "pattern": "(?:^|\\s)(?:-c|--ignore-certs)(?:\\s|$)"},
+      "must_match": ["ansible-galaxy collection install -c example.collection", "ansible-galaxy collection install --ignore-certs example.collection"],
+      "must_not_match": ["ansible-galaxy collection install -r collections/requirements.yml", "ansible-galaxy collection verify example.collection", "echo 'ansible-galaxy collection install --ignore-certs example.collection'"]
+    },
+    {
+      "id": "ansible-galaxy-signature-bypass",
+      "description": "Block Ansible Galaxy collection-signature verification bypass.",
+      "risk_category": "supply_chain_integrity_bypass",
+      "operation_class": "privilege-escalation",
+      "reason": "Disabling collection signature verification weakens supply-chain integrity and is not an acceptable installation workaround.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-galaxy"], "pattern": "(?:^|\\s)--(?:disable-gpg-verify|ignore-signature-status-codes?)(?:=|\\s|$)"},
+      "must_match": ["ansible-galaxy collection install --disable-gpg-verify example.collection", "ansible-galaxy --verbose collection install example.collection --disable-gpg-verify", "ansible-galaxy collection install --ignore-signature-status-code NO_PUBKEY example.collection", "ansible-galaxy collection verify example.collection --ignore-signature-status-codes=NO_PUBKEY"],
+      "must_not_match": ["ansible-galaxy collection install -r collections/requirements.yml", "ansible-galaxy collection verify example.collection", "echo 'ansible-galaxy collection install --disable-gpg-verify example.collection'"]
+    },
+    {
+      "id": "ansible-inventory-variable-output",
+      "description": "Warn before rendering inventory host variables that may contain protected data.",
+      "risk_category": "sensitive_operational_output",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "warn",
+      "reason": "Inventory list and host output can include connection variables and secrets; minimise and redact it before model use.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-inventory"], "pattern": "(?:^|\\s)(?:--list|--host|--vars)(?:=|\\s|$)"},
+      "must_match": ["ansible-inventory -i inventories/dev --list", "ansible-inventory --host app-1", "ansible-inventory --graph --vars"],
+      "must_not_match": ["ansible-inventory -i inventories/dev --graph", "ansible-inventory --version", "grep -R 'ansible-inventory --list' docs"]
+    },
+    {
+      "id": "ansible-pull-destructive-checkout",
+      "description": "Block ansible-pull options that discard or purge local checkout content.",
+      "risk_category": "destructive_source_cleanup",
+      "operation_class": "destructive",
+      "reason": "ansible-pull must not discard modified checkout files or purge a checkout as part of agent execution.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-pull"], "pattern": "(?:^|\\s)(?:--clean|--purge)(?:\\s|$)"},
+      "must_match": ["ansible-pull --clean -U https://example.invalid/automation.git", "ansible-pull -i inventories/dev --purge local.yml"],
+      "must_not_match": ["ansible-pull --check --verify-commit -U https://example.invalid/automation.git", "ansible-pull --list-hosts", "echo 'ansible-pull --clean'"]
+    },
+    {
+      "id": "ansible-pull-host-key-bypass",
+      "description": "Block automatic acceptance of an unverified source-control host key.",
+      "risk_category": "supply_chain_integrity_bypass",
+      "operation_class": "privilege-escalation",
+      "reason": "Automatically accepting an unseen repository host key bypasses an important source-integrity check.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-pull"], "pattern": "(?:^|\\s)--accept-host-key(?:\\s|$)"},
+      "must_match": ["ansible-pull --accept-host-key -U ssh://git@example.invalid/automation.git", "ansible-pull -i inventories/dev --accept-host-key local.yml"],
+      "must_not_match": ["ansible-pull --verify-commit -U https://example.invalid/automation.git", "ansible-pull --check -U https://example.invalid/automation.git", "echo 'ansible-pull --accept-host-key'"]
+    },
+    {
+      "id": "ansible-config-sensitive-output",
+      "description": "Warn before rendering active Ansible configuration that may contain protected values.",
+      "risk_category": "sensitive_operational_output",
+      "operation_class": "sensitive-read",
+      "rollout_mode": "warn",
+      "reason": "Active Ansible configuration can include tokens and passwords; minimise and redact it before model use.",
+      "matching_strategy": {"type": "command_regex", "executables": ["ansible-config"], "pattern": "^(?:(?:-v{1,6}|--verbose)\\s+)*(?:dump|view)(?:\\s|$)"},
+      "must_match": ["ansible-config dump", "ansible-config --verbose dump --only-changed", "ansible-config view"],
+      "must_not_match": ["ansible-config list", "ansible-config validate", "ansible-config --version", "echo 'ansible-config dump'"]
+    }
+  ],
+  "classifications": [
+    {"id":"ansible-cli-metadata","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible","ansible-console","ansible-playbook","ansible-pull"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*(?:--version|--help|-h)(?:\\s|$)"}},
+    {"id":"ansible-playbook-list-only","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-playbook"],"pattern":"^(?!.*(?:^|\\s)--flush-cache(?:\\s|$))(?=.*(?:^|\\s)--list-(?:hosts|tags|tasks)(?:\\s|$)).*$"}},
+    {"id":"ansible-ad-hoc-list-only","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible"],"pattern":"^(?!.*(?:^|\\s)--flush-cache(?:\\s|$))(?=.*(?:^|\\s)--list-hosts(?:\\s|$)).*$"}},
+    {"id":"ansible-playbook-syntax-check","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["ansible-playbook"],"pattern":"(?:^|\\s)--syntax-check(?:\\s|$)"}},
+    {"id":"ansible-playbook-check-mode","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible-playbook"],"pattern":"(?:^|\\s)(?:--check|-C)(?:\\s|$)"}},
+    {"id":"ansible-playbook-remote-execution","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible-playbook"],"pattern":".*"}},
+    {"id":"ansible-ad-hoc-remote-execution","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible"],"pattern":".*"}},
+    {"id":"ansible-pull-remote-execution","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible-pull"],"pattern":".*"}},
+    {"id":"ansible-console-remote-execution","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible-console"],"pattern":".*"}},
+    {"id":"ansible-inventory-observe","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-inventory"],"pattern":"(?:^|\\s)(?:--graph|--version)(?:\\s|$)"}},
+    {"id":"ansible-galaxy-role-import-status","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-galaxy"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*role\\s+import(?=.*\\s--status(?:\\s|$)).*$"}},
+    {"id":"ansible-galaxy-role-setup-list","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-galaxy"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*role\\s+setup(?!.*\\s--remove(?:=|\\s|$))(?=.*\\s--list(?:\\s|$)).*$"}},
+    {"id":"ansible-galaxy-role-setup","operation_class":"mutate","remote":true,"matching_strategy":{"type":"command_regex","executables":["ansible-galaxy"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*role\\s+setup(?:\\s|$)"}},
+    {"id":"ansible-config-observe","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-config"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*(?:list|init|--version|--help|-h)(?:\\s|$)"}},
+    {"id":"ansible-config-validate","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["ansible-config"],"pattern":"^(?:(?:-v{1,6}|--verbose)\\s+)*validate(?:\\s|$)"}},
+    {"id":"ansible-doc-observe","operation_class":"observe","matching_strategy":{"type":"command_regex","executables":["ansible-doc"],"pattern":".*"}},
+    {"id":"ansible-galaxy-local-build","operation_class":"validate","matching_strategy":{"type":"command_regex","executables":["ansible-galaxy"],"pattern":"^collection\\s+build(?:\\s|$)"}}
+  ]
+}

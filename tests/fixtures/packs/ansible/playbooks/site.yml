@@ -1,0 +1,8 @@
+---
+- name: Synthetic fixture play
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Report fixture-only data
+      ansible.builtin.debug:
+        msg: fixture-only

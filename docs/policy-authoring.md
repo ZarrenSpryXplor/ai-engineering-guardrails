@@ -1,6 +1,6 @@
 # Policy authoring
 
-Execution-efficiency task routing is not behavioural policy. Author model tiers, profiles, escalation, and subagent roles under `routing/` as described in [routing and measurement](routing-and-cost.md); do not put vendor model IDs in policy fragments.
+Execution-efficiency task routing is not behavioural policy. Canonical authoring data is shipped under `ai_engineering_guardrails/_resources/`; this document omits that prefix below for readability. Author model tiers, profiles, escalation, and subagent roles under `routing/` as described in [routing and measurement](routing-and-cost.md); do not put vendor model IDs in policy fragments.
 
 ## Add and order a fragment
 
@@ -144,3 +144,17 @@ python tools/guardrails.py uninstall --home "$temporary_home" --product all
 ```
 
 Remove the temporary directory only after confirming it is the expected generated path.
+
+## Local workstation overlay
+
+End users do not edit package resources. A workstation-local overlay is deliberately small and survives package upgrades:
+
+```sh
+ai-guardrails policy init
+ai-guardrails policy validate
+ai-guardrails policy diff
+ai-guardrails policy apply --dry-run
+ai-guardrails policy apply
+```
+
+`~/.ai-guardrails/policy/overrides.json` has `behavioural_fragments`, `rule_modes`, and `additional_rules`. Local fragments are non-empty UTF-8 Markdown beneath `~/.ai-guardrails/policy/fragments/` and use `local-` identifiers. A local `rule_modes` entry may only keep or strengthen an existing rollout mode (`disabled < observe < warn < deny`). Additional shell rules use the existing command-rule schema, a supported matcher, and both dangerous and safe examples. Overlays cannot permanently weaken bundled policy; use a short, human-confirmed waiver for a bounded exception.

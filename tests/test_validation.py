@@ -8,8 +8,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guardrails import build, policy, routing, scan
-from guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path, read_json
+from ai_engineering_guardrails import build, policy, routing, scan
+from ai_engineering_guardrails.resources import RESOURCE_ROOT
+from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path, read_json
 
 
 class ValidationTests(unittest.TestCase):
@@ -28,11 +29,11 @@ class ValidationTests(unittest.TestCase):
                     tomllib.loads(text)
 
     def test_full_validation_without_optional_executables(self) -> None:
-        with mock.patch("guardrails.build.shutil.which", return_value=None):
+        with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
             build.validate(check_codex=True)
 
     def test_codex_check_skips_when_unavailable(self) -> None:
-        with mock.patch("guardrails.build.shutil.which", return_value=None):
+        with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
             self.assertIn("skipped", build.validate_codex_rules())
 
     def test_selected_home_guard_rejects_posix_and_windows_escape(self) -> None:
@@ -62,7 +63,7 @@ class ValidationTests(unittest.TestCase):
         policy.validate_canonical_data()
 
     def test_high_risk_classification_covers_required_domains(self) -> None:
-        data = json.loads((ROOT / "risk/path-classification.json").read_text(encoding="utf-8"))
+        data = json.loads((RESOURCE_ROOT / "risk/path-classification.json").read_text(encoding="utf-8"))
         identifiers = {entry["id"] for entry in data["classifications"]}
         self.assertTrue(
             {
@@ -129,7 +130,7 @@ class ValidationTests(unittest.TestCase):
             self.assertTrue(any("expanded tool surface" in item for item in findings))
 
     def test_spacelift_policy_structure_uses_current_categories_and_rego_v1(self) -> None:
-        root = ROOT / "platform-policies/spacelift"
+        root = RESOURCE_ROOT / "platform-policies/spacelift"
         scan.validate_spacelift_policy_structure(root)
         for name in ("approval", "login", "notification", "plan", "push", "trigger"):
             self.assertTrue((root / name).is_dir())
@@ -150,7 +151,7 @@ class ValidationTests(unittest.TestCase):
         self.assertNotIn("/intent/mcp", "\n".join(path.read_text(encoding="utf-8") for path in root.rglob("*.*")))
 
     def test_generated_codex_requirements_use_current_managed_schema(self) -> None:
-        content = build.build_artifacts(("codex",))[ROOT / "dist/enterprise/codex/requirements.toml"]
+        content = build.build_artifacts(("codex",))[Path("dist/enterprise/codex/requirements.toml")]
         requirements = tomllib.loads(content.decode("utf-8"))
         self.assertEqual(":workspace", requirements["default_permissions"])
         self.assertEqual(
@@ -165,14 +166,14 @@ class ValidationTests(unittest.TestCase):
 
     def test_one_language_implementation_constraint(self) -> None:
         allowed = {".py", ".json", ".md", ".toml", ".rules"}
-        for directory in (ROOT / "guardrails", ROOT / "tools", ROOT / "enforcement"):
+        for directory in (ROOT / "ai_engineering_guardrails", ROOT / "tools", ROOT / "enforcement"):
             for path in directory.rglob("*"):
-                if path.is_file() and "__pycache__" not in path.parts:
+                if path.is_file() and "__pycache__" not in path.parts and "_resources" not in path.parts:
                     self.assertIn(path.suffix, allowed, path)
 
     def test_python_implementation_imports_no_external_runtime_dependency(self) -> None:
         standard = set(__import__("sys").stdlib_module_names)
-        for directory in (ROOT / "guardrails", ROOT / "tools", ROOT / "enforcement"):
+        for directory in (ROOT / "ai_engineering_guardrails", ROOT / "tools", ROOT / "enforcement"):
             for path in directory.rglob("*.py"):
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                 for node in ast.walk(tree):
@@ -180,7 +181,10 @@ class ValidationTests(unittest.TestCase):
                     names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else []
                     roots = ([module.split(".")[0]] if module and node.level == 0 else []) + [name.split(".")[0] for name in names]
                     for imported in roots:
-                        self.assertTrue(imported in standard or imported in {"guardrails"}, f"external import {imported} in {path}")
+                        self.assertTrue(
+                            imported in standard or imported in {"ai_engineering_guardrails"},
+                            f"external import {imported} in {path}",
+                        )
 
     def test_routing_and_policy_identifiers_are_unique(self) -> None:
         merged = policy.load_enforcement_policy()
@@ -189,7 +193,7 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(5, len(routing.load_config()["agents"]))
 
     def test_canonical_policy_is_not_generated_output(self) -> None:
-        for path in (ROOT / "policy/fragments").glob("*.md"):
+        for path in (RESOURCE_ROOT / "policy/fragments").glob("*.md"):
             self.assertNotIn("GENERATED — DO NOT EDIT", path.read_text(encoding="utf-8"))
         for path in (ROOT / "dist").rglob("*"):
             if path.is_file():

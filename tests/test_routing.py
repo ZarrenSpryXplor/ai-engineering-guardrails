@@ -9,8 +9,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
-from guardrails import install as installer, routing
-from guardrails.util import PRODUCTS, ROOT, GuardrailsError
+from ai_engineering_guardrails import install as installer, routing
+from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError
 
 
 class RoutingConfigurationTests(unittest.TestCase):

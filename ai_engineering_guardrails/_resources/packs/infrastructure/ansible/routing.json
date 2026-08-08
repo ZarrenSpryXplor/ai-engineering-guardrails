@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "task_classes": [
+    {"id": "ansible-source-change", "tier": "deep", "reasoning": "high", "write": true},
+    {"id": "ansible-static-review", "tier": "balanced", "reasoning": "medium", "write": false}
+  ],
+  "escalate_on": ["remote execution", "unknown inventory", "prd lifecycle", "privilege escalation", "Vault or credential material", "dynamic inventory or plugin code"]
+}

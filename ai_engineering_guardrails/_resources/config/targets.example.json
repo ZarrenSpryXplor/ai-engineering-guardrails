@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "classifications": {
+    "kubernetes_contexts": {
+      "local-kind": "dev",
+      "integration-cluster": "int",
+      "production-cluster": "prd"
+    },
+    "kubernetes_namespaces": {
+      "local-kind/development": "dev",
+      "integration-cluster/payments": "int",
+      "production-cluster/payments": "prd"
+    },
+    "helm_releases": {},
+    "spacelift_stacks": {},
+    "azure_subscriptions": {
+      "00000000-0000-0000-0000-000000000001": "dev",
+      "00000000-0000-0000-0000-000000000004": "prd"
+    },
+    "cloud_accounts": {},
+    "terraform_workspaces": {},
+    "ansible_inventories": {
+      "inventories/development/hosts.yml": "dev",
+      "inventories/integration/hosts.yml": "int",
+      "inventories/production/hosts.yml": "prd"
+    },
+    "database_targets": {},
+    "container_registries": {}
+  }
+}

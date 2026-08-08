@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guardrails import enforcement, policy
+from ai_engineering_guardrails import enforcement, policy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,6 +103,14 @@ class CommandPolicyTests(unittest.TestCase):
             "psql -c 'DELETE FROM users'": "destructive-database-client",
             "grafana alert mute payments": "observability-control-mutation",
             "openssl pkey -in synthetic-private.pem -text -noout": "pki-private-material-export",
+            "ansible-vault view group_vars/all/vault.yml": "ansible-vault-sensitive-read",
+            "ansible-galaxy collection publish namespace-collection-1.0.0.tar.gz": "ansible-galaxy-publication",
+            "ansible-galaxy role delete example role": "ansible-galaxy-remote-removal",
+            "ansible-galaxy collection install --ignore-certs example.collection": "ansible-galaxy-certificate-bypass",
+            "ansible-galaxy collection install --disable-gpg-verify example.collection": "ansible-galaxy-signature-bypass",
+            "ansible-galaxy collection verify example.collection --ignore-signature-status-code=NO_PUBKEY": "ansible-galaxy-signature-bypass",
+            "ansible-pull --clean -U https://example.invalid/automation.git": "ansible-pull-destructive-checkout",
+            "ansible-pull --accept-host-key -U ssh://git@example.invalid/automation.git": "ansible-pull-host-key-bypass",
         }
         for command, identifier in expected.items():
             with self.subTest(command=command):
@@ -131,6 +139,92 @@ class CommandPolicyTests(unittest.TestCase):
         self.assertIsNone(
             enforcement.evaluate_command("mysql -e 'UPDATE users SET active = false WHERE id = 1' app", self.policy)
         )
+
+    def test_ansible_nearby_safe_commands_are_not_hard_denied(self) -> None:
+        for command in (
+            "ansible-playbook --syntax-check playbooks/site.yml",
+            "ansible-inventory -i inventories/dev --graph",
+            "ansible-galaxy collection build",
+            "ansible-vault encrypt group_vars/all/vault.yml",
+            "ansible-config list",
+            "ansible-config validate",
+            "ansible-galaxy role import --status example role",
+            "echo 'ansible-vault view group_vars/all/vault.yml'",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(enforcement.evaluate_command(command, self.policy))
+
+        for command in (
+            "ansible --help",
+            "ansible-playbook --version",
+            "ansible-pull --version",
+            "ansible-console -h",
+        ):
+            with self.subTest(command=command):
+                classification = enforcement.classify_command(command, self.policy)
+                self.assertEqual("ansible-cli-metadata", classification["id"])
+                decision = enforcement.evaluate_request(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    },
+                    policy_data=self.policy,
+                    metadata=metadata(),
+                )
+                self.assertEqual("no-decision", decision.decision)
+
+        for command in (
+            "ansible-playbook -i inventories/dev --list-hosts playbooks/site.yml",
+            "ansible-playbook --list-tags playbooks/site.yml",
+            "ansible-playbook playbooks/site.yml --list-tasks",
+            "ansible -i inventories/dev --list-hosts all",
+        ):
+            with self.subTest(command=command):
+                decision = enforcement.evaluate_request(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    },
+                    policy_data=self.policy,
+                    metadata=metadata(),
+                )
+                self.assertEqual("no-decision", decision.decision)
+                self.assertEqual("observe", decision.operation_class)
+
+        flush = enforcement.evaluate_request(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "ansible-playbook -i inventories/dev --list-hosts --flush-cache playbooks/site.yml"
+                },
+            },
+            policy_data=self.policy,
+            metadata=metadata(),
+        )
+        self.assertEqual("deny", flush.decision)
+        self.assertEqual("safety-profile-infrastructure-observe", flush.rule_id)
+
+        for command, expected in (
+            ("ansible-galaxy role import --status example role", "no-decision"),
+            ("ansible-galaxy role setup --list example role", "no-decision"),
+            ("ansible-galaxy role setup example role secret", "deny"),
+            ("ansible-galaxy role setup --remove 42 example role", "deny"),
+            ("ansible-galaxy role setup --list --remove=42 example role", "deny"),
+        ):
+            with self.subTest(command=command):
+                decision = enforcement.evaluate_request(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    },
+                    policy_data=self.policy,
+                    metadata=metadata(),
+                )
+                self.assertEqual(expected, decision.decision)
 
     def test_explain_tokens_never_include_positional_command_values(self) -> None:
         command = "helm uninstall synthetic-sensitive-release"
@@ -281,6 +375,132 @@ class DecisionTests(unittest.TestCase):
             metadata=metadata(trust_mode="untrusted-workspace", safety_profile="infrastructure-nonprod"),
         )
         self.assertEqual("trust-mode-remote-mutation", decision.rule_id)
+
+    def test_ansible_remote_execution_uses_existing_safety_profile(self) -> None:
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ansible-playbook -i inventories/dev playbooks/site.yml"},
+        }
+        default = enforcement.evaluate_request(payload, policy_data=self.policy, metadata=metadata())
+        self.assertEqual("deny", default.decision)
+        self.assertEqual("safety-profile-infrastructure-observe", default.rule_id)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            targets = Path(temporary) / "targets.json"
+            targets.write_text(
+                json.dumps(
+                    {
+                        "classifications": {
+                            "ansible_inventories": {
+                                "inventories/dev": "dev",
+                                "inventories/prd": "prd",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mapped_inventory_file = enforcement.evaluate_request(
+                {
+                    **payload,
+                    "tool_input": {
+                        "command": "ansible-playbook --inventory-file inventories/dev playbooks/site.yml"
+                    },
+                },
+                policy_data=self.policy,
+                metadata=metadata(
+                    safety_profile="infrastructure-nonprod",
+                    home_directory=temporary,
+                    targets_path=str(targets),
+                ),
+            )
+            mapped = enforcement.evaluate_request(
+                payload,
+                policy_data=self.policy,
+                metadata=metadata(
+                    safety_profile="infrastructure-nonprod",
+                    home_directory=temporary,
+                    targets_path=str(targets),
+                ),
+            )
+            multiple = enforcement.evaluate_request(
+                {
+                    **payload,
+                    "tool_input": {
+                        "command": (
+                            "ansible-playbook -i inventories/dev "
+                            "--inventory-file inventories/prd playbooks/site.yml"
+                        )
+                    },
+                },
+                policy_data=self.policy,
+                metadata=metadata(
+                    safety_profile="infrastructure-nonprod",
+                    home_directory=temporary,
+                    targets_path=str(targets),
+                ),
+            )
+        self.assertEqual("no-decision", mapped.decision)
+        self.assertEqual("dev", mapped.target_lifecycle)
+        self.assertEqual("no-decision", mapped_inventory_file.decision)
+        self.assertEqual("dev", mapped_inventory_file.target_lifecycle)
+        self.assertEqual("deny", multiple.decision)
+        self.assertEqual("safety-profile-protected-target", multiple.rule_id)
+
+    def test_ansible_check_mode_is_remote_and_inventory_output_warns(self) -> None:
+        check = enforcement.evaluate_request(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "ansible-playbook -i inventories/dev playbooks/site.yml --check"},
+            },
+            policy_data=self.policy,
+            metadata=metadata(),
+        )
+        inventory = enforcement.evaluate_request(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "ansible-inventory -i inventories/dev --list"},
+            },
+            policy_data=self.policy,
+            metadata=metadata(),
+        )
+        self.assertEqual("deny", check.decision)
+        self.assertEqual("warn", inventory.decision)
+        self.assertEqual("ansible-inventory-variable-output", inventory.rule_id)
+        self.assertEqual(("ansible-inventory",), inventory.matched_tokens)
+
+        config = enforcement.evaluate_request(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "ansible-config --verbose dump --only-changed"},
+            },
+            policy_data=self.policy,
+            metadata=metadata(),
+        )
+        self.assertEqual("warn", config.decision)
+        self.assertEqual("ansible-config-sensitive-output", config.rule_id)
+        self.assertEqual(("ansible-config",), config.matched_tokens)
+
+        for command in (
+            "ansible-pull -i inventories/dev local.yml --check",
+            "ansible-console -i inventories/dev app",
+        ):
+            with self.subTest(command=command):
+                decision = enforcement.evaluate_request(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    },
+                    policy_data=self.policy,
+                    metadata=metadata(),
+                )
+                self.assertEqual("deny", decision.decision)
+                self.assertEqual("safety-profile-infrastructure-observe", decision.rule_id)
 
     def test_rollout_modes(self) -> None:
         for mode, expected in (("disabled", "no-decision"), ("observe", "no-decision"), ("warn", "warn"), ("deny", "deny")):
