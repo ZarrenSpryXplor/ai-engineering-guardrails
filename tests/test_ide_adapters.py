@@ -54,7 +54,9 @@ class IdeAdapterTests(unittest.TestCase):
         def which(name: str) -> str | None:
             return f"/synthetic/{name}" if name in {"code", "idea", "devenv.exe"} else None
 
-        with mock.patch("ai_engineering_guardrails.install.shutil.which", side_effect=which):
+        with mock.patch.object(install.sys, "platform", "linux"), mock.patch(
+            "ai_engineering_guardrails.install.shutil.which", side_effect=which
+        ):
             detected = install.detect_products(self.home)
         self.assertEqual(("executable",), detected["vscode"])
         self.assertEqual(("launcher",), detected["jetbrains"])
