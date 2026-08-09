@@ -30,6 +30,7 @@ class CiReportingTests(unittest.TestCase):
         *,
         project_name: str = "ai-engineering-guardrails",
         version: str = "1.2.3",
+        sdist_filename_name: str | None = None,
         wheel_version: str | None = None,
         sdist_version: str | None = None,
     ) -> tuple[Path, Path]:
@@ -44,9 +45,10 @@ class CiReportingTests(unittest.TestCase):
                 f"{filename_name}-{version}.dist-info/METADATA",
                 metadata(wheel_version or version),
             )
-        sdist = directory / f"{project_name}-{version}.tar.gz"
+        sdist_name = sdist_filename_name or project_name
+        sdist = directory / f"{sdist_name}-{version}.tar.gz"
         payload = metadata(sdist_version or version)
-        member = tarfile.TarInfo(f"{project_name}-{version}/PKG-INFO")
+        member = tarfile.TarInfo(f"{sdist_name}-{version}/PKG-INFO")
         member.size = len(payload)
         with tarfile.open(sdist, "w:gz") as archive:
             archive.addfile(member, io.BytesIO(payload))
@@ -248,18 +250,22 @@ class SampleTests(unittest.TestCase):
                     CI_MODULE.validate_release_tag(tag, "1.2.3")
 
     def test_release_artifact_validation_accepts_one_matching_wheel_and_sdist(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            wheel, sdist = self.write_release_artifacts(directory)
-
-            self.assertEqual(
-                (wheel, sdist),
-                CI_MODULE.validate_release_artifacts(
+        for sdist_filename_name in ("ai-engineering-guardrails", "ai_engineering_guardrails"):
+            with self.subTest(sdist_filename_name=sdist_filename_name), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                wheel, sdist = self.write_release_artifacts(
                     directory,
-                    project_name="ai-engineering-guardrails",
-                    package_version="1.2.3",
-                ),
-            )
+                    sdist_filename_name=sdist_filename_name,
+                )
+
+                self.assertEqual(
+                    (wheel, sdist),
+                    CI_MODULE.validate_release_artifacts(
+                        directory,
+                        project_name="ai-engineering-guardrails",
+                        package_version="1.2.3",
+                    ),
+                )
 
     def test_release_artifact_validation_rejects_missing_duplicate_and_unexpected_files(self) -> None:
         cases = ("missing-wheel", "duplicate-wheel", "unexpected-file", "metadata-mismatch")

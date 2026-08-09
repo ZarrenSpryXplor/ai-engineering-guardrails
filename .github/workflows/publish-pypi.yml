@@ -106,7 +106,10 @@ jobs:
           shopt -s nullglob
           entries=(release/*)
           wheels=(release/ai_engineering_guardrails-*.whl)
-          sdists=(release/ai-engineering-guardrails-*.tar.gz)
+          sdists=(
+            release/ai-engineering-guardrails-*.tar.gz
+            release/ai_engineering_guardrails-*.tar.gz
+          )
           if [ "${#entries[@]}" -ne 2 ] || [ "${#wheels[@]}" -ne 1 ] || [ "${#sdists[@]}" -ne 1 ]; then
             echo "error: release artifact must contain exactly one ai-engineering-guardrails wheel and one source distribution" >&2
             exit 1
