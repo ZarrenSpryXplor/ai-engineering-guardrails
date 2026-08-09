@@ -23,7 +23,7 @@ flowchart TD
 | Engineer enabling status, receipts, or demo mode | [Terminal UX](terminal-ux.md) | [compatibility](compatibility.md#terminal-ux-capability-verification-2026-08-09) |
 | Engineer delegating bounded tasks | [Routing and cost](routing-and-cost.md) | [skills catalogue](skills.md) |
 | Contributor changing behavior or generated output | [Policy authoring](policy-authoring.md) | [Architecture](architecture.md), [CONTRIBUTING.md](../CONTRIBUTING.md) |
-| Release maintainer | [Operations](operations.md#first-public-release-checklist) | [changelog](../CHANGELOG.md), [security policy](../SECURITY.md) |
+| Release maintainer | [Releasing to PyPI](releasing.md) | [operations](operations.md#first-public-release-checklist), [changelog](../CHANGELOG.md), [security policy](../SECURITY.md) |
 | Security or platform reviewer | [Threat model](threat-model.md) | [architecture](architecture.md), [compatibility](compatibility.md) |
 | Enterprise or Spacelift reviewer | [Enterprise output](enterprise.md) | [Spacelift](spacelift.md) |
 
@@ -38,6 +38,7 @@ flowchart TD
 - [Architecture](architecture.md): canonical resources, build, installation, enforcement, and ownership boundaries.
 - [Policy authoring](policy-authoring.md): how maintainers safely extend canonical policy, skills, packs, or command rules.
 - [Threat model](threat-model.md): assumptions, non-goals, limitations, and operational mitigations.
+- [Releasing to PyPI](releasing.md): Trusted Publishing setup, protected-environment approval, release-tag checks, and first-release procedure.
 
 For reporting and contribution expectations, see the repository-level [security policy](../SECURITY.md), [contribution guide](../CONTRIBUTING.md), [code of conduct](../CODE_OF_CONDUCT.md), and [changelog](../CHANGELOG.md).
 

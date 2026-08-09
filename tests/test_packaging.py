@@ -69,6 +69,7 @@ class PackagingTests(unittest.TestCase):
     def test_operator_documentation_and_release_governance_entrypoints_exist(self) -> None:
         for relative in (
             "docs/README.md",
+            "docs/releasing.md",
             "SECURITY.md",
             "CONTRIBUTING.md",
             "CODE_OF_CONDUCT.md",
@@ -128,6 +129,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
                 self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))
+                self.assertTrue(any(name.endswith("docs/releasing.md") for name in names))
                 for filename in (
                     "SECURITY.md",
                     "CONTRIBUTING.md",
