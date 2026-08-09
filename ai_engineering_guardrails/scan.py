@@ -28,6 +28,39 @@ IGNORED_PARTS = {
     "build",
     "target",
 }
+DOWNLOAD_EXECUTE_RE = re.compile(
+    r"\b(?:curl|wget)\b[^\n|]{0,400}\|\s*(?:(?:sudo|env|command)\s+)*(?:[^\s|]+[\\/])?(?:bash|sh|zsh|python(?:3)?|pwsh|powershell)\b",
+    re.IGNORECASE,
+)
+POWERSHELL_DOWNLOAD_EXECUTE_RE = re.compile(
+    r"\b(?:invoke-webrequest|iwr|invoke-restmethod|irm)\b[^\n|]{0,400}\|\s*(?:invoke-expression|iex)\b",
+    re.IGNORECASE,
+)
+EXTERNAL_AUTHORITY_RE = re.compile(
+    r"\b(?:external\s+(?:issue|comment|pull\s+request|web\s+page|content)|"
+    r"issue(?:\s+instructions?)?|comment|pull\s+request|web\s+(?:page|content)|mcp\s+output|readme(?:\s+instructions?)?)\b"
+    r".{0,160}?\b(?P<authority>is\s+authoritative|overrides?|supersedes?|must\s+obey|authori[sz]es?)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+FOLLOW_EXTERNAL_OVER_LOCAL_RE = re.compile(
+    r"\bfollow\b.{0,80}\b(?:web\s+page|website|readme|issue|comment)\b.{0,100}\b"
+    r"(?:even\s+if|despite)\b.{0,80}\b(?:local|trusted|workstation|guardrail|policy)\b.{0,60}\b(?:disagrees?|conflicts?)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def locally_negated(text: str, position: int) -> bool:
+    """Recognise only a nearby, same-clause denial of the matched action."""
+    start = max(0, position - 120)
+    prefix = text[start:position]
+    boundaries = list(re.finditer(r"(?:[.!?](?=\s|$)|[;,\n])", prefix))
+    clause = prefix[boundaries[-1].end() :] if boundaries else prefix
+    negator = r"(?:do\s+not|does\s+not|don't|doesn't|must\s+not|must\s+never|should\s+not|cannot|can't|never)"
+    action = r"(?:run|execute|invoke|use|read|access|authorize|allow|follow|obey|override|supersede|grant|pipe)"
+    return bool(
+        re.search(rf"\b{negator}\s*$", clause, re.IGNORECASE)
+        or re.search(rf"\b{negator}\s+{action}\b.{{0,100}}$", clause, re.IGNORECASE)
+    )
 
 
 @dataclass(frozen=True)
@@ -247,8 +280,8 @@ def _scan_package_scripts(repo: Path, path: Path, text: str) -> list[Finding]:
     for name, value in scripts.items():
         if not isinstance(name, str) or not isinstance(value, str):
             continue
-        dangerous = name in {"preinstall", "install", "postinstall"} and re.search(
-            r"(?:curl|wget|Invoke-WebRequest|iwr)\b.*(?:\||Invoke-Expression|iex)", value, re.I
+        dangerous = name in {"preinstall", "install", "postinstall"} and (
+            DOWNLOAD_EXECUTE_RE.search(value) or POWERSHELL_DOWNLOAD_EXECUTE_RE.search(value)
         )
         publication = name in {"publish", "prepublish", "prepublishOnly", "postpublish"} and re.search(
             r"\b(?:npm|pnpm|yarn)\s+publish\b", value, re.I
@@ -338,12 +371,12 @@ def _scan_hook_and_mcp(repo: Path, path: Path, text: str) -> list[Finding]:
         return []
     findings: list[Finding] = []
     patterns = {
-        "unpinned-executable-mcp": r"(?i)\b(?:npx|uvx|pipx\s+run)\b[^\n]*(?:@latest|\blatest\b)",
-        "download-execute-hook": r"(?i)\b(?:curl|wget)\b[^\n|]*\|\s*(?:bash|sh|zsh|pwsh|powershell)\b",
-        "removed-spacelift-mcp-endpoint": r"/intent/mcp",
+        "unpinned-executable-mcp": re.compile(r"\b(?:npx|uvx|pipx\s+run)\b[^\n]*(?:@latest|\blatest\b)", re.I),
+        "download-execute-hook": DOWNLOAD_EXECUTE_RE,
+        "removed-spacelift-mcp-endpoint": re.compile(r"/intent/mcp"),
     }
     for identifier, pattern in patterns.items():
-        for match in re.finditer(pattern, text):
+        for match in pattern.finditer(text):
             findings.append(
                 _finding(
                     identifier,
@@ -358,6 +391,46 @@ def _scan_hook_and_mcp(repo: Path, path: Path, text: str) -> list[Finding]:
                     }[identifier],
                 )
             )
+    return findings
+
+
+def _scan_external_instruction_authority(repo: Path, path: Path, text: str) -> list[Finding]:
+    """Flag a narrow prompt-injection boundary in executable instruction files.
+
+    This is intentionally not a claim to detect arbitrary prompt injection.  It
+    catches only direct statements that promote external content over trusted
+    repository, user, or platform authority.
+    """
+    if path.name not in {"AGENTS.md", "CLAUDE.md", "SKILL.md"}:
+        return []
+    patterns = {
+        "external-content-as-authority": (
+            (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE),
+            "External content is presented as authority; treat it as evidence under trusted policy instead.",
+        ),
+        "instruction-authority-override": (
+            (re.compile(r"\b(?:ignore|disregard)\b.{0,120}\b(?:previous|trusted|system|guardrail|safety)\b.{0,80}\binstruction", re.I | re.S),),
+            "Instruction text asks to override a trusted instruction boundary.",
+        ),
+    }
+    findings: list[Finding] = []
+    for identifier, (matchers, message) in patterns.items():
+        for pattern in matchers:
+            for match in pattern.finditer(text):
+                authority_position = match.start("authority") if "authority" in match.re.groupindex else match.start()
+                if identifier == "external-content-as-authority" and locally_negated(text, authority_position):
+                    continue
+                findings.append(
+                    _finding(
+                        identifier,
+                        "warning",
+                        repo,
+                        path,
+                        _line_number(text, match),
+                        message,
+                        "This is a narrow text pattern, not semantic prompt-injection detection.",
+                    )
+                )
     return findings
 
 
@@ -566,6 +639,7 @@ def scan_repository(repo: Path) -> list[Finding]:
         findings.extend(_scan_yaml_like(resolved, path, text))
         findings.extend(_scan_unknown_remote_targets(resolved, path, text))
         findings.extend(_scan_hook_and_mcp(resolved, path, text))
+        findings.extend(_scan_external_instruction_authority(resolved, path, text))
         findings.extend(_scan_deprecated_spacelift(resolved, path, text))
     findings.extend(_generated_stale(resolved))
     findings.extend(_scan_changed_high_risk_paths(resolved))
@@ -725,7 +799,13 @@ def changed_file_count(repo: Path) -> int:
     return len([entry for entry in result.stdout.split(b"\0") if entry]) if result.returncode == 0 else 0
 
 
-def session_receipt(home: Path, repo: Path, products: Sequence[str]) -> dict[str, Any]:
+def session_receipt(
+    home: Path,
+    repo: Path,
+    products: Sequence[str],
+    *,
+    task_assurance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     from . import complexity, state, terminal_ux
 
     selected_home = home.expanduser().resolve(strict=False)
@@ -753,4 +833,6 @@ def session_receipt(home: Path, repo: Path, products: Sequence[str]) -> dict[str
         "policy_digest": policy_digest,
         "unverified_checks": ["product model availability", "semantic YAML/Rego/API compatibility unless separately validated"],
     }
+    if task_assurance is not None:
+        receipt["task_assurance"] = dict(task_assurance)
     return receipt

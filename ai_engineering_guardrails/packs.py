@@ -134,6 +134,8 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
     if missing:
         raise PackError(f"pack {pack_file} is missing field: {sorted(missing)[0]}")
     data.setdefault("structured_tool_policy_fragments", [])
+    data.setdefault("dependency_manifests", [])
+    data.setdefault("dependency_lockfiles", [])
     identifier = data["id"]
     if not isinstance(identifier, str) or not PACK_ID_RE.fullmatch(identifier):
         raise PackError(f"pack has invalid identifier: {pack_file}")
@@ -156,6 +158,8 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
         "verification_definitions",
         "routing_additions",
         "compatibility_notes",
+        "dependency_manifests",
+        "dependency_lockfiles",
     )
     for field in list_fields:
         value = data[field]
@@ -163,6 +167,10 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
             raise PackError(f"pack {identifier} has invalid {field}")
     if not data["file_detectors"] and not data["directory_detectors"] and data["type"] != "shared":
         raise PackError(f"pack {identifier} lacks detection markers")
+    for field in ("dependency_manifests", "dependency_lockfiles"):
+        unknown = sorted(set(data[field]) - set(data["file_detectors"]))
+        if unknown:
+            raise PackError(f"pack {identifier} {field} references unknown file detector: {unknown[0]}")
     root = pack_file.parent.resolve(strict=False)
     references = (
         *data["policy_fragments"],
@@ -180,6 +188,41 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
         if not target.is_file():
             raise PackError(f"pack {identifier} references missing file: {relative_text}")
     return data
+
+
+def catalogue_tier(pack: Mapping[str, Any]) -> str:
+    """Map existing canonical pack types to their skill-catalogue role."""
+    return "contextual" if pack.get("type") in {"language", "shared"} else "specialist"
+
+
+def default_pack_ids(available: Mapping[str, Mapping[str, Any]] | None = None) -> tuple[str, ...]:
+    """Keep the complete stable deterministic capability policy enabled."""
+    selected = available or load_packs()
+    return tuple(sorted(selected))
+
+
+def default_skill_pack_ids(available: Mapping[str, Mapping[str, Any]] | None = None) -> tuple[str, ...]:
+    """Expose ordinary development skills without every specialist skill."""
+    selected = available or load_packs()
+    return tuple(sorted(identifier for identifier, pack in selected.items() if catalogue_tier(pack) == "contextual"))
+
+
+def dependency_file_patterns(
+    available: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return dependency classifications owned by existing capability packs."""
+    selected = available or load_packs()
+    manifests = {
+        str(pattern)
+        for pack in selected.values()
+        for pattern in pack.get("dependency_manifests", [])
+    }
+    lockfiles = {
+        str(pattern)
+        for pack in selected.values()
+        for pattern in pack.get("dependency_lockfiles", [])
+    }
+    return tuple(sorted(manifests)), tuple(sorted(lockfiles))
 
 
 def load_packs(packs_root: Path = PACKS_ROOT) -> dict[str, dict[str, Any]]:
@@ -296,7 +339,7 @@ def _walk_markers(repo: Path, generated: Sequence[str]) -> tuple[list[str], list
     return files, directories
 
 
-def _matches(value: str, pattern: str) -> bool:
+def matches_detector(value: str, pattern: str) -> bool:
     return fnmatch.fnmatchcase(value, pattern) or fnmatch.fnmatchcase(Path(value).name, pattern)
 
 
@@ -393,12 +436,12 @@ def detect_packs(repo: Path, packs_root: Path = PACKS_ROOT) -> DetectionResult:
         exclusions = tuple(pack["explicit_exclusions"])
         for pattern in pack["file_detectors"]:
             for path in files:
-                if _matches(path, pattern) and not any(_matches(path, exclusion) for exclusion in exclusions):
+                if matches_detector(path, pattern) and not any(matches_detector(path, exclusion) for exclusion in exclusions):
                     active.add(identifier)
                     evidence.append(Evidence(identifier, path, pattern, "file"))
         for pattern in pack["directory_detectors"]:
             for path in directories:
-                if _matches(path, pattern) and not any(_matches(path, exclusion) for exclusion in exclusions):
+                if matches_detector(path, pattern) and not any(matches_detector(path, exclusion) for exclusion in exclusions):
                     active.add(identifier)
                     evidence.append(Evidence(identifier, path, pattern, "directory"))
     for identifier in sorted(enabled):

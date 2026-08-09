@@ -1,6 +1,6 @@
 ---
 name: workstation-ansible
-description: Inspect, change, and verify Ansible playbooks, roles, collections, inventories, and configuration while preserving repository conventions and remote safety. Use for Ansible source and bounded offline validation; do not use to expose Vault or inventory secrets, publish Galaxy content, or run against unknown or production targets.
+description: Inspect, change, and verify Ansible playbooks, roles, collections, inventories, and configuration with bounded offline checks. Never expose Vault or inventory secrets, publish Galaxy content, or run against unknown or production targets.
 ---
 
 # Ansible workflow

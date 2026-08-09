@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/50-dependencies.md
 -->
+<!-- Canonical policy ID: dependencies-and-supply-chain -->
 
 ## Dependencies
 

@@ -1,6 +1,6 @@
 ---
 name: workstation-code-review
-description: Review a change set for defects and regressions with evidence. Use for code review; do not use when the primary request is implementation.
+description: Review code changes for evidence-backed defects and regressions. Use only for review, not when implementation is the primary request.
 ---
 
 # Workstation code review
@@ -11,7 +11,7 @@ Use this skill for a diff, pull request, commit range, or bounded repository rev
 
 ## Procedure
 
-1. Establish the review boundary and read repository instructions plus the surrounding implementation and tests.
+1. Establish the review boundary and read repository instructions. For a diff, pull request, or commit range, start with the changed files and lines; search for affected callers, tests, and interfaces, then read only the focused ranges needed as evidence. Do not explore the repository broadly merely to get oriented. If a targeted search is empty, retry once with simpler terms and treat the absence as evidence rather than guessing neighbouring paths.
 2. Trace changed behavior through callers, state transitions, persistence, interfaces, and failure paths.
 3. Prioritise correctness, regressions, security, concurrency, failure behaviour, operability, missing tests, compatibility, and material maintainability.
 4. For maintainability, flag an unjustified dependency or language, duplicate source of truth, abstraction without three concrete consumers, speculative configurability, unused layer, or scope beyond the accepted task. Do not report a subjective style preference as a defect.

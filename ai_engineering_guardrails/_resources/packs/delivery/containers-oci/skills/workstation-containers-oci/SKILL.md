@@ -1,6 +1,6 @@
 ---
 name: workstation-containers-oci
-description: Review and change Dockerfile, Containerfile, Compose, and OCI workflows with bounded local builds and host-access checks. Use for container build definitions and image metadata; do not use to publish images, expose registry credentials, launch privileged containers, or prune unrelated state.
+description: Review and change Dockerfile, Containerfile, Compose, and OCI build workflows with bounded local builds and host-access checks. Never publish images, expose registry credentials, launch privileged containers, or prune unrelated state.
 ---
 
 # Containers and OCI workflow

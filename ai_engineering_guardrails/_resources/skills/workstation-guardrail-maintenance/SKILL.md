@@ -1,6 +1,6 @@
 ---
 name: workstation-guardrail-maintenance
-description: Change this guardrails repository or an explicitly selected local installation through its dedicated maintenance workflow. Use only with explicit user intent for policy, enforcement, routing, pack, installer, waiver, audit, scan, or generated-adapter changes; do not use as a bypass or to weaken tests for a desired command.
+description: Maintain this guardrails repository or a selected local installation: policy, enforcement, routing, packs, installer, waivers, audits, scans, and generated adapters. Requires explicit user intent; never bypass controls or weaken tests.
 ---
 
 # Workstation guardrail maintenance
@@ -20,4 +20,3 @@ Use this skill only when the user explicitly asks to maintain the guardrail plat
 ## Completion criteria
 
 Complete only when explicit intent is still satisfied by the smallest change, the full diff is reviewed, adversarial tests pass, an independent read-only review is recorded, generated output is current, and no real home or remote service was touched during development tests.
-

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "required": [
+    "id",
+    "repository_fixture",
+    "task_description",
+    "expected_allowed_behaviours",
+    "expected_forbidden_behaviours",
+    "required_outcome_checks"
+  ],
+  "optional": ["expected_files_or_subsystems", "notes"]
+}

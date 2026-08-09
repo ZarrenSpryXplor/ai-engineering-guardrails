@@ -12,8 +12,6 @@
     "new_runtime_dependencies": 2
   },
   "generated_prefixes": ["adapters/", "build/", "dist/", "generated/"],
-  "manifest_names": ["package.json", "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "Directory.Packages.props", "*.csproj", "*.fsproj"],
-  "lockfile_names": ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock", "Pipfile.lock", "Cargo.lock", "packages.lock.json"],
   "ci_governance_prefixes": [".github/", ".azure-pipelines/"],
   "ci_governance_names": ["azure-pipelines.yml", "azure-pipelines.yaml", "CODEOWNERS", "SECURITY.md", "CONTRIBUTING.md"],
   "infrastructure_extensions": [".tf", ".rego"],

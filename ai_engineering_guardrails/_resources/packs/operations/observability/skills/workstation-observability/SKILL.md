@@ -1,6 +1,6 @@
 ---
 name: workstation-observability
-description: Collect and summarise bounded metrics, logs, traces, dashboards, and alert evidence without changing operational controls. Use for read-only incident diagnosis and observability-source review; do not use to mute alerts, change dashboards or retention, delete logs, create tokens, or mutate production.
+description: Collect and summarise observability metrics, logs, traces, dashboards, and alerts for read-only incident diagnosis. Never mute alerts, change dashboards or retention, delete logs, create tokens, or mutate production.
 ---
 
 # Observability workflow

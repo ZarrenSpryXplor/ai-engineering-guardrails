@@ -33,7 +33,7 @@ from .util import (
 )
 
 
-FORMAT_VERSION = 4
+FORMAT_VERSION = 7
 STATE_RELATIVE = Path(".ai-guardrails/state.json")
 BACKUPS_RELATIVE = Path(".ai-guardrails/backups")
 WAIVERS_RELATIVE = Path(".ai-guardrails/waivers")
@@ -77,6 +77,9 @@ def empty_state() -> dict[str, Any]:
         "runtime_digest": None,
         "runtime_path": None,
         "manual_steps": [],
+        "component_trust": [],
+        "component_trust_locations": [],
+        "task_contracts": [],
     }
 
 
@@ -86,16 +89,43 @@ def load_state(home: Path) -> dict[str, Any]:
     data = read_json(path, default=empty_state())
     if not isinstance(data, dict):
         raise GuardrailsError(f"invalid installation state in {path}")
-    if data.get("format_version") in {1, 2, 3}:
-        # Read pre-packaging state for update/uninstall; the next successful write
-        # records the package, overlay, and expanded product identities in v4.
+    if data.get("format_version") in {1, 2, 3, 4, 5, 6}:
+        # Read older state for update/uninstall; the next successful write records
+        # the current package, overlay, product, and component-trust fields.
         upgraded = empty_state()
         for key in upgraded:
-            if key in data:
+            if key != "format_version" and key in data:
                 upgraded[key] = data[key]
+        # Version 5 kept an opaque component locator digest inside each trust
+        # record.  Trust records themselves now contain only review metadata;
+        # retain the locator-to-content relationship separately so audit can
+        # still distinguish modified content without retaining a real path.
+        if data.get("format_version") == 5 and isinstance(upgraded.get("component_trust"), list):
+            records: list[dict[str, Any]] = []
+            locations: list[dict[str, str]] = []
+            for raw in upgraded["component_trust"]:
+                if not isinstance(raw, Mapping):
+                    continue
+                record = dict(raw)
+                locator = record.pop("component_locator_digest", None)
+                digest = record.get("component_digest")
+                if isinstance(locator, str) and SHA256_RE.fullmatch(locator) and isinstance(digest, str) and SHA256_RE.fullmatch(digest):
+                    locations.append({"component_digest": digest, "component_locator_digest": locator})
+                records.append(record)
+            upgraded["component_trust"] = records
+            upgraded["component_trust_locations"] = sorted(
+                locations,
+                key=lambda item: (item["component_locator_digest"], item["component_digest"]),
+            )
         upgraded[LEGACY_FORMAT_KEY] = data["format_version"]
         return upgraded
-    if data.get("format_version") != FORMAT_VERSION or not isinstance(data.get("products"), dict):
+    if (
+        data.get("format_version") != FORMAT_VERSION
+        or not isinstance(data.get("products"), dict)
+        or not isinstance(data.get("component_trust"), list)
+        or not isinstance(data.get("component_trust_locations"), list)
+        or not isinstance(data.get("task_contracts"), list)
+    ):
         raise GuardrailsError(f"unsupported installation state in {path}")
     return data
 
@@ -415,7 +445,7 @@ def create_waiver(
     input_stream = input_stream or __import__("sys").stdin
     output_stream = output_stream or __import__("sys").stdout
     if not input_stream.isatty() or not output_stream.isatty():
-        raise GuardrailsError("waiver creation requires an interactive TTY and exact human confirmation")
+        raise GuardrailsError("waiver creation requires an interactive TTY and exact confirmation; this does not verify human identity")
     if not 1 <= expiry_minutes <= MAX_WAIVER_MINUTES:
         raise GuardrailsError("waiver expiry must be between 1 minute and 24 hours")
     if not 1 <= maximum_uses <= 10:

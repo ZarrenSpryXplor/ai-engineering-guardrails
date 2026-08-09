@@ -621,6 +621,62 @@ def _match_command_regex(script: ParsedScript, strategy: Mapping[str, Any], cwd:
     return False
 
 
+def _logical_guardrails_arguments(command: Sequence[str]) -> tuple[str, ...] | None:
+    """Return CLI arguments after a supported guardrails entry point.
+
+    This normalises only the entry points shipped by this project.  It is not a
+    general Python command parser, and deliberately leaves command semantics to
+    the policy data below.
+    """
+    if not command:
+        return None
+    executable = _basename(command[0])
+    if executable == "ai-guardrails":
+        return tuple(token.lower() for token in command[1:])
+    if executable != "py" and re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", executable) is None:
+        return None
+
+    arguments = list(command[1:])
+    index = 0
+    options_with_values = {"-W", "-X"}
+    while index < len(arguments):
+        token = arguments[index]
+        if token in options_with_values:
+            index += 2
+            continue
+        if token.startswith("-W") or token.startswith("-X"):
+            index += 1
+            continue
+        if executable == "py" and re.fullmatch(r"-\d+(?:\.\d+)?(?:-\d+)?", token):
+            index += 1
+            continue
+        if token in {"-B", "-E", "-I", "-O", "-OO", "-P", "-S", "-s", "-u", "-v", "-x"}:
+            index += 1
+            continue
+        break
+    if index >= len(arguments):
+        return None
+    if arguments[index] == "-m":
+        if index + 1 < len(arguments) and arguments[index + 1].lower() == "ai_engineering_guardrails":
+            return tuple(token.lower() for token in arguments[index + 2 :])
+        return None
+    if _basename(arguments[index]) == "guardrails.py":
+        return tuple(token.lower() for token in arguments[index + 1 :])
+    return None
+
+
+def _match_guardrails_mutation(script: ParsedScript, strategy: Mapping[str, Any], cwd: Path | None) -> bool:
+    del cwd
+    prefixes = [tuple(str(token).lower() for token in item) for item in strategy.get("command_prefixes", [])]
+    if not prefixes or any(not prefix for prefix in prefixes):
+        raise PolicyError("guardrails_mutation strategy requires command_prefixes")
+    for command in script.commands:
+        arguments = _logical_guardrails_arguments(command)
+        if arguments is not None and any(arguments[: len(prefix)] == prefix for prefix in prefixes):
+            return True
+    return False
+
+
 MATCHERS = {
     "git_reset_hard": _match_git_reset_hard,
     "git_clean_force_directories": _match_git_clean,
@@ -635,6 +691,7 @@ MATCHERS = {
     "powershell_download_execute": _match_powershell_download,
     "destructive_database_client": _match_database,
     "command_regex": _match_command_regex,
+    "guardrails_mutation": _match_guardrails_mutation,
 }
 
 

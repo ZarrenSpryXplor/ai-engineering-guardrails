@@ -72,9 +72,9 @@ def validate_resources() -> None:
     for review, high in (("review_files", "high_files"), ("review_lines", "high_lines"), ("review_directories", "high_directories")):
         if values[review] > values[high]:
             raise GuardrailsError("complexity review thresholds cannot exceed high-change thresholds")
-    if any(not isinstance(thresholds.get(field), list) for field in ("generated_prefixes", "manifest_names", "lockfile_names")) or not isinstance(thresholds.get("language_extensions"), dict):
+    if not isinstance(thresholds.get("generated_prefixes"), list) or not isinstance(thresholds.get("language_extensions"), dict):
         raise GuardrailsError("complexity resource is missing classifications")
-    if any(not isinstance(item, str) for field in ("generated_prefixes", "manifest_names", "lockfile_names", "ci_governance_prefixes", "ci_governance_names", "infrastructure_extensions") for item in thresholds.get(field, [])):
+    if any(not isinstance(item, str) for field in ("generated_prefixes", "ci_governance_prefixes", "ci_governance_names", "infrastructure_extensions") for item in thresholds.get(field, [])):
         raise GuardrailsError("complexity classifications must be strings")
     if any(not isinstance(key, str) or not isinstance(value, str) for key, value in thresholds["language_extensions"].items()):
         raise GuardrailsError("complexity language classifications must be strings")

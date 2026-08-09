@@ -1,6 +1,6 @@
 ---
 name: workstation-source-control-cicd
-description: Review and change GitHub Actions, Azure Pipelines, and source-control automation with trust-boundary and permission analysis. Use for workflow source and read-only run evidence; do not use to self-approve, merge, weaken protections, retrieve secrets, deploy production, or publish releases.
+description: Review and change GitHub Actions, Azure Pipelines, and source-control automation with permission and trust-boundary checks. Never self-approve, merge, weaken protections, retrieve secrets, deploy production, or publish releases.
 ---
 
 # Source control and CI/CD workflow

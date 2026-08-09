@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 from ai_engineering_guardrails import build, install as installer, packs, state
-from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path
+from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path, path_within
 
 
 class InstallTests(unittest.TestCase):
@@ -453,6 +453,40 @@ class InstallTests(unittest.TestCase):
         )
         self.assertEqual("deny", json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"])
 
+    def test_fresh_default_installs_core_and_contextual_skills_not_specialists(self) -> None:
+        self.install(("codex",))
+        installed = self.read_state()["products"]["codex"]
+
+        self.assertEqual(set(packs.default_pack_ids()), set(installed["installed_packs"]))
+        self.assertEqual(set(packs.default_skill_pack_ids()), set(installed["installed_skill_packs"]))
+        self.assertTrue((self.home / ".agents/skills/workstation-python/SKILL.md").is_file())
+        self.assertTrue((self.home / ".agents/skills/workstation-dependency-management/SKILL.md").is_file())
+        self.assertFalse((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-spacelift/SKILL.md").exists())
+
+        runtime = self.home / ".ai-guardrails/runtime" / installed["runtime_digest"]
+        policy_data = json.loads((runtime / "command-policy.json").read_text(encoding="utf-8"))
+        self.assertIn("kubernetes-sensitive-read", {rule["id"] for rule in policy_data["rules"]})
+
+    def test_skill_catalogue_option_changes_only_managed_skill_exposure(self) -> None:
+        self.install(("codex",))
+        initial = self.read_state()["products"]["codex"]
+        initial_policy_digest = initial["policy_digest"]
+
+        self.install(("codex",), skill_catalogue="all")
+        expanded = self.read_state()["products"]["codex"]
+        self.assertEqual(set(packs.default_pack_ids()), set(expanded["installed_packs"]))
+        self.assertEqual(set(packs.default_pack_ids()), set(expanded["installed_skill_packs"]))
+        self.assertEqual(initial_policy_digest, expanded["policy_digest"])
+        self.assertTrue((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").is_file())
+
+        self.install(("codex",), skill_catalogue="contextual")
+        reduced = self.read_state()["products"]["codex"]
+        self.assertEqual(set(packs.default_pack_ids()), set(reduced["installed_packs"]))
+        self.assertEqual(set(packs.default_skill_pack_ids()), set(reduced["installed_skill_packs"]))
+        self.assertEqual(initial_policy_digest, reduced["policy_digest"])
+        self.assertFalse((self.home / ".agents/skills/workstation-kubernetes").exists())
+
     def test_unmanaged_skill_collision_refused_then_force_backed_up(self) -> None:
         collision = self.home / ".agents/skills/workstation-safe-change"
         collision.mkdir(parents=True)
@@ -819,6 +853,12 @@ class InstallTests(unittest.TestCase):
     def test_absolute_windows_path_is_rejected_outside_selected_home(self) -> None:
         with self.assertRaisesRegex(GuardrailsError, "outside selected home"):
             home_path(self.home, r"C:\\Users\\Example\\.codex")
+
+    @unittest.skipUnless(sys.platform == "win32", "case-insensitive filesystem fixture")
+    def test_windows_path_containment_is_case_insensitive(self) -> None:
+        differently_cased_child = Path(str(self.home).swapcase()) / "managed" / "child"
+
+        self.assertTrue(path_within(differently_cased_child, self.home))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/30-git.md
 -->
+<!-- Canonical policy ID: git -->
 
 ## Git safety
 

@@ -1,6 +1,6 @@
 ---
 name: workstation-java
-description: Inspect, change, and verify Maven or Gradle Java projects while preserving wrappers, modules, toolchains, dependency semantics, and publication boundaries. Use for bounded Java implementation, debugging, dependency, or build work; do not use it to publish artifacts, upgrade wrappers incidentally, or clear machine-global caches.
+description: Inspect, change, debug, build, and verify Maven or Gradle Java projects while preserving wrappers, modules, toolchains, and dependency semantics. Never publish artifacts, upgrade wrappers incidentally, or clear machine-global caches.
 ---
 
 # Java repository workflow

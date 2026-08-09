@@ -4,6 +4,8 @@
   "type": "language",
   "description": "Python projects using existing packaging, environment, test, lint, and type-check tooling.",
   "file_detectors": ["pyproject.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", "Pipfile.lock", "requirements*.txt", "setup.py", "setup.cfg", "tox.ini", "noxfile.py", "pytest.ini"],
+  "dependency_manifests": ["pyproject.toml", "Pipfile", "requirements*.txt", "setup.py", "setup.cfg"],
+  "dependency_lockfiles": ["uv.lock", "poetry.lock", "pdm.lock", "Pipfile.lock"],
   "directory_detectors": [],
   "explicit_exclusions": ["**/.venv/**", "**/.tox/**", "**/.nox/**", "**/site-packages/**", "**/vendor/**"],
   "dependent_packs": ["dependency-management", "package-publication", "database-migrations", "sensitive-output"],

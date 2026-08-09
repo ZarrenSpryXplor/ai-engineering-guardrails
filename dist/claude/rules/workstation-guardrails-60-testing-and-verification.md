@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/60-testing-and-verification.md
 -->
+<!-- Canonical policy ID: testing-and-verification -->
 
 ## Testing and verification
 

@@ -1,6 +1,6 @@
 ---
 name: workstation-terragrunt
-description: Inspect and validate Terragrunt units, stacks, includes, dependencies, and bounded plans while protecting remote state and run scope. Use for local source and limited plan analysis; do not use for run-all apply or destroy, broad unreviewed run-all operations, state mutation, or sensitive output disclosure.
+description: Inspect and validate Terragrunt units, stacks, includes, dependencies, and bounded plans while protecting remote state. Never run-all apply/destroy, perform broad unreviewed run-all operations, mutate state, or disclose sensitive output.
 ---
 
 # Terragrunt workflow

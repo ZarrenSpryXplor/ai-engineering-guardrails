@@ -57,6 +57,8 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(">=3.11", data["project"]["requires-python"])
         self.assertTrue((RESOURCE_ROOT / "policy/manifest.json").is_file())
         self.assertTrue((RESOURCE_ROOT / "enforcement/command-policy.json").is_file())
+        self.assertTrue((RESOURCE_ROOT / "evidence/registry.json").is_file())
+        self.assertTrue((RESOURCE_ROOT / "assurance/task-schema.json").is_file())
         self.assertTrue((RESOURCE_ROOT / "packs").is_dir())
         self.assertFalse((REPOSITORY_ROOT / "guardrails").exists())
 
@@ -66,10 +68,34 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("docs/README.md", readme)
         self.assertIn("assets/ai_comic_screen_only_corrected.png", (REPOSITORY_ROOT / "MANIFEST.in").read_text(encoding="utf-8"))
 
+    def test_public_install_guides_use_the_published_package_without_stale_claims(self) -> None:
+        stale_phrases = (
+            "this repository does not publish a package",
+            "package is not published",
+            "publication is only prepared",
+            "install the application from a reviewed clone",
+        )
+        required_sequence = (
+            "pipx install ai-engineering-guardrails",
+            "ai-guardrails install --dry-run",
+            "ai-guardrails install",
+            "ai-guardrails status",
+        )
+        for relative in ("README.md", "docs/user-guide.md"):
+            with self.subTest(document=relative):
+                text = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                lowered = text.lower()
+                for phrase in stale_phrases:
+                    self.assertNotIn(phrase, lowered)
+                lines = [line.strip() for line in text.splitlines()]
+                positions = [lines.index(value) for value in required_sequence]
+                self.assertEqual(positions, sorted(positions))
+
     def test_operator_documentation_and_release_governance_entrypoints_exist(self) -> None:
         for relative in (
             "docs/README.md",
             "docs/releasing.md",
+            "docs/evidence-and-assurance.md",
             "SECURITY.md",
             "CONTRIBUTING.md",
             "CODE_OF_CONDUCT.md",
@@ -86,9 +112,25 @@ class PackagingTests(unittest.TestCase):
             outside = temporary_root / "outside"
             home = temporary_root / "home"
             outside.mkdir()
+            (outside / "component").mkdir()
+            (outside / "component/SKILL.md").write_text(
+                "---\nname: component\ndescription: Inspect a bounded local fixture without executing its resources.\n---\n\n# Fixture\n",
+                encoding="utf-8",
+            )
+            (outside / "reports").mkdir()
+            (outside / "reports/before.sarif").write_text('{"version":"2.1.0","runs":[]}', encoding="utf-8")
+            (outside / "reports/after.sarif").write_text('{"version":"2.1.0","runs":[]}', encoding="utf-8")
+            (outside / "reports/before.xml").write_text('<coverage line-rate="1"/>', encoding="utf-8")
+            (outside / "reports/after.xml").write_text('<coverage line-rate="1"/>', encoding="utf-8")
+            (outside / "reports/tests.xml").write_text('<testsuite><testcase name="ok"/></testsuite>', encoding="utf-8")
             environment = os.environ.copy()
             environment["PYTHONPATH"] = ""
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            environment["HOME"] = str(home)
+            environment["USERPROFILE"] = str(home)
+            environment["XDG_CONFIG_HOME"] = str(home / ".config")
+            environment["APPDATA"] = str(home / "AppData/Roaming")
+            environment["LOCALAPPDATA"] = str(home / "AppData/Local")
             subprocess.run(
                 [sys.executable, "-m", "build", "--no-isolation", "--outdir", str(output)],
                 cwd=REPOSITORY_ROOT,
@@ -100,6 +142,7 @@ class PackagingTests(unittest.TestCase):
             wheel = next(output.glob("*.whl"))
             sdist = next(output.glob("*.tar.gz"))
             expected_resources = _tree_hashes(RESOURCE_ROOT)
+            private_key_marker = b"-----BEGIN " + b"PRIVATE KEY-----"
             with zipfile.ZipFile(wheel) as archive:
                 names = set(archive.namelist())
                 self.assertIn("ai_engineering_guardrails/__init__.py", names)
@@ -111,6 +154,8 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/jetbrains.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/ux/statusline-profiles.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/ux/complexity-thresholds.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/evidence/registry.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/assurance/task-schema.json", names)
                 self.assertFalse(any(name.startswith("guardrails/") for name in names))
                 resource_prefix = "ai_engineering_guardrails/_resources/"
                 wheel_resources = {
@@ -124,12 +169,29 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("ai-guardrails = ai_engineering_guardrails.cli:main", entry_points)
                 metadata_path = next(name for name in names if name.endswith(".dist-info/METADATA"))
                 self.assertNotIn("Requires-Dist:", archive.read(metadata_path).decode("utf-8"))
+                self.assertFalse(
+                    any(
+                        "/.idea/" in f"/{name}"
+                        or "/.DS_Store" in f"/{name}"
+                        or "__pycache__" in name
+                        or name.endswith((".pyc", ".tmp"))
+                        for name in names
+                    )
+                )
+                for name in names:
+                    if name.endswith("/"):
+                        continue
+                    content = archive.read(name)
+                    self.assertNotIn(str(REPOSITORY_ROOT).encode(), content)
+                    self.assertNotIn(str(Path.home()).encode(), content)
+                    self.assertNotIn(private_key_marker, content)
             with tarfile.open(sdist) as archive:
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
                 self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/releasing.md") for name in names))
+                self.assertTrue(any(name.endswith("docs/evidence-and-assurance.md") for name in names))
                 for filename in (
                     "SECURITY.md",
                     "CONTRIBUTING.md",
@@ -147,6 +209,27 @@ class PackagingTests(unittest.TestCase):
                 }
                 self.assertEqual(expected_resources, sdist_resources)
                 self.assertTrue(any(name.endswith("assets/ai_comic_screen_only_corrected.png") for name in names))
+                forbidden_parts = {
+                    ".DS_Store",
+                    ".idea",
+                    ".pytest_cache",
+                    ".mypy_cache",
+                    "__pycache__",
+                    ".ai-guardrails",
+                    "release",
+                }
+                for member in archive.getmembers():
+                    parts = set(Path(member.name).parts)
+                    self.assertFalse(parts & forbidden_parts, member.name)
+                    if not member.isfile():
+                        continue
+                    self.assertLessEqual(member.size, 2_000_000, member.name)
+                    content_file = archive.extractfile(member)
+                    self.assertIsNotNone(content_file)
+                    content = content_file.read()
+                    self.assertNotIn(str(REPOSITORY_ROOT).encode(), content)
+                    self.assertNotIn(str(Path.home()).encode(), content)
+                    self.assertNotIn(private_key_marker, content)
 
             environment_root = temporary_root / "venv"
             venv.EnvBuilder(with_pip=True).create(environment_root)
@@ -218,6 +301,9 @@ class PackagingTests(unittest.TestCase):
             for arguments in (
                 ["--help"],
                 ["--version"],
+                ["task", "--help"],
+                ["component", "--help"],
+                ["complexity", "--help"],
                 ["validate"],
                 ["install", "--product", "codex", "--home", str(home), "--dry-run"],
                 ["install", "--product", "vscode", "--home", str(home), "--dry-run"],
@@ -229,6 +315,21 @@ class PackagingTests(unittest.TestCase):
                 ["uninstall", "--product", "codex", "--home", str(home)],
                 ["packs", "list"],
                 ["routing", "validate"],
+                ["policy", "audit"],
+                ["policy", "evidence", "maintainability"],
+                ["task", "init", "--repo", str(outside)],
+                ["task", "validate", "--repo", str(outside)],
+                ["task", "status", "--repo", str(outside)],
+                ["task", "receipt", "--repo", str(outside), "--format", "json"],
+                ["component", "inspect", str(outside / "component")],
+                ["component", "audit", "--home", str(home)],
+                ["skills", "audit"],
+                [
+                    "complexity", "compare", "--repo", str(outside),
+                    "--baseline-sarif", "reports/before.sarif", "--current-sarif", "reports/after.sarif",
+                    "--baseline-coverage", "reports/before.xml", "--current-coverage", "reports/after.xml",
+                    "--junit", "reports/tests.xml",
+                ],
                 ["statusline", "capabilities"],
                 ["statusline", "preview", "--product", "all", "--profile", "standard"],
                 ["statusline", "install", "--product", "all", "--profile", "standard", "--home", str(home), "--dry-run"],

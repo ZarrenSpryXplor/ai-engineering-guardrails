@@ -1,6 +1,6 @@
 ---
 name: workstation-database-migrations
-description: Author and verify database migration source using the repository's existing framework while separating creation from execution and preserving history. Use for bounded schema/data migration code and isolated tests; do not use to apply migrations to real databases, delete history, or execute destructive production data changes.
+description: Author and verify database schema/data migration source with the repository's framework and isolated tests. Keep creation separate from execution; never apply to real databases, delete history, or run destructive production changes.
 ---
 
 # Migration authoring workflow

@@ -1,6 +1,6 @@
 ---
 name: workstation-dotnet
-description: Inspect, change, and verify C#, F#, or other .NET projects while respecting solutions, global.json, central package management, analyzers, and migration safety. Use for bounded .NET implementation and build work; do not use for package publication, global tool or workload changes, or applying database migrations.
+description: Inspect, change, and verify .NET/dotnet, C#, and F# projects with solutions, global.json, central package management, analyzers, and safe builds. Never publish packages, change global tools/workloads, or apply database migrations.
 ---
 
 # .NET repository workflow

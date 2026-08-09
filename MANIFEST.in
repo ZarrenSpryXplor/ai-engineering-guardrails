@@ -2,3 +2,4 @@ include README.md LICENSE SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md CHANGEL
 recursive-include docs *.md
 include assets/ai_comic_screen_only_corrected.png
 recursive-include ai_engineering_guardrails/_resources *
+global-exclude .DS_Store

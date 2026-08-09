@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/55-infrastructure-posture.md
 -->
+<!-- Canonical policy ID: infrastructure-posture -->
 
 ## Infrastructure posture
 

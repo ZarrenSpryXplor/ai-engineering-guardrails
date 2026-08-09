@@ -1,6 +1,6 @@
 ---
 name: workstation-package-publication
-description: Prepare and verify a package or release candidate without uploading, publishing, creating a hosted release, or exposing registry credentials. Use for local packaging and release-readiness evidence; do not use to execute any publication command even when asked to finish a release.
+description: Prepare and verify package/release candidates and local publication artifacts without uploading or creating hosted releases. Never expose registry credentials or execute a publication command.
 ---
 
 # Release-candidate preparation

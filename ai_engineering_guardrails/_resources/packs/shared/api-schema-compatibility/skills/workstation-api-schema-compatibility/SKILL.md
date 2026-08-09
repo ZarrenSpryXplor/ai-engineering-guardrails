@@ -1,6 +1,6 @@
 ---
 name: workstation-api-schema-compatibility
-description: Review OpenAPI, JSON Schema, Protobuf, GraphQL, AsyncAPI, Avro, and event-contract changes against an explicit compatibility baseline. Use for contract evolution and generated-client review; do not use to claim semantic compatibility from text or JSON parsing alone.
+description: Review OpenAPI, JSON Schema, Protobuf, GraphQL, AsyncAPI, Avro, and event-contract changes against an explicit compatibility baseline. Never claim semantic compatibility from text or JSON parsing alone.
 ---
 
 # API and schema compatibility workflow

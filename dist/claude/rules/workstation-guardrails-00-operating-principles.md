@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/00-operating-principles.md
 -->
+<!-- Canonical policy ID: operating-principles -->
 
 ## Operating principles
 

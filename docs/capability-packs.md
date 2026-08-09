@@ -23,13 +23,13 @@ Optional `.ai-guardrails.json` can explicitly enable/disable packs, resolve pack
 
 ## Pack contents and installation
 
-A pack uses only the files it needs: `pack.json`, concise `policy.md` or references, command/structured-tool policy, verification/routing data, a distinct portable skill, and synthetic fixtures. `pack.json` declares stable ID/type, description, detectors/exclusions, dependencies/conflicts, and referenced files.
+A pack uses only the files it needs: `pack.json`, concise `policy.md` or references, command/structured-tool policy, verification/routing data, a distinct portable skill, and synthetic fixtures. `pack.json` declares stable ID/type, description, detectors/exclusions, dependencies/conflicts, and referenced files. Its optional dependency-manifest/lockfile classifications must reference existing file detectors; task assurance consumes that shared package knowledge without adding ecosystem parsers.
 
-Fresh default installation includes every current stable pack without asking the consumer to choose. Skills remain progressively discoverable through the product's own mechanisms, enforcement compiles into the content-addressed runtime, and pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not limit future workstation guidance.
+Fresh default installation compiles all stable deterministic pack enforcement while globally exposing only contextual language/shared pack skills. This keeps the established safety policy and ordinary development guidance without filling the global skill catalogue with specialist infrastructure, delivery, and operations procedures. Pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not itself change an installation.
 
 Each current pack contributes a distinct `workstation-…` skill. The [skills catalogue](skills.md) is the authoritative reader-friendly index for all language, infrastructure, delivery, operations, and shared skills, including their use boundaries. Product discovery controls whether and when an installed skill is available to an agent; a detected pack or copied directory is not a permission grant or proof of activation.
 
-Explicit `--pack` and `--all-packs` options remain for advanced distribution authoring or deliberately reduced installations. Selected dependencies close deterministically. Collision and uninstallation rules are the same as base skills and agents.
+Use repeatable `--pack ID` selections for deliberately reduced policy/skill installations. `--all-packs` selects all policy and skill packs. On an installation that retains all deterministic packs, `--skill-catalogue contextual` or `--skill-catalogue all` changes only managed skill exposure. Existing installations preserve their policy and skill selections during ordinary updates, selected dependencies close deterministically, and collision/uninstallation rules remain the same as for base skills and agents. The installer never disables user-owned skills.
 
 ## Toolchain preservation
 

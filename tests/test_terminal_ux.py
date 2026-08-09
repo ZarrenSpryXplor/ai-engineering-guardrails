@@ -143,12 +143,13 @@ class TerminalUxTests(unittest.TestCase):
     def test_activity_is_content_free_and_duration_bounded(self) -> None:
         audit = self.home / ".ai-guardrails/audit"
         audit.mkdir(parents=True)
-        timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+        timestamp = now.isoformat().replace("+00:00", "Z")
         audit.joinpath("events.jsonl").write_text(
             json.dumps({"timestamp": timestamp, "product": "codex", "decision": "no-decision", "operation_class": "observe", "rule_id": None, "command": "secret"}) + "\n",
             encoding="utf-8",
         )
-        summary = terminal_ux.audit_summary(self.home, window="7d", now=dt.datetime(2026, 8, 9, 11, tzinfo=dt.timezone.utc))
+        summary = terminal_ux.audit_summary(self.home, window="7d", now=now)
         self.assertEqual(1, summary["observed"])
         output = io.StringIO()
         with contextlib.redirect_stdout(output):

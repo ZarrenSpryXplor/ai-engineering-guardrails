@@ -2,6 +2,22 @@
 
 Execution-efficiency task routing is not behavioural policy. Canonical authoring data is shipped under `ai_engineering_guardrails/_resources/`; this document omits that prefix below for readability. Author model tiers, profiles, escalation, and subagent roles under `routing/` as described in [routing and measurement](routing-and-cost.md); do not put vendor model IDs in policy fragments.
 
+## Attach evidence metadata, not duplicate prose
+
+Always-loaded behavioural fragments remain concise Markdown. Their rationale, evidence source IDs, confidence, review dates, polarity, scope, and fixture identifiers live once in `evidence/registry.json`; do not paste that metadata into each fragment. Scope uses the registry's small canonical vocabulary so the audit can reject an unbounded or unknown lifecycle boundary. The registry is local metadata only: validation and `ai-guardrails policy audit` never fetch its URLs or ask a model to judge prose.
+
+When adding or changing a high-level fragment, add its matching stable ID and metadata record in the same change. Use a bounded scope, an explicit rationale, source IDs where they genuinely help, and the fixture IDs that prove deterministic relationships. Review dates are review prompts, not an automatic rule deletion mechanism. The normal lifecycle is:
+
+```mermaid
+flowchart LR
+  Author[Change canonical policy] --> Evidence[Add rationale, evidence IDs, dates, fixtures]
+  Evidence --> Build[build and validate]
+  Build --> Audit[policy audit]
+  Audit --> Review[Periodic human review]
+```
+
+Run `ai-guardrails policy evidence <POLICY_ID>` to inspect one record. `policy audit` returns a non-zero result for structural mistakes such as missing IDs, bad dates, unknown sources, or broken traceability; an overdue review is reported distinctly and does not by itself break ordinary installation.
+
 ## Add and order a fragment
 
 Create a concise vendor-neutral Markdown file under `policy/fragments/`, for example `policy/fragments/35-database-changes.md`. Add an entry at the intended position in `policy/manifest.json`:

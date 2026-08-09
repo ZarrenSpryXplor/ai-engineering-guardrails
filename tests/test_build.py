@@ -41,6 +41,31 @@ class BuildTests(unittest.TestCase):
         positions = [codex.index(heading) for heading in headings]
         self.assertEqual(positions, sorted(positions))
 
+    def test_language_continuity_guidance_is_rendered_for_native_products(self) -> None:
+        artifacts = build.build_artifacts()
+        guidance = (
+            "do not introduce another implementation language, runtime, package manager, "
+            "or build system without a task-specific need."
+        )
+        for path in (
+            Path("dist/codex/AGENTS.md"),
+            Path("dist/claude/rules/workstation-guardrails-15-maintainability.md"),
+            Path("dist/cursor/user-rules.md"),
+        ):
+            with self.subTest(path=path):
+                self.assertIn(guidance, artifacts[path].decode())
+
+    def test_generated_policy_has_canonical_identifier_traceability(self) -> None:
+        artifacts = build.build_artifacts()
+        self.assertIn(
+            "Canonical policy IDs: operating-principles, investigation-and-scope, maintainability",
+            artifacts[Path("dist/codex/AGENTS.md")].decode(),
+        )
+        self.assertIn(
+            "Canonical policy ID: maintainability",
+            artifacts[Path("dist/claude/rules/workstation-guardrails-15-maintainability.md")].decode(),
+        )
+
     def test_build_is_byte_deterministic(self) -> None:
         self.assertEqual(build.build_artifacts(), build.build_artifacts())
 
@@ -166,6 +191,14 @@ class SkillTests(unittest.TestCase):
     def test_code_review_skill_requires_a_material_simplicity_review(self) -> None:
         text = (policy.SKILLS_ROOT / "workstation-code-review/SKILL.md").read_text(encoding="utf-8")
         self.assertIn("three concrete consumers", text)
+
+    def test_review_and_safe_change_skills_have_task_specific_scope_guidance(self) -> None:
+        review = (policy.SKILLS_ROOT / "workstation-code-review/SKILL.md").read_text(encoding="utf-8")
+        safe_change = (policy.SKILLS_ROOT / "workstation-safe-change/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("start with the changed files and lines", review)
+        self.assertIn("retry once with simpler terms", review)
+        self.assertIn("named known-good local source template", safe_change)
+        self.assertIn("never edit generated files as the source of truth", safe_change)
 
 
 if __name__ == "__main__":

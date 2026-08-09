@@ -1,6 +1,6 @@
 ---
 name: workstation-opentofu
-description: Inspect, format, validate, and plan OpenTofu source while preserving engine choice and protecting state, plans, locks, and targets. Use for local source and plan analysis; do not use for Terraform substitution, destroy, apply, unsafe state operations, auto-approval, or sensitive output disclosure.
+description: Inspect, format, validate, and plan OpenTofu source while protecting state, plans, locks, and targets. Preserve the selected engine; never substitute Terraform, destroy/apply, mutate state, auto-approve, or expose sensitive output.
 ---
 
 # OpenTofu workflow

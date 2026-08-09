@@ -2,11 +2,11 @@
 
 Skills are short, on-demand procedures for a bounded kind of work. They are not a second global policy, a command runner, or a permission grant. They tell a compatible agent how to investigate, change, verify, and report work safely; deterministic hooks and product-native approvals remain separate controls.
 
-The current distribution ships 28 portable skills: six workstation skills and one skill for each of the 22 capability packs. The catalogue below is the human-readable index. The canonical `SKILL.md` files under `ai_engineering_guardrails/_resources/` remain authoritative.
+The distribution contains 28 portable skills: six core workstation skills and one skill for each of 22 capability packs. Canonical pack type supplies a small catalogue tier: the six base skills are **core**, language/shared pack skills are **contextual**, and infrastructure/delivery/operations skills are **specialist**. The canonical `SKILL.md` files under `ai_engineering_guardrails/_resources/` remain authoritative.
 
 ## How skills become available
 
-Default installation copies the stable skills without requiring pack selection. They are deliberately kept out of the always-loaded instruction baseline, so a simple repository question does not have to carry every infrastructure and language procedure along for the ride.
+Fresh default installation copies the six core and ten contextual skills while retaining deterministic enforcement from every stable pack. It keeps ordinary language and cross-stack development guidance discoverable without globally exposing all twelve specialist skills. Use `ai-guardrails install --skill-catalogue all` to expose all selected pack skills, or `--skill-catalogue contextual` to return managed exposure to the smaller set without weakening pack enforcement. Repeatable `--pack ID` remains a deliberately reduced policy/skill installation. Existing installations keep their prior selections during update, and validation never edits Codex configuration or disables user-owned skills.
 
 | Product or surface | Installed location | Important activation boundary |
 | --- | --- | --- |
@@ -90,5 +90,13 @@ Routing remains off by default. Its five `workstation_` roles are deliberately d
 ## Adding or changing a skill
 
 For contributors, canonical skills live in the package resource tree. Do not edit generated copies under `dist/`. New skills need portable `name` and `description` frontmatter, an explicit use/not-use boundary, an evidence-driven procedure, and observable completion criteria. See [policy authoring](policy-authoring.md#add-a-portable-skill) for the minimal format and validation workflow.
+
+## Inspecting skill efficiency and external skills
+
+Run `ai-guardrails skills audit` for bundled skills, or `ai-guardrails skills audit --path PATH` for one local skill or directory. It bounds the component tree before reading content, then reports installed/bundled count, description characters, longest descriptions, front-loading quality, catalogue tiers, exact/near routing overlap, body/reference size, undeclared executables, and estimated tokens. The catalogue-pressure value is explicitly a description-only estimate: the actual Codex metadata budget varies with model context and other installed/plugin skills. The audit only suggests changes; it never rewrites a skill, edits product configuration, or disables user-owned content.
+
+Codex initially discovers a skill from its name, description, and path before loading the selected `SKILL.md`, so descriptions put the task and trigger terms first. OpenAI documents that descriptions are shortened first under metadata pressure and that a sufficiently large catalogue can omit later entries from initial discovery; full content remains available after selection. See [OpenAI's skill documentation](https://developers.openai.com/codex/skills).
+
+Before using an external skill or instruction bundle, run `ai-guardrails component inspect PATH`. The inspection covers the complete bounded tree and flags links, missing references, scripts, binary/oversized content, selected high-confidence risk patterns, and content digest facts without executing anything. A clean result is not a safety proof. Local `component trust` is an operator-created, digest-bound, expiring review record—not verified human identity, an installer, marketplace, permission grant, or signature verification system. See [evidence and assurance](evidence-and-assurance.md) for the trust boundary and external-content authority limits.
 
 For users, use a local policy overlay to add workstation-specific behavioural guidance. It can strengthen deterministic rules but cannot permanently weaken bundled enforcement; use an expiring waiver for a narrow temporary exception. See [operations](operations.md#waivers-and-audit) for the safe lifecycle.

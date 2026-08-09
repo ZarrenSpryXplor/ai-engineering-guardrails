@@ -22,6 +22,7 @@ flowchart TD
 | Engineer using installed guardrails day to day | [Quick user guide](user-guide.md#day-to-day-use) | [skills catalogue](skills.md), [capability packs](capability-packs.md) |
 | Engineer enabling status, receipts, or demo mode | [Terminal UX](terminal-ux.md) | [compatibility](compatibility.md#terminal-ux-capability-verification-2026-08-09) |
 | Engineer delegating bounded tasks | [Routing and cost](routing-and-cost.md) | [skills catalogue](skills.md) |
+| Maintainer reviewing policy, task evidence, or a local component | [Evidence and assurance](evidence-and-assurance.md) | [policy authoring](policy-authoring.md), [operations](operations.md) |
 | Contributor changing behavior or generated output | [Policy authoring](policy-authoring.md) | [Architecture](architecture.md), [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | Release maintainer | [Releasing to PyPI](releasing.md) | [operations](operations.md#release-checklist), [changelog](../CHANGELOG.md), [security policy](../SECURITY.md) |
 | Security or platform reviewer | [Threat model](threat-model.md) | [architecture](architecture.md), [compatibility](compatibility.md) |
@@ -37,6 +38,7 @@ flowchart TD
 - [Capability packs](capability-packs.md) and [skills catalogue](skills.md): on-demand stack support and portable workflows.
 - [Architecture](architecture.md): canonical resources, build, installation, enforcement, and ownership boundaries.
 - [Policy authoring](policy-authoring.md): how maintainers safely extend canonical policy, skills, packs, or command rules.
+- [Evidence and assurance](evidence-and-assurance.md): policy evidence lifecycle, task contracts, imported report limits, component trust, skill audits, and guidance probes.
 - [Threat model](threat-model.md): assumptions, non-goals, limitations, and operational mitigations.
 - [Releasing to PyPI](releasing.md): Trusted Publishing setup, protected-environment approval, release-tag checks, and first-release procedure.
 

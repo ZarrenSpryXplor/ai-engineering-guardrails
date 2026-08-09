@@ -4,6 +4,8 @@
   "type": "infrastructure",
   "description": "Terraform configuration, plans, state-sensitive workflows, and workspaces.",
   "file_detectors": ["*.tf", "*.tf.json", ".terraform.lock.hcl", "terraform.rc", ".terraformrc"],
+  "dependency_manifests": [],
+  "dependency_lockfiles": [".terraform.lock.hcl"],
   "directory_detectors": [".terraform"],
   "explicit_exclusions": ["**/.terraform/**", "**/vendor/**", "**/examples/generated/**"],
   "dependent_packs": ["sensitive-output"],

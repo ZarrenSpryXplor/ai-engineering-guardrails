@@ -1,6 +1,6 @@
 ---
 name: workstation-kustomize
-description: Inspect and verify Kustomize bases, components, overlays, generators, and patches using local rendering. Use for declarative Kubernetes source changes; do not use for kubectl delete -k, automatic apply, editing rendered output, or exposing generated Secret values.
+description: Inspect and verify Kustomize bases, components, overlays, generators, and patches through local rendering. Never run kubectl delete -k, apply automatically, edit rendered output, or expose generated Secret values.
 ---
 
 # Kustomize workflow

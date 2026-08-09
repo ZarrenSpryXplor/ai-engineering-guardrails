@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "required": [
+    "schema_version",
+    "objective",
+    "observable_outcomes",
+    "non_goals",
+    "risk_class",
+    "status"
+  ],
+  "statuses": ["planned", "in-progress", "partial", "completed", "blocked", "halted"],
+  "evidence_types": [
+    "junit",
+    "sarif",
+    "cobertura",
+    "manual-review",
+    "security-review",
+    "compatibility-review",
+    "change-diff-review"
+  ],
+  "optional_fields": [
+    "invariants",
+    "allowed_paths",
+    "forbidden_paths",
+    "maximum_files_changed",
+    "maximum_lines_changed",
+    "maximum_directories_changed",
+    "dependency_policy",
+    "required_evidence",
+    "coverage_policy",
+    "review_checkpoints",
+    "halt_conditions",
+    "notes"
+  ]
+}
