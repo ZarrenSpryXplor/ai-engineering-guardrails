@@ -67,7 +67,7 @@ pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.g
 
 No product, pack, profile, target mapping, or waiver selection is required. Detection uses local commands, existing product configuration, and managed state without contacting the network. If nothing supported is found, the installer makes no changes and prints an exact explicit-product command. No wizard, no guessing game, no mysterious cloud login.
 
-The default posture enables normal application development, all stable language and tool guidance as on-demand skills, infrastructure observation, and local render/lint/validate/plan work. It denies destructive Git operations, publication, credential exposure, remote infrastructure mutation, production operations, and mutation of unknown targets. It leaves the primary model, model routing, approval mode, sandbox, network access, permissions, credentials, and target mappings unchanged. Enterprise output is not installed, Spacelift policy is not deployed, and auditing is local and redacted.
+The default posture enables normal application development, all stable language and tool guidance as on-demand skills, infrastructure observation, and local render/lint/validate/plan work. It denies destructive Git operations, publication, credential exposure, remote infrastructure mutation, production operations, and mutation of unknown targets. It leaves the primary model, [model routing](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/routing-and-cost.md), approval mode, sandbox, network access, permissions, credentials, and target mappings unchanged. Enterprise output is not installed, Spacelift policy is not deployed, and auditing is local and redacted.
 
 The dry-run performs deterministic build computation, canonical validation, offline product and repository-capability detection, collision checks, backup planning, and installation planning without modifying files. Its default output lists product configuration, managed blocks, skills, agents, planned backups, unchanged settings, safety boundaries, and manual steps.
 
@@ -183,38 +183,20 @@ Add `--verbose` to install or update only when troubleshooting internal build, v
 
 ### Optional execution routing
 
-Safety-only installation is the default. Omitting `--routing-profile` installs no new routing agents and preserves existing managed routing. The recommended profile is `balanced`, but installation requires explicit intent:
+Safety-only installation is the default. Routing installs static product-native roles; it does not classify prompts, schedule agents, change the primary model, or grant authority. The recommended profile is `balanced`, but it requires explicit intent.
+
+For an existing managed Codex installation:
 
 ```sh
-ai-guardrails routing show --profile balanced --product all
-ai-guardrails install --product all --routing-profile balanced --dry-run
-ai-guardrails install --product all --routing-profile balanced
-ai-guardrails status --product all --show-routing
+ai-guardrails routing show --profile balanced --product codex
+ai-guardrails routing set balanced --product codex --dry-run
+ai-guardrails routing set balanced --product codex
+ai-guardrails status --product codex --show-routing
 ```
 
-Routing can also be managed independently:
+For a fresh installation, use the same preview/apply pattern with `install --product codex --routing-profile balanced`. The implementer is the only role designated to write, and it excludes unresolved architecture, security, production, destructive-migration, and public-contract work. High-risk classes are escalation guidance for the engineer and primary agent, not automatic dispatch to a deep worker.
 
-```sh
-ai-guardrails routing validate
-ai-guardrails routing set economy --product codex --dry-run
-ai-guardrails routing set quality --product claude
-ai-guardrails routing set none --product all
-```
-
-Profiles map task classes to portable `economy`, `balanced`, and `deep` capability tiers; map those independently to `low`, `medium`, and `high` reasoning; cap read-only and writing concurrency; and set escalation thresholds and bounded attempts. Economy agents remain read-only, ordinary writers use at least the balanced tier, and every high-risk class routes to deep. Five `workstation_` canonical roles generate native files under `~/.codex/agents/`, `~/.claude/agents/`, or `~/.cursor/agents/`. Only the implementer can write. Unmanaged collisions are preserved unless `--force` is explicit, in which case the displaced file is backed up.
-
-Vendor IDs live only in `routing/model-maps/`. Override one installed subagent tier without changing the primary session model:
-
-```sh
-ai-guardrails routing set balanced --product cursor \
-  --model-override cursor:economy=provider/model-id
-```
-
-Cursor defaults to `inherit` because available IDs depend on plan and organisation policy; Cursor may fall back even after an explicit ID is configured. Status therefore reports models as configured but availability as unverified. The installer never sets Claude's global subagent model environment variable, writes a main-model setting, or changes the active session model.
-
-Subagents have startup and independent-context costs, so they are inappropriate for trivial work. The roles require targeted search and reads, narrow tests before broad suites, terse deterministic summaries that preserve exit status and useful failures, reuse of an existing agent context when helpful, and stopping unused agents. No output-filtering or shell-command rewriting hook is installed.
-
-Before changing a routing profile or model map, compare a small set of representative tasks against a baseline. Record pass/fail, unnecessary files or dependencies, diff size, verification outcome, retries, duration, and product-native token data when available. The goal is better outcomes with less waste—not a leaderboard for expensive models. See [routing and measurement](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/routing-and-cost.md) for the lightweight protocol.
+The [engineer routing guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/routing-and-cost.md) owns the profile matrix, role-selection flow, product-specific activation, prompt examples, model overrides, troubleshooting, disable limitations, and measurement protocol.
 
 ### Capability packs and infrastructure safety
 

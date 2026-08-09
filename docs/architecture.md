@@ -2,54 +2,56 @@
 
 The repository separates authoring from delivery so product adapters can change without forking behavioural policy.
 
-```text
-Canonical policy and data
-       |
-       +--> deterministic build
-       |       +--> Codex aggregate, hooks, rules, agents, skills
-       |       +--> Claude modular rules, hooks, agents, skills
-       |       +--> Cursor User Rules, hooks, agents, skills
-       |       +--> VS Code Copilot instructions, Preview hook, agents, skills
-       |       +--> Visual Studio Copilot instruction block, agents, skills
-       |       +--> JetBrains AI Assistant/Copilot manual guidance, project-rule export, skills
-       |
-       +--> portable skills
-       |
-       +--> capability packs
-       |
-       +--> shared enforcement runtime
-       |
-       +--> installer, state, audit, explain, simulation, scan
-       |
-       +--> enterprise and Spacelift examples
+```mermaid
+flowchart TB
+    subgraph canonical["Canonical package resources"]
+        policy["Behavioural policy"]
+        controls["Deterministic enforcement, safety, trust, audit, and risk data"]
+        skills["Portable skills"]
+        packs["Capability packs and offline detectors"]
+        routing["Optional routing roles, task classes, profiles, and model maps"]
+    end
 
-Optional efficiency routing (separate authority)
-       |
-       +--> portable task classes, profiles, and escalation
-       +--> vendor model maps
-       +--> canonical role definitions
-                |
-                +--> Codex TOML agents
-                +--> Claude Markdown agents
-                +--> Cursor Markdown agents
+    build["Deterministic build and validation"]
+    routeRender["Profile-specific static role rendering"]
+    installer["Installer: preflight, backup, atomic writes, and managed state"]
 
-Capability packs (progressive, separate from global policy)
-       |
-       +--> offline marker detection + evidence
-       +--> stack policy and portable pack skills
-       +--> verification and routing additions
-       +--> shell command-policy fragments
-       +--> structured MCP/tool-policy fragments
-                |
-                +--> lifecycle target mapping
-                +--> independent safety profiles
+    subgraph workstation["Installed workstation"]
+        guidance["Product instructions and on-demand skills"]
+        runtime["Immutable local enforcement runtime"]
+        roles["Product-native routing roles when explicitly enabled"]
+        state["Local state and operational commands"]
+    end
+
+    hookedProducts["Hook-capable products: Codex, Claude Code, Cursor, and VS Code"]
+    guidanceProducts["Guidance and manual surfaces: Visual Studio and JetBrains"]
+
+    policy --> build
+    controls --> build
+    skills --> build
+    packs --> build
+    routing --> build
+    routing --> routeRender
+    build --> installer
+    routeRender --> installer
+    installer --> guidance
+    installer --> runtime
+    installer --> roles
+    installer --> state
+    guidance --> hookedProducts
+    guidance --> guidanceProducts
+    runtime --> hookedProducts
+    roles --> hookedProducts
+    roles --> guidanceProducts
 ```
+
+Enterprise and Spacelift platform-policy examples remain reviewable repository output outside the workstation installation path; build, validation, and tests never deploy them.
 
 ## Canonical sources
 
 `ai_engineering_guardrails/_resources/` is the single canonical read-only resource root. Within it, `policy/manifest.json` establishes fragment order, stable identifiers, product applicability, descriptions, classifications, per-product output limits, and an 8 KiB always-loaded-policy budget. Markdown under `policy/fragments/` contains vendor-neutral behavioural content. `skills/` contains repeatable procedures that should not consume every session's instruction budget; the [skills catalogue](skills.md) explains the shipped core and pack skills, their product locations, and their activation limits. `enforcement/command-policy.json` defines deterministic denial intent and examples; the Python package's `enforcement.py` provides bounded parsing and strategy implementations without executing payload data.
 
-`routing/` is a fourth canonical resource area, but it does not participate in behavioural or enforcement authority. Task classes and profiles hold portable tiers, reasoning, parallelism, capabilities, attempts, and thresholds. Model maps are the only canonical files containing vendor model IDs. Role Markdown and shared context guidance generate native subagents. The metrics schema defines optional content-free records; the repository installs no telemetry collector.
+`routing/` is a fourth canonical resource area, but it does not participate in behavioural or enforcement authority. The [routing guide](routing-and-cost.md) owns the engineer-facing workflow. Task classes and profiles hold portable tiers, reasoning, parallelism, capabilities, attempts, and thresholds. Model maps are the only canonical files containing vendor model IDs. Role Markdown and shared context guidance generate static product-native role files. `ai-guardrails` does not inspect prompts, classify work at runtime, schedule agents, enforce profile concurrency, promote a running task, or broker model calls; the engineer, primary agent, and native product decide whether to use an installed role. The metrics schema defines an optional content-free record shape, but the repository installs no collector or uploader.
 
 `packs/` is the canonical stack-specific layer. Each language, infrastructure, or shared pack owns a manifest, on-demand policy, portable skill, verification data, routing hints, deterministic command fragment, and fixtures. `packs explain` is the deliberate on-demand reader for its concise policy heading plus named verification and routing guidance; it avoids a second routing or verification engine and keeps this material out of global instructions. Marker-based discovery supports several simultaneous packs in a monorepository while pruning build output, caches, vendored code, and configured generated directories. Detection has no installation authority and does not contact a toolchain or network.
 
@@ -67,12 +69,12 @@ The root `AGENTS.md` is repository contribution guidance, not the global policy'
 - one Claude user-rule file per applicable fragment;
 - a pasteable Cursor User Rules document;
 - portable skill copies;
-- balanced-profile Codex TOML and Claude/Cursor Markdown agents;
+- balanced-profile custom-agent output for all six products, with JetBrains retained as a reviewable manual bundle;
 - product hook fragments, Codex prefix rules, and the Cursor CLI permissions recommendation.
 
 The JSON fragments retain a placeholder for the installed engine path. Installation copies the standalone standard-library runtime and selected policy into a content-addressed directory, then builds native entries with that immutable absolute path and `sys.executable`; repository artifacts therefore remain machine independent and installed hooks do not depend on the clone.
 
-All routing profiles are validated on every routing validation, while version-controlled `dist/` agents represent the recommended balanced profile. A profile-specific installation renders from the same canonical roles, selected profile, and product model map. This avoids maintaining profile copies in `dist/`.
+All routing profiles are validated on every routing validation, while version-controlled `dist/` agents represent the recommended balanced profile. A profile-specific installation renders from the same canonical roles, selected profile, and product model map. Each generated role has one fixed task class; that class determines the role's tier and reasoning at render time. The renderer emits the resolved model for Codex, Claude Code, and Cursor, while intentionally leaving model selection native for VS Code, Visual Studio, and JetBrains. The remaining portable task classes and capability-pack routing hints are validated guidance, not a dynamic router that retargets an installed role during a session. This avoids maintaining profile copies in `dist/` while keeping the automation boundary explicit.
 
 ## Installation flow
 
@@ -80,7 +82,7 @@ The CLI resolves authored sources from its package-local `_resources` tree and u
 
 Codex and Cursor share skill destinations. State records both owners, so uninstalling one product does not remove a skill still owned by the other. Claude receives a separate copy in its documented personal skill directory.
 
-Routing installation is opt-in. Native agent files are copied to the documented user agent directory for Codex, Claude, Cursor, VS Code, and version-unverified Visual Studio; JetBrains receives only a reviewable manual Copilot bundle because its customizations are Preview and no stable personal path is assumed. The state records profile, resolved tier mappings, hashes, overrides, manual activation, and `unverified` availability—never prompts or configuration contents. Routing operations do not edit a main-model setting or global concurrency setting. Concurrency is portable profile guidance because native products do not expose one common safe user-level configuration surface.
+Routing installation is opt-in. Native agent files are copied to the documented user agent directory for Codex, Claude, Cursor, VS Code, and version-unverified Visual Studio; JetBrains receives only a reviewable manual Copilot bundle because its customizations are Preview and no stable personal path is assumed. The state records the selected profile, managed hashes, explicit model overrides, and manual activation steps—never prompts, task content, or actual model use. Status resolves the configured mappings on demand and reports availability as `unverified`; it cannot prove that a product discovered a role or used the displayed model. Routing operations do not edit a main-model setting or global concurrency setting. Concurrency and escalation are portable instructions because native products do not expose one common safe user-level enforcement surface.
 
 VS Code can load Claude-compatible hooks. The installer uses a tiny recorded ownership choice rather than a general dependency graph: when a managed Claude hook is present, VS Code uses it as `shared-claude`; otherwise VS Code owns its Preview-native hook. Claude is registered before a native VS Code hook is removed, and VS Code is restored to a native hook before Claude is removed. Visual Studio and JetBrains are behavioural/skill adapters only: neither receives a fabricated deterministic hook.
 

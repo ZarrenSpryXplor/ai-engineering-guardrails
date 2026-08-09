@@ -74,6 +74,27 @@ See what is active:
 ai-guardrails status --repo .
 ```
 
+## Optional routing
+
+Routing is off by default. Enabling it installs five product-native roles for bounded exploration, test-output analysis, ordinary implementation, independent review, and verification. It does not inspect your prompts or automatically broker model calls: you or the primary agent still decide whether delegation is useful.
+
+If you followed the installation steps above, preview and enable the recommended profile on the existing managed Codex installation:
+
+```sh
+ai-guardrails routing show --profile balanced --product codex
+ai-guardrails routing set balanced --product codex --dry-run
+ai-guardrails routing set balanced --product codex
+ai-guardrails status --product codex --show-routing
+```
+
+For a fresh installation, use `install --product codex --routing-profile balanced` with the same dry-run/apply sequence. In a session, a concrete request is enough where native delegation is supported:
+
+> Use `workstation_explorer` to map the relevant files and constraints. Keep it read-only and return evidence only; do not edit.
+
+Codex keeps underscore role names; the other rendered products use hyphens, such as `workstation-explorer`. Visual Studio roles are selected by the user rather than run as subagents, and JetBrains routing is a manual Preview bundle.
+
+Use `routing set none --product codex --dry-run` and then the same command without `--dry-run` to reconfigure the managed product without routing when no model override is stored. Read the [engineer routing guide](routing-and-cost.md) for profile selection, model overrides, and product activation, and review its [disable limitations](routing-and-cost.md#inspect-troubleshoot-and-disable) before applying that full installation transaction.
+
 ## Ansible
 
 The Ansible pack is detected from distinctive files such as `ansible.cfg`, `.ansible-lint`, `galaxy.yml`, execution-environment metadata, Molecule configuration, or collection/role requirements.

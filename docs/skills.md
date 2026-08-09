@@ -83,9 +83,9 @@ Use `ai-guardrails packs detect --repo .` to see which packs have evidence in a 
 | Skill | Gives an agent a repeatable, evidence-driven workflow for one task class. | Grant permission, execute commands by itself, or replace review. |
 | Capability pack | Groups stack detectors, a skill, verification hints, and relevant deterministic rules. | Mean a detected repository is safe to mutate. |
 | Deterministic rule | Matches a narrow, high-confidence command or structured-tool request. | Understand every shell construct or protect arbitrary user processes. |
-| Routing role | Optional native subagent profile for delegation. | Replace a skill, alter the main model, or weaken safety controls. |
+| Routing role | Optional product-native custom-agent role for bounded delegation or explicit selection. | Replace a skill, alter the main model, or weaken safety controls. |
 
-Routing remains off by default. Its five `workstation_` roles are deliberately different from skills: they describe who performs a bounded delegated task, while a skill describes how to perform a category of work. See [routing and cost](routing-and-cost.md) for the role catalogue and profile limits.
+Routing remains off by default. Its five `workstation_` roles are deliberately different from skills: they describe who performs a bounded delegated task, while a skill describes how to perform a category of work. See [profile selection](routing-and-cost.md#choose-a-profile) for limits and [using roles in an engineering session](routing-and-cost.md#use-roles-in-an-engineering-session) for the role catalogue and prompt examples.
 
 ## Adding or changing a skill
 
