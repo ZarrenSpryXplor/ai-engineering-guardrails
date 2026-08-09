@@ -105,9 +105,10 @@ def validate_release_artifacts(
     normalised_name = _normalise_distribution_name(name)
     if not wheel.name.startswith(f"{normalised_name}-{version}-"):
         raise ValueError(f"wheel filename does not match {name!r} version {version!r}")
-    expected_sdist = f"{name}-{version}.tar.gz"
-    if sdist.name != expected_sdist:
-        raise ValueError(f"source distribution filename must be {expected_sdist!r}")
+    expected_sdists = {f"{candidate}-{version}.tar.gz" for candidate in (name, normalised_name)}
+    if sdist.name not in expected_sdists:
+        expected = " or ".join(repr(candidate) for candidate in sorted(expected_sdists))
+        raise ValueError(f"source distribution filename must be {expected}")
 
     with zipfile.ZipFile(wheel) as archive:
         metadata_paths = [item for item in archive.namelist() if item.endswith(".dist-info/METADATA")]
@@ -117,7 +118,7 @@ def validate_release_artifacts(
 
     with tarfile.open(sdist, mode="r:gz") as archive:
         try:
-            metadata_member = archive.getmember(f"{name}-{version}/PKG-INFO")
+            metadata_member = archive.getmember(f"{sdist.name.removesuffix('.tar.gz')}/PKG-INFO")
         except KeyError as error:
             raise ValueError("source distribution does not contain root PKG-INFO") from error
         if not metadata_member.isfile():
