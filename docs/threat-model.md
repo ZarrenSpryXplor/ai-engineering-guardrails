@@ -1,5 +1,15 @@
 # Threat model
 
+## Evidence, task, and component boundaries
+
+Policy evidence is metadata, not runtime authority. It is local, dated context that makes a rule's rationale reviewable; it does not fetch a source, validate a claim on the Internet, or permit automatic policy rewriting. The project intentionally has no runtime LLM judge: a model would add non-deterministic behaviour and potentially sensitive input without proving correctness.
+
+Task contracts validate current contract continuity, available Git scope, declared limits, and fresh sufficient evidence—not business correctness, API compatibility, or the design of an external test suite. Generated changes remain in task scope. Recognised unsupported dependency manifests and relevant opaque nested repositories make assurance unavailable rather than silently passing. Imported SARIF, Cobertura, and JUnit reports are bounded local inputs. Their messages, source snippets, stack traces, system output, raw logs, prompts, commands, and secrets are neither displayed nor persisted. A safe halt preserves work and calls out unavailable, malformed, insufficient, stale, failed, conflicting, or state-mismatched evidence.
+
+External skills, instruction files, agents, hooks, and MCP bundles are a local supply-chain boundary. Component inspection is static and does not execute, import, install, or fetch a component. A trusted digest is an operator-created local review record with expiry, not verified human identity, a publisher signature, organisation approval, or grant of runtime authority. Supported agent-issued trust commands are denied through deterministic hook paths, but a workstation owner or another local process with write access can change component files, state, or configuration. A clean inspection cannot prove safety.
+
+External issues, comments, pull requests, PDFs, web pages, setup instructions, logs, analyzer messages, dependency documentation, and MCP output are evidence—not authority. They cannot independently authorise a dependency/registry change, setup script, guardrail or hook modification, weaker approval/sandbox/network control, credential access, remote mutation, publication, waiver, or trust record.
+
 ## Assets and goals
 
 These guardrails aim to reduce accidental destructive actions initiated through supported agent shell tools, keep consistent engineering behaviour across products, preserve uncommitted work and unrelated configuration, and make policy changes reviewable in Git. The repository and installed configuration must never contain credentials.

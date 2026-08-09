@@ -1,6 +1,6 @@
 ---
 name: workstation-sensitive-output
-description: Collect, minimise, redact, and summarise potentially sensitive logs, plans, state, configuration, or remote-tool output while preserving diagnostic meaning. Use when evidence may contain secrets or operational data; do not use to retrieve raw credentials, Secret values, tokens, private keys, or unnecessary full outputs.
+description: Collect, minimise, redact, and summarise sensitive logs, plans, state, configuration, and remote-tool output. Preserve diagnostic meaning; never retrieve credentials, Secret values, tokens, private keys, or unnecessary full output.
 ---
 
 # Sensitive evidence workflow

@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "known_fixture_ids": [
+    "canonical-policy-validation",
+    "deterministic-enforcement-examples",
+    "generated-policy-output",
+    "portable-skill-validation"
+  ],
+  "sources": [
+    {
+      "id": "context-evaluations-2026",
+      "title": "Your AGENTS.md file isn't the problem. Your lack of AI Agent Evaluations is.",
+      "url": "https://tessl.io/blog/your-agentsmd-file-isnt-the-problem-your-lack-of-evals-is/",
+      "publication_date": "2026-02-24",
+      "evidence_type": "official-engineering-report",
+      "relevance": "Supports keeping behavioural guidance concise, measurable, and reviewable rather than treating it as self-validating.",
+      "confidence": 55,
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "limitations": "Vendor commentary that discusses reported studies; it is contextual evidence, not a universal performance claim."
+    },
+    {
+      "id": "review-task-guidance-2026",
+      "title": "What GitHub learned when better tools made Copilot code review worse",
+      "url": "https://tessl.io/blog/what-github-learned-when-better-tools-made-copilot-code-review-worse/",
+      "publication_date": "2026-07-14",
+      "evidence_type": "official-engineering-report",
+      "relevance": "Supports task-shaped review guidance, narrow evidence gathering, and repeated evaluation after instruction or tool changes.",
+      "confidence": 60,
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "limitations": "A reported product-specific case study; results are not independently verified or assumed to generalise to every agent surface."
+    },
+    {
+      "id": "bounded-template-change-case-study-2026",
+      "title": "When AI Over-Engineers: A DevCrate Case Study",
+      "url": "https://dev.to/willivan0706/when-ai-over-engineers-why-dumb-copy-paste-is-sometimes-the-smartest-solution-126k",
+      "publication_date": "2026-04-02",
+      "evidence_type": "incident-study",
+      "relevance": "Supports choosing bounded, known-good local changes over speculative automation when the scope is small and precision matters.",
+      "confidence": 35,
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "limitations": "A single self-reported case study, used only as context for a maintainability principle."
+    },
+    {
+      "id": "project-design-decision",
+      "title": "AI Engineering Guardrails architecture and threat model",
+      "url": "https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/architecture.md",
+      "publication_date": "2026-08-09",
+      "evidence_type": "project-design-decision",
+      "relevance": "Records project-owned rationale for deterministic, local, bounded guardrails and explicit operational limits.",
+      "confidence": 100,
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "limitations": "A project design record, not independent empirical evidence."
+    }
+  ],
+  "policies": [
+    {
+      "id": "operating-principles",
+      "polarity": "principle",
+      "scope": "always-loaded-behavioural-policy",
+      "evidence_source_ids": ["context-evaluations-2026", "project-design-decision"],
+      "rationale": "Small, evidence-aware operating principles reduce unsupported assumptions and make incomplete verification visible.",
+      "confidence": 85,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["generated-policy-output", "canonical-policy-validation"]
+    },
+    {
+      "id": "investigation-and-scope",
+      "polarity": "positive-guidance",
+      "scope": "always-loaded-behavioural-policy",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "A bounded investigation and scope check preserves user work and prevents unrelated changes.",
+      "confidence": 90,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["generated-policy-output"]
+    },
+    {
+      "id": "maintainability",
+      "polarity": "principle",
+      "scope": "always-loaded-behavioural-policy",
+      "evidence_source_ids": ["bounded-template-change-case-study-2026", "project-design-decision"],
+      "rationale": "Small, direct changes and existing project conventions reduce accidental complexity and maintenance surface.",
+      "confidence": 70,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["generated-policy-output"]
+    },
+    {
+      "id": "change-safety",
+      "polarity": "negative-constraint",
+      "scope": "change-safety",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "High-impact changes require explicit intent, target evidence, and a recoverable path.",
+      "confidence": 95,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["deterministic-enforcement-examples"]
+    },
+    {
+      "id": "git",
+      "polarity": "negative-constraint",
+      "scope": "source-control",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "Working-tree and shared-history loss must not be used as a shortcut to progress.",
+      "confidence": 95,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["deterministic-enforcement-examples"]
+    },
+    {
+      "id": "security-and-secrets",
+      "polarity": "negative-constraint",
+      "scope": "security-and-secrets",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "Sensitive material and security controls require deliberate human authority and redaction-aware handling.",
+      "confidence": 98,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["deterministic-enforcement-examples"]
+    },
+    {
+      "id": "dependencies-and-supply-chain",
+      "polarity": "negative-constraint",
+      "scope": "dependency-and-supply-chain",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "Dependency changes expand runtime and supply-chain scope and must be justified explicitly.",
+      "confidence": 92,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["deterministic-enforcement-examples"]
+    },
+    {
+      "id": "infrastructure-posture",
+      "polarity": "negative-constraint",
+      "scope": "infrastructure-posture",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "Unknown remote targets are protected until platform authority and lifecycle evidence are explicit.",
+      "confidence": 95,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["deterministic-enforcement-examples"]
+    },
+    {
+      "id": "testing-and-verification",
+      "polarity": "positive-guidance",
+      "scope": "always-loaded-behavioural-policy",
+      "evidence_source_ids": ["context-evaluations-2026", "review-task-guidance-2026", "project-design-decision"],
+      "rationale": "Verification evidence and a final diff review make guidance changes and implementation claims reviewable over time.",
+      "confidence": 85,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["canonical-policy-validation", "deterministic-enforcement-examples"]
+    },
+    {
+      "id": "reporting",
+      "polarity": "positive-guidance",
+      "scope": "always-loaded-behavioural-policy",
+      "evidence_source_ids": ["project-design-decision"],
+      "rationale": "Clear reporting distinguishes observed outcomes, limitations, and unverified assumptions.",
+      "confidence": 90,
+      "introduced_date": "2026-08-09",
+      "last_reviewed": "2026-08-09",
+      "review_after": "2027-08-09",
+      "fixture_ids": ["generated-policy-output"]
+    }
+  ]
+}

@@ -684,6 +684,21 @@ def validate_canonical_data() -> None:
 
     terminal_ux.validate_resources()
 
+    # Evidence lifecycle data is canonical metadata for high-level guidance.
+    # It is intentionally separate from deterministic matcher data so rule
+    # evaluation stays small and offline.
+    from . import evidence
+
+    evidence.validate_registry(load_manifest())
+
+    from . import assurance
+
+    assurance.validate_resources()
+
+    from . import components
+
+    components.validate_resources()
+
     executable_suffixes = {".py", ".sh", ".ps1", ".bat", ".cmd", ".exe"}
     for root in (SKILLS_ROOT, RESOURCE_ROOT / "packs"):
         for skill_file in root.rglob("skills/*/SKILL.md") if root.name == "packs" else root.glob("*/SKILL.md"):

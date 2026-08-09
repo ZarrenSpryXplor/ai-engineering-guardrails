@@ -4,6 +4,8 @@
   "type": "infrastructure",
   "description": "Ansible playbooks, roles, collections, inventories, Vault boundaries, and remote execution.",
   "file_detectors": ["ansible.cfg", ".ansible-lint", "galaxy.yml", "execution-environment.yml", "molecule/*/molecule.yml", "collections/requirements.yml", "roles/requirements.yml"],
+  "dependency_manifests": ["collections/requirements.yml", "roles/requirements.yml"],
+  "dependency_lockfiles": [],
   "directory_detectors": [],
   "explicit_exclusions": [".ansible/**", "**/.ansible/**", "collections/ansible_collections/**", "**/collections/ansible_collections/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "generated/**", "**/generated/**"],
   "dependent_packs": ["sensitive-output"],

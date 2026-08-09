@@ -72,6 +72,23 @@ class GuardrailsError(RuntimeError):
     """A user-actionable guardrails management failure."""
 
 
+def is_reparse_point(path: Path) -> bool:
+    """Recognise Windows reparse points without depending on the host OS."""
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
+        return False
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def is_link_or_reparse(path: Path) -> bool:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return False
+    return stat.S_ISLNK(mode) or is_reparse_point(path)
+
+
 def json_bytes(value: Any) -> bytes:
     return (json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
 

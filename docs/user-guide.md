@@ -4,29 +4,22 @@ This is the short version. Python 3.11+ and [pipx](https://pipx.pypa.io/) are re
 
 ## Install
 
-Install the application from a reviewed clone, then preview first:
+Install the published package, then preview before writing anything:
 
 ```sh
-git clone https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git
-cd ai-engineering-guardrails
-pipx install .
+pipx install ai-engineering-guardrails
 
 ai-guardrails install --dry-run
+ai-guardrails install
+ai-guardrails status
 ```
 
-After reviewing a specific tag or full commit, a direct VCS install is also available:
+Reviewed tag/commit, local-clone, and local-wheel installs remain available alternatives:
 
 ```sh
 pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git@<reviewed-tag-or-full-commit>'
-```
-
-This repository does not publish a package as part of its normal workflow.
-
-Install for locally detected Codex, Claude Code, Cursor, VS Code Copilot, Visual Studio Copilot, and JetBrains IDE evidence:
-
-```sh
-ai-guardrails install
-ai-guardrails status
+pipx install .
+pipx install ./dist/ai_engineering_guardrails-<version>-py3-none-any.whl
 ```
 
 No pack, profile, model, cloud login, or target mapping is required. Installation does not contact remote services.
@@ -57,7 +50,7 @@ Paste the first command's output in **Settings > Tools > AI Assistant > Prompt L
 
 ## Day-to-day use
 
-Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install ships six core workstation skills plus 22 capability-pack skills. See the [skills catalogue](skills.md) for the exact names and use cases.
+Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Twelve specialist infrastructure, delivery, and operations skills remain packaged; `install --skill-catalogue all` exposes the complete 28-skill catalogue and `--skill-catalogue contextual` explicitly restores the smaller managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 

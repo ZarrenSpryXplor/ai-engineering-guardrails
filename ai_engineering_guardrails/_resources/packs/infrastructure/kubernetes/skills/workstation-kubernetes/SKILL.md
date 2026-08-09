@@ -1,6 +1,6 @@
 ---
 name: workstation-kubernetes
-description: Inspect Kubernetes source, classify kubectl operations, render or diff changes, and collect read-only evidence with explicit target handling. Use for manifests and bounded cluster diagnosis; do not use for direct production mutation, namespace or CRD deletion, broad deletion, secret extraction, or tests against a real cluster.
+description: Inspect Kubernetes manifests, classify kubectl operations, render/diff changes, and collect read-only evidence for explicit targets. Never mutate production, delete namespaces or CRDs broadly, extract secrets, or test against a real cluster.
 ---
 
 # Kubernetes workflow

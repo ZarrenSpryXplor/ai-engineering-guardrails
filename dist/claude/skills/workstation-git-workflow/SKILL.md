@@ -1,6 +1,6 @@
 ---
 name: workstation-git-workflow
-description: Carry out an explicitly requested Git workflow while preserving user work. Use for staging, commits, branches, or history inspection; do not use without requested Git mutation.
+description: Perform explicitly requested Git staging, commit, branch, or history workflows while preserving user work. Never mutate Git state without explicit request.
 ---
 
 <!-- GENERATED — DO NOT EDIT

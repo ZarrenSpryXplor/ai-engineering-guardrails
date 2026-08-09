@@ -1,6 +1,6 @@
 ---
 name: workstation-azure
-description: Review Azure infrastructure source and collect bounded Azure metadata with explicit subscription and tenant evidence. Use for Bicep, Azure CLI planning, and read-only diagnosis; do not use for token or secret retrieval, role changes, destructive cloud operations, or direct production mutation.
+description: Review Azure Bicep/infrastructure source and collect bounded metadata with explicit subscription and tenant evidence. Never retrieve tokens or secrets, change roles, run destructive cloud operations, or mutate production.
 ---
 
 # Azure workflow

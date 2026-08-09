@@ -1,6 +1,6 @@
 ---
 name: workstation-terraform
-description: Inspect, format, validate, and plan Terraform source while protecting state, plans, locks, targets, and remote execution boundaries. Use for local source and plan analysis; do not use for destroy, apply, state removal or push, auto-approval, unverified force-unlock, or exposing state and plan content.
+description: Inspect, format, validate, and plan Terraform source while protecting state, plans, locks, targets, and remote execution. Never destroy/apply, remove or push state, auto-approve, force-unlock without evidence, or expose state/plan content.
 ---
 
 # Terraform workflow

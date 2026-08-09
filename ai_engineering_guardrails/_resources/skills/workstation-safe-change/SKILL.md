@@ -1,6 +1,6 @@
 ---
 name: workstation-safe-change
-description: Plan and implement a bounded repository change safely. Use for code or configuration changes; do not use for read-only explanation or incident response.
+description: Plan and implement bounded code or configuration changes safely. Do not use for read-only explanation, review, or incident response.
 ---
 
 # Workstation safe change
@@ -13,7 +13,7 @@ Use this skill when a request requires editing a repository while preserving exi
 
 1. Inspect repository instructions, status, relevant implementation, tests, and recent conventions.
 2. Define the requested outcome, observable acceptance criteria, affected surfaces, and any evidence gaps.
-3. Choose the smallest change that addresses the root cause. Identify compatibility and rollback implications before editing.
+3. Choose the smallest change that addresses the root cause. For a small, bounded change with a named known-good local source template, copy the relevant structure and change only the stated differences. Do not build a general transformation unless repeated scope and maintenance benefit justify it; never edit generated files as the source of truth. Identify compatibility and rollback implications before editing.
 4. Preserve unrelated and uncommitted work. Change canonical sources before generated outputs.
 5. Add or update focused tests, then run targeted checks followed by broader applicable checks.
 6. Review the final diff for scope, accidental generated changes, secrets, and behavioural changes.

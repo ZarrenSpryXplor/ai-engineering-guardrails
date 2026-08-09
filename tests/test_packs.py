@@ -177,6 +177,34 @@ class PackValidationTests(unittest.TestCase):
         self.assertEqual(22, count)
         self.assertGreater(examples, 375)
 
+    def test_pack_types_define_small_catalogue_tiers_and_contextual_defaults(self) -> None:
+        available = packs.load_packs()
+        tiers = {identifier: packs.catalogue_tier(pack) for identifier, pack in available.items()}
+
+        self.assertEqual(10, sum(tier == "contextual" for tier in tiers.values()))
+        self.assertEqual(12, sum(tier == "specialist" for tier in tiers.values()))
+        self.assertEqual(set(available), set(packs.default_pack_ids(available)))
+        skill_defaults = set(packs.default_skill_pack_ids(available))
+        self.assertTrue({"python", "node", "java", "dotnet", "dependency-management"}.issubset(skill_defaults))
+        self.assertTrue({"kubernetes", "terraform", "spacelift", "source-control-cicd"}.isdisjoint(skill_defaults))
+
+    def test_dependency_patterns_are_classified_by_existing_capability_packs(self) -> None:
+        available = packs.load_packs()
+        manifests, lockfiles = packs.dependency_file_patterns(available)
+
+        self.assertTrue(
+            {"package.json", "pyproject.toml", "requirements*.txt", "pom.xml", "*.csproj", "Chart.yaml"}
+            <= set(manifests)
+        )
+        self.assertTrue(
+            {"package-lock.json", "poetry.lock", "gradle.lockfile", "packages.lock.json", ".terraform.lock.hcl", "Chart.lock"}
+            <= set(lockfiles)
+        )
+        for pack in available.values():
+            detectors = set(pack["file_detectors"])
+            self.assertTrue(set(pack["dependency_manifests"]) <= detectors)
+            self.assertTrue(set(pack["dependency_lockfiles"]) <= detectors)
+
     def test_missing_pack_field_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary) / "languages/java"

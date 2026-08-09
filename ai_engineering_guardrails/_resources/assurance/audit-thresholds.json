@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "component": {
+    "maximum_files": 200,
+    "maximum_depth": 12,
+    "maximum_file_bytes": 262144,
+    "maximum_total_bytes": 1048576,
+    "maximum_line_length": 2000
+  },
+  "skills": {
+    "description_characters": 400,
+    "body_characters": 12000,
+    "reference_characters": 18000,
+    "reference_file_characters": 8000,
+    "always_loaded_characters": 6000,
+    "characters_per_estimated_token": 4,
+    "catalogue_reference_budget_characters": 8000
+  }
+}

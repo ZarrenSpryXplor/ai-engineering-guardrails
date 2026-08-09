@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are made on the current `main` development line until the project has a versioned public release. After releases begin, this table will name the supported release lines and their end-of-support dates.
+Security fixes are made on the current `main` development line and the latest release published on PyPI. Older release lines are not currently supported; this section will name additional supported lines and their end-of-support dates if that policy changes.
 
 ## Report a vulnerability privately
 

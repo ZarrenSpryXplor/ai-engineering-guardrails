@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/70-reporting.md
 -->
+<!-- Canonical policy ID: reporting -->
 
 ## Reporting
 

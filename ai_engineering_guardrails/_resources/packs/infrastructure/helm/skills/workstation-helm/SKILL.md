@@ -1,6 +1,6 @@
 ---
 name: workstation-helm
-description: Inspect, lint, render, diff, and verify Helm charts while preserving values precedence, hooks, CRDs, and version compatibility. Use for chart source and read-only release analysis; do not use for uninstall, unreviewed plugins, insecure repository access, secret-bearing command flags, or automatic deployment.
+description: Inspect, lint, render, diff, and verify Helm charts, values, hooks, and CRDs with read-only release analysis. Never uninstall, load unreviewed plugins, bypass repository security, expose secrets, or deploy automatically.
 ---
 
 # Helm workflow

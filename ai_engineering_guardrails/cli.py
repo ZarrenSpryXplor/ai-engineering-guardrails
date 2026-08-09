@@ -10,7 +10,22 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from . import __version__, build, complexity, enforcement, install, packs, policy, routing, scan, state, terminal_ux
+from . import (
+    __version__,
+    assurance,
+    build,
+    complexity,
+    components,
+    enforcement,
+    evidence,
+    install,
+    packs,
+    policy,
+    routing,
+    scan,
+    state,
+    terminal_ux,
+)
 from .resources import repository_output_root
 from .util import PRODUCTS, SAFETY_PROFILES, TRUST_MODES, GuardrailsError, home_path
 
@@ -91,6 +106,12 @@ def add_install_options(parser: argparse.ArgumentParser) -> None:
     pack_group.add_argument("--pack", action="append", default=[], metavar="ID", help="install a capability pack (repeatable)")
     pack_group.add_argument("--all-packs", action="store_true", help="install every capability pack progressively")
     parser.add_argument(
+        "--skill-catalogue",
+        choices=("contextual", "all"),
+        default=None,
+        help="expose contextual skills or all selected pack skills; omission preserves existing installs and uses contextual when fresh",
+    )
+    parser.add_argument(
         "--safety-profile",
         choices=SAFETY_PROFILES,
         default=None,
@@ -131,9 +152,9 @@ def _run_consumer_install(
     *,
     updating: bool,
 ) -> None:
-    repository_detection = packs.detect_packs(Path.cwd())
     details = io.StringIO()
-    with contextlib.redirect_stdout(details):
+    output = contextlib.nullcontext() if args.verbose else contextlib.redirect_stdout(details)
+    with output:
         install.prepare_installation(dry_run=args.dry_run, home=args.home)
         if updating:
             report = install.update(
@@ -151,6 +172,7 @@ def _run_consumer_install(
                 dry_run=args.dry_run,
                 pack_ids=args.pack,
                 all_packs=args.all_packs,
+                skill_catalogue=args.skill_catalogue,
                 routing_profile=args.routing_profile,
                 safety_profile=args.safety_profile,
                 trust_mode=args.trust_mode,
@@ -158,9 +180,7 @@ def _run_consumer_install(
                 model_overrides=parse_model_overrides(args.model_override) or None,
                 explicit_product=args.product is not None,
             )
-    if args.verbose:
-        print(details.getvalue(), end="")
-    install.print_consumer_install_summary(report, detected, repository_detection)
+    install.print_consumer_install_summary(report, detected)
 
 
 def _routing_show(products: Sequence[str], profile_name: str) -> None:
@@ -390,6 +410,205 @@ def _policy_apply(args: argparse.Namespace) -> None:
     install.update(products, home, force=args.force, dry_run=args.dry_run)
 
 
+def _policy_audit(args: argparse.Namespace) -> bool:
+    result = evidence.audit_registry(policy.load_manifest(), generated_artifacts=build.build_artifacts())
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return not result["errors"]
+    print(
+        "Policy evidence audit: "
+        + ("structural checks passed" if not result["errors"] else "structural issues found")
+        + f"; {result['sources']} sources, {result['policy_records']} policy records"
+    )
+    for item in result["errors"]:
+        print(f"error: {item['id']}: {item['detail']}")
+    for item in result["reviews"]:
+        print(f"review: {item['id']}: {item['detail']}")
+    if not result["errors"] and not result["reviews"]:
+        print("No evidence review dates are overdue.")
+    return not result["errors"]
+
+
+def _policy_evidence(args: argparse.Namespace) -> None:
+    result = evidence.evidence_for_policy(args.policy_id, policy.load_manifest())
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return
+    metadata = result["policy"]
+    print(f"policy: {metadata['id']}")
+    print(f"polarity: {metadata['polarity']}; scope: {metadata['scope']}")
+    print(f"rationale: {metadata['rationale']}")
+    print(f"confidence: {metadata['confidence']}; review after: {metadata['review_after']}")
+    for source in result["sources"]:
+        print(f"evidence: {source['id']}: {source['title']} ({source['url']})")
+    for item in result["review_findings"]:
+        print(f"review: {item['detail']}")
+
+
+def _task_result(args: argparse.Namespace, *, receipt: bool) -> bool:
+    result = assurance.task_receipt(args.repo, home=args.home) if receipt else assurance.task_status(args.repo, home=args.home)
+    task_result = result["task_assurance"] if receipt else result
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        title = "Task receipt" if receipt else "Task status"
+        print(f"{title}: {task_result['effective_status']}")
+        scope = task_result["scope"]
+        if scope["available"]:
+            print(
+                "  Scope: "
+                f"{scope['files_changed']} file(s), {scope['lines_added']} added, {scope['lines_removed']} removed, "
+                f"{scope['directories_changed']} directories changed"
+            )
+        else:
+            print("  Scope: unavailable")
+        print("  Evidence: " + (", ".join(f"{item['id']}={item['state']}" for item in task_result["evidence"]) or "none required"))
+        print(f"  Contract continuity: {task_result['contract_continuity']}")
+        coverage = task_result.get("coverage")
+        if isinstance(coverage, Mapping):
+            print(f"  Coverage line-rate delta: {coverage['line_rate_delta']:+.4f}")
+        for invariant in task_result.get("invariants", []):
+            if isinstance(invariant, Mapping) and invariant.get("state") != "declared-evidence-fresh":
+                print(f"  invariant: {invariant.get('id')}={invariant.get('state')}")
+        for item in task_result.get("contract_violations", []):
+            print(f"  violation: {item['detail']}")
+        for item in task_result.get("evidence_gaps", []):
+            print(f"  evidence gap: {item['detail']}")
+        for item in task_result.get("warnings", []):
+            print(f"  warning: {item['detail']}")
+        if task_result.get("safe_halt", {}).get("required") or task_result.get("halt_reasons"):
+            print("  Safe halt: preserve work; refresh or supply the named evidence before claiming completion.")
+    return bool(task_result["completed"] or task_result["contract_status"] != "completed")
+
+
+def _task_init(args: argparse.Namespace) -> None:
+    paths = assurance.initialise_task(args.repo, force=args.force, dry_run=args.dry_run)
+    prefix = "would create" if args.dry_run else "created"
+    print(f"{prefix} task contract: {paths['contract']}")
+    print(f"evidence ledger example: {paths['evidence_example']}")
+
+
+def _task_establish(args: argparse.Namespace) -> None:
+    result = assurance.establish_contract(args.repo, args.home, dry_run=args.dry_run)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return
+    action = "would establish" if args.dry_run else "established"
+    print(f"Task contract {action}: {result['contract_digest']}")
+    if not args.dry_run:
+        print(
+            "Interactive confirmation completed. Supported agent-issued establishment commands are blocked by deterministic command policy; local filesystem control remains outside this boundary."
+        )
+
+
+def _component_inspect(args: argparse.Namespace) -> bool:
+    result = components.inspect(args.path)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return not any(item["level"] == "error" for item in result["findings"])
+    print(f"Component: {result['component_type']}; digest={result['component_digest']}")
+    print(f"Files inspected: {result['files_inspected']}; entry: {result['entry_document'] or 'not found'}")
+    if not result["findings"]:
+        print("No structural or high-confidence indicators found; this is not a safety guarantee.")
+    for item in result["findings"]:
+        print(f"{item['level']}: {item['id']}: {item['path']}:{item['line']}: {item['message']}")
+    return not any(item["level"] == "error" for item in result["findings"])
+
+
+def _component_audit(args: argparse.Namespace) -> bool:
+    result = components.audit(args.home, repo=args.repo)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return not any("error" in item for item in result["components"])
+    print("Component audit")
+    if not result["components"]:
+        print("  No known component locations were present beneath the selected home.")
+    for item in result["components"]:
+        detail = item.get("component_type", item.get("error", "component"))
+        print(f"  {item['state']}: {item['path']} ({detail})")
+    print("  " + result["limitation"])
+    return not any("error" in item for item in result["components"])
+
+
+def _component_trust(args: argparse.Namespace) -> None:
+    record = components.trust(
+        args.path,
+        args.home,
+        expires_at=args.expires_at,
+        source=args.source,
+        version_reference=args.version_reference,
+        reviewed_by=args.reviewed_by,
+        permission_tier=args.permission_tier,
+        dry_run=args.dry_run,
+    )
+    if args.format == "json":
+        print(json.dumps(record, indent=2, sort_keys=True))
+        return
+    print(("Trust preview" if args.dry_run else "Trusted component") + f": {record['component_digest']}")
+    print(f"  expires: {record['expires_at']}; tier: {record['permission_tier']}")
+
+
+def _component_list(args: argparse.Namespace) -> None:
+    values = components.list_trust(args.home)
+    if args.format == "json":
+        print(json.dumps({"schema_version": 1, "components": values}, indent=2, sort_keys=True))
+        return
+    if not values:
+        print("No local component trust records.")
+        return
+    for value in values:
+        print(f"{value['trust_status']}: {value['component_digest']} ({value['component_type']}); expires={value['expires_at']}")
+
+
+def _component_revoke(args: argparse.Namespace) -> None:
+    changed = components.revoke(args.digest, args.home, dry_run=args.dry_run)
+    value = {"schema_version": 1, "digest": args.digest, "revoked": changed, "dry_run": args.dry_run}
+    if args.format == "json":
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+    print(("would revoke" if args.dry_run else "revoked") if changed else "trust record not found or already revoked")
+
+
+def _skills_audit(args: argparse.Namespace) -> bool:
+    result = components.skills_audit(args.path)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return bool(result["audit_complete"]) and not any(item["level"] == "error" for item in result["findings"])
+    print("Skills audit")
+    print("  Estimated tokens use " + result["token_estimate_method"] + ".")
+    catalogue = result["catalogue"]
+    pressure = catalogue["estimated_catalogue_pressure"]
+    print(
+        f"  Catalogue ({catalogue['scope']}): {catalogue['skill_count']} skill(s), "
+        f"{catalogue['total_description_characters']} description characters; "
+        f"estimated pressure={pressure['level']} ({pressure['description_only_percent_of_reference']}% description-only reference)"
+    )
+    exposure_key = "fresh_default" if "fresh_default" in catalogue else "selected_installation"
+    exposure = catalogue[exposure_key]
+    print(
+        f"  {'Fresh default exposure' if exposure_key == 'fresh_default' else 'Selected installation'}: "
+        f"{exposure['skill_count']} skill(s), {exposure['description_characters']} description characters; "
+        f"estimated pressure={exposure['estimated_pressure']['level']}"
+    )
+    print("  Catalogue pressure is an estimate; model context and other installed/plugin skills change the actual budget.")
+    print("  Tiers: " + ", ".join(f"{name}={count}" for name, count in catalogue["tier_counts"].items()))
+    if catalogue["longest_descriptions"]:
+        print(
+            "  Longest descriptions: "
+            + ", ".join(f"{item['name']}={item['characters']}" for item in catalogue["longest_descriptions"])
+        )
+    for skill in result["skills"]:
+        print(
+            f"  {skill['name']}: estimated tokens={skill['estimated_tokens']}; "
+            f"references={skill['reference_file_count']} ({skill['reference_estimated_tokens']} estimated tokens)"
+        )
+    for item in result["findings"]:
+        print(f"  {item['level']}: {item['id']}: {item['message']}")
+    if not result["audit_complete"]:
+        print("  Audit incomplete; no clean result is asserted.")
+    return bool(result["audit_complete"]) and not any(item["level"] == "error" for item in result["findings"])
+
+
 def _statusline_products(value: str) -> tuple[str, ...]:
     return terminal_ux.STATUSLINE_PRODUCTS if value == "all" else (value,)
 
@@ -507,6 +726,45 @@ def _activity(args: argparse.Namespace) -> None:
 
 
 def _complexity(args: argparse.Namespace) -> None:
+    report_options = (
+        args.baseline_sarif,
+        args.current_sarif,
+        args.baseline_coverage,
+        args.current_coverage,
+        args.junit,
+    )
+    if args.complexity_mode == "compare" or any(report_options):
+        if not any(report_options):
+            raise GuardrailsError("complexity compare requires at least one supplied SARIF, Cobertura, or JUnit report")
+        if args.write_snapshot:
+            raise GuardrailsError("complexity report comparison does not write a terminal status snapshot")
+        result = assurance.compare_reports(
+            args.repo,
+            baseline_sarif=args.baseline_sarif,
+            current_sarif=args.current_sarif,
+            baseline_coverage=args.baseline_coverage,
+            current_coverage=args.current_coverage,
+            junit=args.junit,
+        )
+        if args.format == "json":
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return
+        print("Maintainability evidence comparison")
+        sarif = result["reports"].get("sarif")
+        if isinstance(sarif, Mapping):
+            print(
+                "  SARIF: "
+                f"{sarif['new_findings']} new, {sarif['resolved_findings']} resolved, {sarif['unchanged_findings']} unchanged"
+            )
+        coverage = result["reports"].get("cobertura")
+        if isinstance(coverage, Mapping):
+            print(f"  Coverage line-rate delta: {coverage['line_rate_delta']:+.4f}")
+        junit = result["reports"].get("junit")
+        if isinstance(junit, Mapping):
+            print(f"  JUnit: {junit['tests']} tests, {junit['failures']} failures, {junit['errors']} errors")
+        for finding in result["findings"]:
+            print(f"  {finding['id']}: {finding['evidence']}")
+        return
     result = complexity.analyse(args.repo, base=args.base, staged=args.staged)
     if args.write_snapshot:
         complexity.write_cache(args.home, result, dry_run=False)
@@ -722,9 +980,9 @@ def create_parser() -> argparse.ArgumentParser:
     add_home(project_rules)
     add_mutation_flags(project_rules)
 
-    waiver_parser = sub.add_parser("waiver", help="manage local, expiring, human-confirmed waivers")
+    waiver_parser = sub.add_parser("waiver", help="manage local, expiring, interactively confirmed waivers")
     waiver_sub = waiver_parser.add_subparsers(dest="waiver_command", required=True)
-    waiver_create = waiver_sub.add_parser("create")
+    waiver_create = waiver_sub.add_parser("create", help="interactively create a bounded local waiver (mutates local state)")
     add_home(waiver_create)
     waiver_create.add_argument("--rule-id", required=True)
     waiver_create.add_argument("--repo", type=Path, default=Path.cwd())
@@ -734,9 +992,9 @@ def create_parser() -> argparse.ArgumentParser:
     waiver_create.add_argument("--change-reference", required=True)
     waiver_create.add_argument("--expires-minutes", type=int, default=15)
     waiver_create.add_argument("--maximum-uses", type=int, default=1)
-    waiver_list = waiver_sub.add_parser("list")
+    waiver_list = waiver_sub.add_parser("list", help="list local waiver metadata without mutation")
     add_home(waiver_list)
-    waiver_revoke = waiver_sub.add_parser("revoke")
+    waiver_revoke = waiver_sub.add_parser("revoke", help="revoke a local waiver (mutates local state)")
     add_home(waiver_revoke)
     waiver_revoke.add_argument("id")
 
@@ -748,12 +1006,72 @@ def create_parser() -> argparse.ArgumentParser:
     policy_show = policy_sub.add_parser("show")
     policy_show.add_argument("rule_id")
     add_home(policy_show)
-    policy_init = policy_sub.add_parser("init")
+    policy_init = policy_sub.add_parser("init", help="initialise a local policy overlay (mutates local files)")
     add_home(policy_init)
     add_mutation_flags(policy_init)
-    policy_apply = policy_sub.add_parser("apply")
+    policy_apply = policy_sub.add_parser("apply", help="apply a validated local policy overlay (mutates managed files)")
     add_home(policy_apply)
     add_mutation_flags(policy_apply)
+    policy_audit = policy_sub.add_parser("audit", help="audit canonical policy evidence metadata offline")
+    policy_audit.add_argument("--format", choices=("human", "json"), default="human")
+    policy_evidence = policy_sub.add_parser("evidence", help="show evidence metadata for one canonical policy fragment")
+    policy_evidence.add_argument("policy_id")
+    policy_evidence.add_argument("--format", choices=("human", "json"), default="human")
+
+    task_parser = sub.add_parser("task", help="create, establish, validate, and report bounded local task assurance")
+    task_sub = task_parser.add_subparsers(dest="task_command", required=True)
+    task_init = task_sub.add_parser("init", help="create a minimal repository task contract")
+    task_init.add_argument("--repo", type=Path, default=Path.cwd())
+    add_mutation_flags(task_init)
+    task_establish = task_sub.add_parser("establish", help="explicitly establish the reviewed task contract as the local baseline")
+    task_establish.add_argument("--repo", type=Path, default=Path.cwd())
+    add_home(task_establish)
+    task_establish.add_argument("--dry-run", action="store_true")
+    task_establish.add_argument("--format", choices=("human", "json"), default="human")
+    task_help = {
+        "validate": "validate the task contract and evidence ledger without running checks",
+        "status": "report configured local assurance status without running checks",
+        "receipt": "emit the existing receipt envelope with optional local task assurance",
+    }
+    for name in ("validate", "status", "receipt"):
+        task_command = task_sub.add_parser(name, help=task_help[name])
+        task_command.add_argument("--repo", type=Path, default=Path.cwd())
+        add_home(task_command)
+        task_command.add_argument("--format", choices=("human", "json"), default="human")
+
+    component_parser = sub.add_parser("component", help="statically inspect components and manage local digest-bound review records")
+    component_sub = component_parser.add_subparsers(dest="component_command", required=True)
+    component_inspect = component_sub.add_parser("inspect", help="inspect a bounded local component without executing it")
+    component_inspect.add_argument("path", type=Path)
+    component_inspect.add_argument("--format", choices=("human", "json"), default="human")
+    component_audit = component_sub.add_parser("audit", help="audit known local component locations without mutation")
+    add_home(component_audit)
+    component_audit.add_argument("--repo", type=Path)
+    component_audit.add_argument("--format", choices=("human", "json"), default="human")
+    component_trust = component_sub.add_parser("trust", help="interactively create a digest-bound review record (mutates local state)")
+    component_trust.add_argument("path", type=Path)
+    add_home(component_trust)
+    component_trust.add_argument("--expires-at", required=True, help="future ISO-8601 timestamp, at most one year away")
+    component_trust.add_argument("--source", required=True, help="operator-provided provenance label")
+    component_trust.add_argument("--version-reference", default="local", help="operator-provided version or reference")
+    component_trust.add_argument("--reviewed-by", default=None, help="reviewer label (defaults to the local account name)")
+    component_trust.add_argument("--permission-tier", default="review-only", help="operator-provided review classification; it grants no authority")
+    component_trust.add_argument("--dry-run", action="store_true")
+    component_trust.add_argument("--format", choices=("human", "json"), default="human")
+    component_list = component_sub.add_parser("list", help="list local component review records without mutation")
+    add_home(component_list)
+    component_list.add_argument("--format", choices=("human", "json"), default="human")
+    component_revoke = component_sub.add_parser("revoke", help="revoke a local component review record (mutates local state)")
+    component_revoke.add_argument("digest")
+    add_home(component_revoke)
+    component_revoke.add_argument("--dry-run", action="store_true")
+    component_revoke.add_argument("--format", choices=("human", "json"), default="human")
+
+    skills_parser = sub.add_parser("skills", help="audit portable skill structure and estimated context size")
+    skills_sub = skills_parser.add_subparsers(dest="skills_command", required=True)
+    skills_audit = skills_sub.add_parser("audit")
+    skills_audit.add_argument("--path", type=Path)
+    skills_audit.add_argument("--format", choices=("human", "json"), default="human")
 
     receipt_parser = sub.add_parser("receipt", help="emit a content-free local session receipt")
     add_home(receipt_parser)
@@ -803,9 +1121,15 @@ def create_parser() -> argparse.ArgumentParser:
     events_summary.add_argument("--format", choices=("human", "json"), default="human")
 
     complexity_parser = sub.add_parser("complexity", help="report deterministic repository-change complexity signals")
+    complexity_parser.add_argument("complexity_mode", nargs="?", choices=("compare",))
     complexity_parser.add_argument("--repo", type=Path, default=Path.cwd())
     complexity_parser.add_argument("--base")
     complexity_parser.add_argument("--staged", action="store_true")
+    complexity_parser.add_argument("--baseline-sarif", type=Path)
+    complexity_parser.add_argument("--current-sarif", type=Path)
+    complexity_parser.add_argument("--baseline-coverage", type=Path)
+    complexity_parser.add_argument("--current-coverage", type=Path)
+    complexity_parser.add_argument("--junit", type=Path)
     complexity_parser.add_argument("--format", choices=("human", "json"), default="human")
     complexity_parser.add_argument("--write-snapshot", "--write-cache", dest="write_snapshot", action="store_true", help="write only a compact local status snapshot")
     add_home(complexity_parser)
@@ -927,8 +1251,42 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _policy_validate(args)
             elif args.policy_command == "diff":
                 _policy_diff(args)
-            else:
+            elif args.policy_command == "apply":
                 _policy_apply(args)
+            elif args.policy_command == "audit":
+                if not _policy_audit(args):
+                    return 1
+            else:
+                _policy_evidence(args)
+        elif args.command == "task":
+            if args.task_command == "init":
+                _task_init(args)
+            elif args.task_command == "establish":
+                _task_establish(args)
+            elif args.task_command == "validate":
+                _, contract = assurance.load_contract(args.repo)
+                if args.format == "json":
+                    print(json.dumps({"schema_version": 1, "valid": True, "status": contract["status"]}, indent=2, sort_keys=True))
+                else:
+                    print("Task contract validation passed.")
+            elif not _task_result(args, receipt=args.task_command == "receipt"):
+                return 1
+        elif args.command == "component":
+            if args.component_command == "inspect":
+                if not _component_inspect(args):
+                    return 1
+            elif args.component_command == "audit":
+                if not _component_audit(args):
+                    return 1
+            elif args.component_command == "trust":
+                _component_trust(args)
+            elif args.component_command == "list":
+                _component_list(args)
+            else:
+                _component_revoke(args)
+        elif args.command == "skills":
+            if not _skills_audit(args):
+                return 1
         elif args.command == "receipt":
             _receipt(args)
         elif args.command == "statusline":

@@ -1,6 +1,6 @@
 ---
 name: workstation-secrets-pki
-description: Inspect secret and certificate metadata and review PKI source without exposing protected values. Use for expiry, issuer, fingerprint, rotation, and access-policy analysis; do not use to retrieve secret values, private keys, raw tokens, kubeconfigs, decrypted files, or keystore passwords.
+description: Inspect secret/certificate metadata and PKI source for expiry, issuer, fingerprint, rotation, and access policy. Never retrieve secret values, private keys, raw tokens, kubeconfigs, decrypted files, or keystore passwords.
 ---
 
 # Secrets and PKI workflow

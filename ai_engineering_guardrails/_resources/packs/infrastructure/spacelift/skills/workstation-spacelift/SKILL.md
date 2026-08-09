@@ -1,6 +1,6 @@
 ---
 name: workstation-spacelift
-description: Collect and summarise read-only Spacelift evidence through spacectl, GraphQL queries, or read-scoped MCP tools while protecting tokens, logs, outputs, and run state. Use for stack/run/resource investigation and schema lookup; do not use for deploy, confirmation, tasks, cancellation, token export, GraphQL mutation, MCP writes, local preview, or profile changes.
+description: Collect read-only Spacelift stack, run, resource, and schema evidence through spacectl, GraphQL, or read-scoped MCP tools. Never deploy, confirm, run tasks, cancel, export tokens, mutate GraphQL/MCP state, preview locally, or change profiles.
 ---
 
 # Spacelift read-only workflow

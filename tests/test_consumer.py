@@ -73,6 +73,8 @@ class ConsumerJourneyTests(unittest.TestCase):
         self.assertEqual(0, result, errors)
         self.assertEqual(before_preview, self.snapshot())
         self.assertIn("Detected products: OpenAI Codex, Cursor", preview)
+        self.assertIn("Repository capability detection: not run by install/update", preview)
+        self.assertIn("ai-guardrails packs detect --repo <path>", preview)
         self.assertIn("Default safety posture", preview)
         self.assertIn("Normal application development: enabled", preview)
         self.assertIn("Infrastructure observation and local validation/planning: enabled", preview)
@@ -101,15 +103,17 @@ class ConsumerJourneyTests(unittest.TestCase):
         self.assertIn("Installation integrity: passed", installed_output)
         installed_state = json.loads((self.home / state.STATE_RELATIVE).read_text(encoding="utf-8"))
         self.assertEqual({"codex", "cursor"}, set(installed_state["products"]))
-        expected_packs = set(packs.load_packs())
+        expected_packs = set(packs.default_pack_ids())
+        expected_skill_packs = set(packs.default_skill_pack_ids())
         for product in ("codex", "cursor"):
             product_state = installed_state["products"][product]
             self.assertEqual(expected_packs, set(product_state["installed_packs"]))
+            self.assertEqual(expected_skill_packs, set(product_state["installed_skill_packs"]))
             self.assertEqual("none", product_state["routing_profile"])
             self.assertEqual("infrastructure-observe", product_state["safety_profile"])
             self.assertEqual({}, product_state["model_overrides"])
         self.assertTrue((self.home / ".agents/skills/workstation-java/SKILL.md").is_file())
-        self.assertTrue((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").is_file())
+        self.assertFalse((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").exists())
         self.assertFalse((self.home / ".codex/agents").exists())
         self.assertFalse((self.home / ".cursor/agents").exists())
         self.assertEqual(self.original_codex_config, (self.home / ".codex/config.toml").read_bytes())
@@ -181,6 +185,43 @@ class ConsumerJourneyTests(unittest.TestCase):
         )
         self.assertEqual(self.original_cursor_hooks, (self.home / ".cursor/hooks.json").read_bytes())
         self.assertTrue((self.bin / "cursor").is_file())
+
+    def test_install_and_update_do_not_scan_the_current_directory(self) -> None:
+        with mock.patch(
+            "ai_engineering_guardrails.cli.packs.detect_packs",
+            side_effect=AssertionError("install/update must not scan the current directory"),
+        ):
+            result, install_output, errors = self.run_cli(
+                ["install", "--product", "codex", "--home", str(self.home)]
+            )
+            self.assertEqual(0, result, errors)
+            self.assertIn("Repository capability detection: not run", install_output)
+
+            result, update_output, errors = self.run_cli(
+                ["update", "--product", "codex", "--home", str(self.home), "--verbose"]
+            )
+            self.assertEqual(0, result, errors)
+            self.assertIn("Repository capability detection: not run", update_output)
+
+    def test_skill_catalogue_cli_option_previews_full_managed_exposure(self) -> None:
+        before = self.snapshot()
+
+        result, output, errors = self.run_cli(
+            [
+                "install",
+                "--product",
+                "codex",
+                "--home",
+                str(self.home),
+                "--skill-catalogue",
+                "all",
+                "--dry-run",
+            ]
+        )
+
+        self.assertEqual(0, result, errors)
+        self.assertEqual(before, self.snapshot())
+        self.assertIn("Global skill catalogue: 22 pack skill(s), plus six core skills", output)
 
     def test_no_detected_product_reports_explicit_command_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

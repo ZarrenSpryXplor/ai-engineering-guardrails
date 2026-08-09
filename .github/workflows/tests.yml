@@ -50,6 +50,13 @@ jobs:
           CI_SUMMARY_PLATFORM: Ubuntu / Python 3.11
         run: python tools/ci.py validate
 
+      - name: Audit policy evidence, portable skills, and one bundled component
+        id: assurance
+        run: |
+          python tools/guardrails.py policy audit
+          python tools/guardrails.py skills audit
+          python tools/guardrails.py component inspect ai_engineering_guardrails/_resources/skills/workstation-safe-change --format json
+
       - name: Run tests
         id: unit_tests
         env:
@@ -100,6 +107,7 @@ jobs:
             Build generated output=${{ steps.build.outcome }}
             Generated output committed=${{ steps.generated.outcome }}
             Validate=${{ steps.validate.outcome }}
+            Policy evidence, skills, and component audit=${{ steps.assurance.outcome }}
             Unit tests=${{ steps.unit_tests.outcome }}
             Compile=${{ steps.compile.outcome }}
             Build distributions=${{ steps.package.outcome }}
@@ -206,6 +214,19 @@ jobs:
           CI_SUMMARY_PLATFORM: ${{ runner.os }} / Python 3.11
         run: python tools/ci.py test tests.test_ide_adapters -v
 
+      - name: Exercise Windows path and junction boundaries
+        id: windows_boundaries
+        if: runner.os == 'Windows' && steps.tooling.outcome == 'success'
+        env:
+          CI_TEST_SUMMARY_TITLE: Windows filesystem boundary tests
+          CI_SUMMARY_PLATFORM: Windows / Python 3.11
+        run: >-
+          python tools/ci.py test
+          tests.test_assurance.AssuranceTests.test_task_paths_reject_absolute_windows_and_unc_syntax_on_every_host
+          tests.test_components.ComponentTests.test_windows_junction_is_rejected_before_component_or_skill_read
+          tests.test_install.InstallTests.test_windows_path_containment_is_case_insensitive
+          -v
+
       - name: Summarize job
         if: always()
         env:
@@ -218,4 +239,5 @@ jobs:
             Install tooling=${{ steps.tooling.outcome }}
             Installed wheel smoke=${{ steps.package_smoke.outcome }}
             IDE adapter tests=${{ steps.ide_tests.outcome }}
+            Windows filesystem boundaries=${{ steps.windows_boundaries.outcome }}
         run: python tools/ci.py summary

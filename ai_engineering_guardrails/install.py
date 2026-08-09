@@ -374,7 +374,7 @@ def _install_json_hook(
 def _managed_paths_for_product(
     home: Path,
     product: str,
-    selected_packs: Sequence[str],
+    skill_packs: Sequence[str],
     routing_profile: str,
     model_overrides: Mapping[str, Mapping[str, str]] | None,
     generated_artifacts: Mapping[Path, bytes],
@@ -411,7 +411,7 @@ def _managed_paths_for_product(
 
     skill_sources = [source.parent for source in policy.discover_skills()]
     available = packs.load_packs()
-    for identifier in selected_packs:
+    for identifier in skill_packs:
         skill_sources.extend(source.parent for source in packs.pack_skill_files(available[identifier]))
     paths.extend(_skill_root(home, product) / source.name for source in skill_sources)
 
@@ -427,6 +427,7 @@ def _runtime_payloads(
     home: Path,
     product: str,
     selected_packs: Sequence[str],
+    skill_packs: Sequence[str],
     routing_profile: str,
     safety_profile: str,
     trust_mode: str,
@@ -464,13 +465,14 @@ def _runtime_payloads(
             for path in _managed_paths_for_product(
                 home,
                 product,
-                selected_packs,
+                skill_packs,
                 routing_profile,
                 model_overrides,
                 generated_artifacts,
             )
         ],
         "installed_packs": list(selected_packs),
+        "installed_skill_packs": list(skill_packs),
     }
     payloads = {
         "hook_runtime.py": (Path(__file__).with_name("enforcement.py")).read_bytes(),
@@ -1106,6 +1108,28 @@ def _agent_root(home: Path, product: str) -> Path:
     return home_path(home, relative)
 
 
+def known_component_paths(home: Path) -> tuple[Path, ...]:
+    """Return only product locations relevant to static component inspection.
+
+    This deliberately shares the installer's product-path knowledge so the
+    component auditor does not grow its own product registry.  Callers decide
+    whether an existing file or a child of an existing directory is inspected.
+    """
+    selected = home.expanduser().resolve(strict=False)
+    paths = {
+        *(_skill_root(selected, product) for product in PRODUCTS),
+        *(_agent_root(selected, product) for product in PRODUCTS),
+        codex_home(selected) / "AGENTS.md",
+        codex_home(selected) / "config.toml",
+        home_path(selected, ".claude/settings.json"),
+        home_path(selected, ".claude/rules"),
+        home_path(selected, ".cursor/hooks.json"),
+        home_path(selected, ".copilot/instructions"),
+        home_path(selected, ".copilot/hooks"),
+    }
+    return tuple(sorted(paths, key=lambda item: str(item)))
+
+
 def _jetbrains_copilot_target(home: Path) -> Path | None:
     """Return only the documented platform destination, always below --home."""
     if sys.platform == "darwin":
@@ -1119,7 +1143,7 @@ def _install_skills(
     product: str,
     home: Path,
     current_state: Mapping[str, Any],
-    selected_packs: Sequence[str],
+    skill_packs: Sequence[str],
     *,
     force: bool,
     dry_run: bool,
@@ -1139,7 +1163,7 @@ def _install_skills(
             )
         )
     available = packs.load_packs()
-    for identifier in selected_packs:
+    for identifier in skill_packs:
         for skill_file in packs.pack_skill_files(available[identifier]):
             records.append(
                 state.install_directory(
@@ -1414,7 +1438,7 @@ def _preflight_collisions(
     products: Sequence[str],
     home: Path,
     current_state: Mapping[str, Any],
-    selected_packs: Sequence[str],
+    skill_packs: Sequence[str],
     routing_profile: str,
     model_overrides: Mapping[str, Mapping[str, str]] | None,
     generated_artifacts: Mapping[Path, bytes],
@@ -1427,7 +1451,7 @@ def _preflight_collisions(
         for target in _managed_paths_for_product(
             home,
             product,
-            selected_packs,
+            skill_packs,
             routing_profile,
             model_overrides,
             generated_artifacts,
@@ -1510,7 +1534,7 @@ def _preflight_collisions(
                 )
         skill_sources = [path.parent for path in policy.discover_skills()]
         available = packs.load_packs()
-        for identifier in selected_packs:
+        for identifier in skill_packs:
             skill_sources.extend(path.parent for path in packs.pack_skill_files(available[identifier]))
         for source in skill_sources:
             target = _skill_root(home, product) / source.name
@@ -1624,6 +1648,9 @@ def _selected_installation_is_current(
                 return False
         if tuple(existing.get("installed_packs", [])) != tuple(expected["installed_packs"]):
             return False
+        existing_skill_packs = existing.get("installed_skill_packs", existing.get("installed_packs", []))
+        if tuple(existing_skill_packs) != tuple(expected["installed_skill_packs"]):
+            return False
         if dict(existing.get("model_overrides", {})) != dict(expected["model_overrides"]):
             return False
         records = state.product_records(current, product)
@@ -1659,6 +1686,7 @@ def install(
     dry_run: bool,
     pack_ids: Sequence[str] = (),
     all_packs: bool = False,
+    skill_catalogue: str | None = None,
     routing_profile: str | None = None,
     statusline_profile: str | None = None,
     safety_profile: str | None = None,
@@ -1679,6 +1707,8 @@ def install(
         raise GuardrailsError(f"unknown routing profile: {routing_profile}")
     if statusline_profile is not None and statusline_profile not in terminal_ux.STATUSLINE_PROFILES:
         raise GuardrailsError(f"unknown status-line profile: {statusline_profile}")
+    if skill_catalogue not in {None, "contextual", "all"}:
+        raise GuardrailsError(f"unknown skill catalogue: {skill_catalogue}")
     if model_overrides and sorted(set(model_overrides) - set(selected_products)):
         raise GuardrailsError("model override references a product outside the selected installation")
     # Validate the overlay before collision detection or any user-home mutation.
@@ -1687,7 +1717,8 @@ def install(
     packs_were_selected = bool(pack_ids) or all_packs
     available_packs = packs.load_packs()
     requested_packs = _selected_packs(pack_ids, all_packs)
-    stable_default_packs = tuple(sorted(available_packs))
+    default_policy_packs = packs.default_pack_ids(available_packs)
+    contextual_skill_packs = packs.default_skill_pack_ids(available_packs)
     product_settings: dict[str, dict[str, Any]] = {}
     for product in selected_products:
         existing = current.get("products", {}).get(product, {})
@@ -1698,8 +1729,22 @@ def install(
         elif existing:
             selected_packs = tuple(str(value) for value in existing.get("installed_packs", []))
         else:
-            selected_packs = stable_default_packs
+            selected_packs = default_policy_packs
         selected_packs = packs.selected_pack_closure(selected_packs, available_packs)
+        existing_runtime_packs = tuple(str(value) for value in existing.get("installed_packs", []))
+        if skill_catalogue == "all":
+            skill_packs = selected_packs
+        elif skill_catalogue == "contextual":
+            skill_packs = tuple(identifier for identifier in selected_packs if identifier in contextual_skill_packs)
+        elif existing and existing_runtime_packs == selected_packs:
+            skill_packs = tuple(
+                str(value)
+                for value in existing.get("installed_skill_packs", existing.get("installed_packs", []))
+            )
+        elif packs_were_selected:
+            skill_packs = selected_packs
+        else:
+            skill_packs = tuple(identifier for identifier in selected_packs if identifier in contextual_skill_packs)
         selected_safety = safety_profile or str(existing.get("safety_profile", "infrastructure-observe"))
         selected_trust = trust_mode or str(existing.get("trust_mode", "trusted-workspace"))
         if selected_safety not in SAFETY_PROFILES or selected_trust not in TRUST_MODES:
@@ -1713,6 +1758,7 @@ def install(
         product_settings[product] = {
             "routing_profile": profile,
             "installed_packs": selected_packs,
+            "installed_skill_packs": skill_packs,
             "safety_profile": selected_safety,
             "trust_mode": selected_trust,
             "model_overrides": selected_overrides,
@@ -1732,7 +1778,7 @@ def install(
             (product,),
             home,
             current,
-            selected_packs,
+            skill_packs,
             profile,
             product_overrides,
             generated_artifacts,
@@ -1762,6 +1808,7 @@ def install(
         settings = product_settings[product]
         profile = settings["routing_profile"]
         selected_packs = settings["installed_packs"]
+        skill_packs = settings["installed_skill_packs"]
         selected_safety = settings["safety_profile"]
         selected_trust = settings["trust_mode"]
         selected_overrides = settings["model_overrides"]
@@ -1774,6 +1821,7 @@ def install(
             home,
             product,
             selected_packs,
+            skill_packs,
             profile,
             selected_safety,
             selected_trust,
@@ -1845,7 +1893,7 @@ def install(
                 )
             )
         product_records.extend(
-            _install_skills(product, home, product_state, selected_packs, force=force, dry_run=dry_run)
+            _install_skills(product, home, product_state, skill_packs, force=force, dry_run=dry_run)
         )
         product_records.extend(
             _install_agents(
@@ -1874,6 +1922,7 @@ def install(
             "safety_profile": selected_safety,
             "trust_mode": selected_trust,
             "installed_packs": list(selected_packs),
+            "installed_skill_packs": list(skill_packs),
             "model_overrides": selected_overrides,
             "managed": product_records,
             "model_availability": "unverified",
@@ -2043,6 +2092,13 @@ def install(
         )
     )
     print(
+        "installed pack skills: "
+        + "; ".join(
+            f"{product}={','.join(product_settings[product]['installed_skill_packs']) or 'none'}"
+            for product in selected_products
+        )
+    )
+    print(
         "routing profiles: "
         + ", ".join(f"{product}={product_settings[product]['routing_profile']}" for product in selected_products)
         + "; model availability: unverified; main-session model unchanged"
@@ -2088,7 +2144,6 @@ def update(
 def print_consumer_install_summary(
     report: Mapping[str, Any],
     detected: Mapping[str, Sequence[str]],
-    repository_detection: packs.DetectionResult,
 ) -> None:
     home = Path(str(report["home"]))
     products = tuple(str(product) for product in report["products"])
@@ -2100,12 +2155,12 @@ def print_consumer_install_summary(
     if tuple(product for product in PRODUCTS if product in detected) != products:
         print("Selected products: " + ", ".join(selected_labels) + " (explicit selection)")
     print("Build and local compatibility validation: passed")
-    print(
-        "Repository capability detection: complete "
-        f"({len(repository_detection.active_packs)} currently relevant capability area(s))"
-    )
+    print("Repository capability detection: not run by install/update")
+    print("Repository capability command: ai-guardrails packs detect --repo <path>")
     stable_pack_count = len({pack for product in products for pack in settings[product]["installed_packs"]})
-    print(f"Capability guidance: {stable_pack_count} stable pack(s), installed as on-demand skills")
+    skill_pack_count = len({pack for product in products for pack in settings[product]["installed_skill_packs"]})
+    print(f"Capability policy: {stable_pack_count} selected pack(s)")
+    print(f"Global skill catalogue: {skill_pack_count} pack skill(s), plus six core skills")
 
     print("\nDefault safety posture")
     print("- Normal application development: enabled")
@@ -2355,6 +2410,9 @@ def status(
             product_result["trust_mode"] = product_data.get("trust_mode", "trusted-workspace")
             product_result["model_availability"] = "unverified"
             product_result["installed_packs"] = product_data.get("installed_packs", [])
+            product_result["installed_skill_packs"] = product_data.get(
+                "installed_skill_packs", product_data.get("installed_packs", [])
+            )
             if legacy_state:
                 product_result["state_format"] = "legacy; will migrate on the next successful install or update"
             product_result["shell_enforcement"] = "configured" if any(
@@ -2462,6 +2520,8 @@ def status(
         if product_result.get("installed_packs") is not None:
             installed = product_result.get("installed_packs") or []
             print(f"  packs: {', '.join(installed) if installed else 'none'}")
+            skill_packs = product_result.get("installed_skill_packs") or []
+            print(f"  globally exposed pack skills: {', '.join(skill_packs) if skill_packs else 'none'}")
             print(f"  shell enforcement: {product_result.get('shell_enforcement', 'missing')}")
             print(f"  structured-tool enforcement: {product_result.get('structured_tool_enforcement', 'missing')}")
             print(f"  Spacelift MCP: {product_result.get('spacelift_mcp_enforcement', 'pack not installed')}")

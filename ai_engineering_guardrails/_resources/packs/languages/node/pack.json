@@ -4,6 +4,8 @@
   "type": "language",
   "description": "Node.js, JavaScript, and TypeScript projects using npm, pnpm, Yarn, or workspace tools.",
   "file_detectors": ["package.json", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", ".yarnrc.yml", "turbo.json", "nx.json", "lerna.json", "tsconfig*.json", "eslint.config.*", ".eslintrc*", "vite.config.*", "webpack.config.*"],
+  "dependency_manifests": ["package.json"],
+  "dependency_lockfiles": ["package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock"],
   "directory_detectors": [],
   "explicit_exclusions": ["**/node_modules/**", "**/.yarn/cache/**", "**/.next/**", "**/vendor/**"],
   "dependent_packs": ["dependency-management", "package-publication", "sensitive-output"],

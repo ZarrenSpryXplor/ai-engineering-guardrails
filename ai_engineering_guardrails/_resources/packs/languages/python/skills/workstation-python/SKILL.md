@@ -1,6 +1,6 @@
 ---
 name: workstation-python
-description: Inspect, change, and verify Python projects using their existing environment, package, lock, test, lint, format, and type-check tools. Use for bounded Python implementation or dependency work; do not use for system-Python installation, package publication, TLS bypass, lock-manager migration, or applying database migrations.
+description: Inspect, change, test, lint, type-check, and package Python projects with their existing environment and lock tooling. Never alter system Python, publish packages, bypass TLS, migrate lock managers, or apply database migrations.
 ---
 
 # Python repository workflow

@@ -1,6 +1,6 @@
 ---
 name: workstation-node
-description: Inspect, change, and verify Node.js, JavaScript, or TypeScript workspaces using the repository-selected npm, pnpm, or Yarn version and local scripts. Use for bounded implementation, dependency, or workspace work; do not use for package publication, global installation, unpinned remote execution, forced audit remediation, or blind snapshot updates.
+description: Inspect, change, and verify Node.js, JavaScript, and TypeScript workspaces with the repository's npm, pnpm, or Yarn version and scripts. Never publish packages, install globally, execute unpinned remotes, force audit fixes, or update snapshots blindly.
 ---
 
 # Node repository workflow

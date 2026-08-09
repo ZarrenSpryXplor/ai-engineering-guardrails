@@ -1,6 +1,6 @@
 ---
 name: workstation-infrastructure-review
-description: Review infrastructure source or a proposed remote operation using lifecycle, target, blast-radius, secret, rollback, and platform-control evidence. Use for Kubernetes, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, Azure, containers, databases, or Spacelift review; do not use to execute remote mutations or reveal sensitive output.
+description: Review infrastructure source/operations across Kubernetes, Helm, Kustomize, Terraform/OpenTofu/Terragrunt, Azure, containers, databases, and Spacelift for target, blast radius, secrets, rollback, and platform controls. Never mutate remote systems or reveal sensitive output.
 ---
 
 <!-- GENERATED — DO NOT EDIT

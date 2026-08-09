@@ -54,10 +54,14 @@ def render_policy(
     manifest_path: Path,
     local_fragments: Sequence[Mapping[str, Any]] = (),
 ) -> str:
-    sections = [
-        (manifest_path.parent / entry["path"]).read_text(encoding="utf-8").strip()
+    entries = [
+        entry
         for entry in manifest["fragments"]
         if product in entry["products"] and entry["load"] == "always"
+    ]
+    sections = [
+        (manifest_path.parent / entry["path"]).read_text(encoding="utf-8").strip()
+        for entry in entries
     ]
     sections.extend(
         str(fragment["content"]).strip()
@@ -68,6 +72,9 @@ def render_policy(
         raise GuardrailsError(f"generated {product} policy would be empty")
     output = one_newline(
         markdown_header("policy/manifest.json and policy/fragments/")
+        + "<!-- Canonical policy IDs: "
+        + ", ".join(str(entry["id"]) for entry in entries)
+        + " -->\n"
         + "\n# Workstation AI Guardrails\n\n"
         + "\n\n".join(sections)
     )
@@ -81,7 +88,9 @@ def render_policy(
 def render_claude_rule(entry: Mapping[str, Any], manifest_path: Path) -> str:
     source = manifest_path.parent / entry["path"]
     return one_newline(
-        markdown_header(f"policy/{entry['path']}") + "\n" + source.read_text(encoding="utf-8").strip()
+        markdown_header(f"policy/{entry['path']}")
+        + f"<!-- Canonical policy ID: {entry['id']} -->\n\n"
+        + source.read_text(encoding="utf-8").strip()
     )
 
 

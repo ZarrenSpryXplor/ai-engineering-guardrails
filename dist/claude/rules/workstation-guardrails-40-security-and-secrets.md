@@ -1,6 +1,7 @@
 <!-- GENERATED — DO NOT EDIT
 Canonical source: policy/fragments/40-security-and-secrets.md
 -->
+<!-- Canonical policy ID: security-and-secrets -->
 
 ## Security and secrets
 

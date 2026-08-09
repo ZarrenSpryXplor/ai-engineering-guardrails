@@ -4,6 +4,8 @@
   "type": "infrastructure",
   "description": "Helm charts and release workflows compatible with supported Helm 3 and Helm 4 forms.",
   "file_detectors": ["Chart.yaml", "Chart.lock", "values.yaml", "values.schema.json"],
+  "dependency_manifests": ["Chart.yaml"],
+  "dependency_lockfiles": ["Chart.lock"],
   "directory_detectors": ["charts", "templates"],
   "explicit_exclusions": ["**/vendor/**", "**/node_modules/**", "**/dist/**"],
   "dependent_packs": ["kubernetes", "sensitive-output"],

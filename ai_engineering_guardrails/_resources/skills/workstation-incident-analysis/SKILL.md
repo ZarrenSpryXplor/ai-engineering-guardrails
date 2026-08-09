@@ -1,6 +1,6 @@
 ---
 name: workstation-incident-analysis
-description: Investigate an operational or security incident without making production changes. Use for evidence collection and causal analysis; do not use to deploy remediation.
+description: Investigate operational or security incidents through evidence collection and causal analysis. Never make production changes or deploy remediation.
 ---
 
 # Workstation incident analysis

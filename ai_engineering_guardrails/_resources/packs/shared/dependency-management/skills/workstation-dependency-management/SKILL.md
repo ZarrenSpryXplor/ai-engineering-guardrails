@@ -1,6 +1,6 @@
 ---
 name: workstation-dependency-management
-description: Plan, implement, and verify bounded dependency changes while preserving the repository's manager, wrapper, lockfiles, module boundaries, and integrity controls. Use when a dependency change is necessary; do not use for unrelated upgrades, manager migration, global tooling changes, cache destruction, publication, or integrity bypass.
+description: Plan, implement, and verify dependency changes while preserving the repository's manager, wrapper, lockfiles, module boundaries, and integrity. Never perform unrelated upgrades, manager migration, global tooling changes, cache destruction, publication, or integrity bypass.
 ---
 
 # Dependency change workflow

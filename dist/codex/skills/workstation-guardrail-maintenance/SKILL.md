@@ -1,6 +1,6 @@
 ---
 name: workstation-guardrail-maintenance
-description: Change this guardrails repository or an explicitly selected local installation through its dedicated maintenance workflow. Use only with explicit user intent for policy, enforcement, routing, pack, installer, waiver, audit, scan, or generated-adapter changes; do not use as a bypass or to weaken tests for a desired command.
+description: Maintain this guardrails repository or a selected local installation: policy, enforcement, routing, packs, installer, waivers, audits, scans, and generated adapters. Requires explicit user intent; never bypass controls or weaken tests.
 ---
 
 <!-- GENERATED — DO NOT EDIT

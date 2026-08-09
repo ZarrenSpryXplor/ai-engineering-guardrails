@@ -656,6 +656,167 @@ class DecisionTests(unittest.TestCase):
                     self.assertEqual("guardrail-self-protection", decision.rule_id)
                     self.assertEqual("deny", decision.decision)
 
+    def test_component_trust_is_protected_but_offline_assurance_reads_are_safe(self) -> None:
+        protected = (
+            "ai-guardrails component trust ./third-party-skill "
+            "--expires-at 2027-01-01T00:00:00Z"
+        )
+        revoked = "ai-guardrails component revoke " + ("0" * 64)
+        module_forms = (
+            "python -m ai_engineering_guardrails component trust ./third-party-skill",
+            "python3 -m ai_engineering_guardrails component trust ./third-party-skill",
+            "py -m ai_engineering_guardrails component trust ./third-party-skill",
+            "/opt/python/bin/python3.12 -m ai_engineering_guardrails component trust ./third-party-skill",
+            "python tools/guardrails.py component trust ./third-party-skill",
+        )
+        for command in (protected, revoked, *module_forms):
+            with self.subTest(command=command):
+                match = enforcement.evaluate_command(command, self.policy)
+                self.assertIsNotNone(match)
+                self.assertEqual("guardrail-self-modification-shell", match["id"])
+        for command in (
+            "ai-guardrails policy audit",
+            "ai-guardrails policy evidence maintainability",
+            "ai-guardrails task validate --repo .",
+            "ai-guardrails task status --repo .",
+            "ai-guardrails task receipt --repo .",
+            "ai-guardrails component inspect ./third-party-skill",
+            "ai-guardrails component audit",
+            "ai-guardrails skills audit",
+            "python -m ai_engineering_guardrails component inspect ./third-party-skill",
+            "python3 -m ai_engineering_guardrails component list",
+            "py -m ai_engineering_guardrails policy audit",
+            "echo 'python -m ai_engineering_guardrails component trust ./third-party-skill'",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(enforcement.evaluate_command(command, self.policy))
+
+    def test_guardrail_help_and_verified_dry_runs_are_read_only_across_entrypoints(self) -> None:
+        entrypoints = (
+            "ai-guardrails",
+            "python tools/guardrails.py",
+            "python -m ai_engineering_guardrails",
+            "/opt/python/bin/python3.12 -m ai_engineering_guardrails",
+            "ai-guardrails.exe",
+            "python.exe -m ai_engineering_guardrails",
+            '"C:\\Program Files\\Python311\\python.exe" -m ai_engineering_guardrails',
+        )
+        dry_run_commands = (
+            "install",
+            "update",
+            "uninstall",
+            "statusline install",
+            "statusline uninstall",
+            "routing set balanced",
+            "jetbrains export-project-rules --repo .",
+            "policy init",
+            "policy apply",
+            "component trust ./third-party-skill",
+            "component revoke " + ("0" * 64),
+            "task establish --repo .",
+        )
+        for entrypoint in entrypoints:
+            for command in dry_run_commands:
+                with self.subTest(entrypoint=entrypoint, command=command, modifier="help"):
+                    self.assertIsNone(enforcement.evaluate_command(f"{entrypoint} {command} --help", self.policy))
+                with self.subTest(entrypoint=entrypoint, command=command, modifier="dry-run"):
+                    self.assertIsNone(enforcement.evaluate_command(f"{entrypoint} {command} --dry-run", self.policy))
+
+    def test_read_only_text_does_not_hide_guardrail_mutations(self) -> None:
+        for command in (
+            "ai-guardrails install -- --help",
+            "ai-guardrails install 'documentation mentions --help'",
+            "ai-guardrails waiver create --reason 'documentation mentions --dry-run'",
+        ):
+            with self.subTest(command=command):
+                match = enforcement.evaluate_command(command, self.policy)
+                self.assertIsNotNone(match)
+                self.assertEqual("guardrail-self-modification-shell", match["id"])
+        for command in (
+            "echo 'ai-guardrails install --help'",
+            "grep -R -- '--help' docs",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(enforcement.evaluate_command(command, self.policy))
+
+    def test_task_contract_establishment_is_guardrail_self_modification(self) -> None:
+        for command in (
+            "ai-guardrails task establish --repo .",
+            "python tools/guardrails.py task establish --repo .",
+            "python -m ai_engineering_guardrails task establish --repo .",
+            "python3 -m ai_engineering_guardrails task establish --repo .",
+            "py -m ai_engineering_guardrails task establish --repo .",
+        ):
+            with self.subTest(command=command):
+                match = enforcement.evaluate_command(command, self.policy)
+                self.assertIsNotNone(match)
+                self.assertEqual("guardrail-self-modification-shell", match["id"])
+
+    def test_python_interpreter_options_do_not_bypass_guardrail_mutation_denial(self) -> None:
+        options = (
+            "-q",
+            "-b",
+            "-bb",
+            "-d",
+            "-R",
+            "-qbb",
+            "-Werror",
+            "-Xdev",
+            "--check-hash-based-pycs always",
+        )
+        for executable in ("python", "python3", "python.exe", "py"):
+            for option in options:
+                command = f"{executable} {option} -m ai_engineering_guardrails task establish --repo ."
+                with self.subTest(command=command):
+                    match = enforcement.evaluate_command(command, self.policy)
+                    self.assertIsNotNone(match)
+                    self.assertEqual("guardrail-self-modification-shell", match["id"])
+
+    def test_windows_executable_suffixes_preserve_guardrails_mutation_boundaries(self) -> None:
+        entrypoints = (
+            "ai-guardrails.exe",
+            "python.exe -m ai_engineering_guardrails",
+            "python3.exe -m ai_engineering_guardrails",
+            "py.exe -m ai_engineering_guardrails",
+            '"C:\\Program Files\\Python311\\python.exe" -m ai_engineering_guardrails',
+        )
+        mutations = (
+            "install",
+            "update",
+            "uninstall",
+            "statusline install",
+            "statusline uninstall",
+            "routing set",
+            "jetbrains export-project-rules",
+            "policy init",
+            "policy apply",
+            "waiver create",
+            "waiver revoke",
+            "component trust",
+            "component revoke",
+            "task establish",
+        )
+        for entrypoint in entrypoints:
+            for mutation in mutations:
+                command = f"{entrypoint} {mutation} synthetic"
+                with self.subTest(command=command):
+                    match = enforcement.evaluate_command(command, self.policy)
+                    self.assertIsNotNone(match)
+                    self.assertEqual("guardrail-self-modification-shell", match["id"])
+
+            for read in (
+                "status",
+                "policy audit",
+                "task status --repo .",
+                "component inspect synthetic",
+                "component list",
+                "explain --command 'git status'",
+                "simulate git status",
+            ):
+                command = f"{entrypoint} {read}"
+                with self.subTest(command=command):
+                    self.assertIsNone(enforcement.evaluate_command(command, self.policy))
+
 
 class HookProtocolTests(unittest.TestCase):
     def run_hook(self, payload: str | dict[str, object]) -> subprocess.CompletedProcess[str]:
