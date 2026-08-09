@@ -1,6 +1,6 @@
 # Releasing to PyPI
 
-This repository is prepared for production PyPI publication, but Trusted Publishing is **not active** until a maintainer completes the remote setup below. The workflow deliberately publishes only after a human publishes a GitHub Release; it never publishes from a branch push, pull request, schedule, tag push, or local checkout.
+Production releases are published to [PyPI](https://pypi.org/project/ai-engineering-guardrails/) through GitHub OIDC Trusted Publishing. The workflow deliberately publishes only after a human publishes a GitHub Release; it never publishes from a branch push, pull request, schedule, tag push, or local checkout.
 
 ## Verified release assumptions — 2026-08-09
 
@@ -10,7 +10,9 @@ This repository is prepared for production PyPI publication, but Trusted Publish
 
 The production workflow is `.github/workflows/publish-pypi.yml`. It accepts the repository convention `v<package-version>`: a package version of `1.2.3` must be released from tag `v1.2.3`. Pre-release versions use the same rule, for example `1.2.3rc1` and `v1.2.3rc1`.
 
-## One-time maintainer setup
+## Trusted Publisher configuration
+
+The following was required before the first release and remains the configuration to verify before changing the release workflow. Do not add a duplicate publisher or a registry secret merely because a release is already live.
 
 ### GitHub
 
@@ -44,7 +46,7 @@ flowchart TD
 
 The build job has read-only repository permission and no OIDC publishing permission. The publish job neither checks out source nor builds packages; it downloads only the validated artifact, has `id-token: write`, and runs the official PyPA publisher. A duplicate version fails loudly—there is no `skip-existing` setting. The PyPA action produces PyPI publish attestations by default; this repository does not add custom signing code.
 
-## First and subsequent releases
+## Each release
 
 1. Ensure `main` is clean, protected, and all required CI checks are green.
 2. Review [CHANGELOG.md](../CHANGELOG.md) and confirm the intended version in `ai_engineering_guardrails.__version__`:
@@ -78,6 +80,14 @@ Do not recreate an existing GitHub Release or re-upload a PyPI version to force 
 
 No TestPyPI workflow is included. A manual Trusted Publishing rehearsal would duplicate the restrictive build and privileged publish jobs, while the official PyPA action does not support Trusted Publishing from reusable workflows. Add a separate, explicitly reviewed TestPyPI workflow later only if its maintenance cost is justified; it requires a distinct `testpypi` GitHub Environment and a separate TestPyPI Trusted Publisher.
 
-## User installation note
+## User installation
 
-This documentation prepares publication; it does not assert that a version is already available from PyPI. Until the first successful PyPI publication, use a reviewed clone or reviewed wheel. After publication, `pipx install ai-engineering-guardrails` is the supported installation route.
+Install the published package from a clean environment:
+
+```sh
+pipx install ai-engineering-guardrails
+ai-guardrails --version
+ai-guardrails install --dry-run
+```
+
+For contributor work, use a reviewed clone or wheel instead of treating a moving Git branch as a release artifact.
