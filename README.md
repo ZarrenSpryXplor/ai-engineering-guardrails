@@ -42,6 +42,8 @@ For a direct Git install, pin a reviewed tag or full commit rather than a moving
 pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git@<reviewed-tag-or-full-commit>'
 ```
 
+PyPI Trusted Publishing is prepared, but this repository does not claim a package is already available there. After the first successful PyPI release, the supported command will be `pipx install ai-engineering-guardrails`; until then, use a reviewed clone or wheel. Maintainers should follow the [release guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/releasing.md).
+
 ## Optional extras
 
 **Terminal visibility** is opt-in. Claude Code can use a managed local status line; Codex uses its native `/statusline` fields; Cursor CLI keeps its documented `/status-indicators` control.

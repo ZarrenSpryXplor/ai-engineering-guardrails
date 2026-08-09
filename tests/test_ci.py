@@ -6,8 +6,10 @@ import io
 import os
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -22,6 +24,34 @@ CI_SPEC.loader.exec_module(CI_MODULE)
 
 
 class CiReportingTests(unittest.TestCase):
+    def write_release_artifacts(
+        self,
+        directory: Path,
+        *,
+        project_name: str = "ai-engineering-guardrails",
+        version: str = "1.2.3",
+        wheel_version: str | None = None,
+        sdist_version: str | None = None,
+    ) -> tuple[Path, Path]:
+        filename_name = project_name.replace("-", "_")
+
+        def metadata(value: str) -> bytes:
+            return f"Metadata-Version: 2.3\nName: {project_name}\nVersion: {value}\n".encode("utf-8")
+
+        wheel = directory / f"{filename_name}-{version}-py3-none-any.whl"
+        with zipfile.ZipFile(wheel, "w") as archive:
+            archive.writestr(
+                f"{filename_name}-{version}.dist-info/METADATA",
+                metadata(wheel_version or version),
+            )
+        sdist = directory / f"{project_name}-{version}.tar.gz"
+        payload = metadata(sdist_version or version)
+        member = tarfile.TarInfo(f"{project_name}-{version}/PKG-INFO")
+        member.size = len(payload)
+        with tarfile.open(sdist, "w:gz") as archive:
+            archive.addfile(member, io.BytesIO(payload))
+        return wheel, sdist
+
     def run_ci(self, arguments: list[str], environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(CI_TOOL), *arguments],
@@ -208,6 +238,53 @@ class SampleTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertFalse(summary.exists())
+
+    def test_release_tag_validation_requires_documented_v_prefix(self) -> None:
+        self.assertEqual("1.2.3", CI_MODULE.validate_release_tag("v1.2.3", "1.2.3"))
+        self.assertEqual("1.2.3rc1", CI_MODULE.validate_release_tag("v1.2.3rc1", "1.2.3rc1"))
+        for tag in ("1.2.3", "v1.2.4", "release-1.2.3"):
+            with self.subTest(tag=tag):
+                with self.assertRaises(ValueError):
+                    CI_MODULE.validate_release_tag(tag, "1.2.3")
+
+    def test_release_artifact_validation_accepts_one_matching_wheel_and_sdist(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            wheel, sdist = self.write_release_artifacts(directory)
+
+            self.assertEqual(
+                (wheel, sdist),
+                CI_MODULE.validate_release_artifacts(
+                    directory,
+                    project_name="ai-engineering-guardrails",
+                    package_version="1.2.3",
+                ),
+            )
+
+    def test_release_artifact_validation_rejects_missing_duplicate_and_unexpected_files(self) -> None:
+        cases = ("missing-wheel", "duplicate-wheel", "unexpected-file", "metadata-mismatch")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                wheel, _ = self.write_release_artifacts(directory)
+                if case == "missing-wheel":
+                    wheel.unlink()
+                elif case == "duplicate-wheel":
+                    duplicate = directory / "ai_engineering_guardrails-1.2.3-py2-none-any.whl"
+                    duplicate.write_bytes(wheel.read_bytes())
+                elif case == "unexpected-file":
+                    (directory / "SHA256SUMS").write_text("not a distribution", encoding="utf-8")
+                else:
+                    for path in directory.iterdir():
+                        path.unlink()
+                    self.write_release_artifacts(directory, wheel_version="1.2.4")
+
+                with self.assertRaises(ValueError):
+                    CI_MODULE.validate_release_artifacts(
+                        directory,
+                        project_name="ai-engineering-guardrails",
+                        package_version="1.2.3",
+                    )
 
 
 if __name__ == "__main__":

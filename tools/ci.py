@@ -3,12 +3,17 @@
 
 from __future__ import annotations
 
+from email.parser import BytesParser
 import os
 import platform
+import re
 import subprocess
 import sys
+import tarfile
 import time
+import tomllib
 import unittest
+import zipfile
 from pathlib import Path
 from typing import Sequence
 
@@ -25,6 +30,110 @@ OUTCOME_LABELS = {
     "skipped": "Skipped",
     "unknown": "Unknown",
 }
+
+
+def _normalise_distribution_name(value: str) -> str:
+    """Return the filename form of a Python distribution name."""
+    return re.sub(r"[-_.]+", "_", value).lower()
+
+
+def _package_metadata() -> tuple[str, str]:
+    """Read the package name and its existing single-sourced version."""
+    data = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    name = data.get("project", {}).get("name")
+    if not isinstance(name, str) or not name:
+        raise ValueError("pyproject.toml does not contain a project name")
+    from ai_engineering_guardrails import __version__
+
+    if not isinstance(__version__, str) or not __version__:
+        raise ValueError("package version is not a non-empty string")
+    return name, __version__
+
+
+def validate_release_tag(tag: str, package_version: str | None = None) -> str:
+    """Require the project's documented ``v<version>`` release-tag convention."""
+    _, version = _package_metadata()
+    expected_version = package_version or version
+    expected_tag = f"v{expected_version}"
+    if tag != expected_tag:
+        raise ValueError(f"release tag must be {expected_tag!r}; received {tag!r}")
+    return expected_version
+
+
+def _metadata_from_bytes(content: bytes, label: str) -> tuple[str, str]:
+    parsed = BytesParser().parsebytes(content)
+    name = parsed.get("Name")
+    version = parsed.get("Version")
+    if not isinstance(name, str) or not name or not isinstance(version, str) or not version:
+        raise ValueError(f"{label} does not contain required Name and Version metadata")
+    return name, version
+
+
+def _validate_distribution_metadata(content: bytes, label: str, project_name: str, version: str) -> None:
+    name, artifact_version = _metadata_from_bytes(content, label)
+    if _normalise_distribution_name(name) != _normalise_distribution_name(project_name):
+        raise ValueError(f"{label} metadata project name does not match {project_name!r}")
+    if artifact_version != version:
+        raise ValueError(f"{label} metadata version does not match {version!r}")
+
+
+def validate_release_artifacts(
+    directory: Path,
+    project_name: str | None = None,
+    package_version: str | None = None,
+) -> tuple[Path, Path]:
+    """Validate the exact wheel and sdist set a release workflow may publish."""
+    configured_name, configured_version = _package_metadata()
+    name = project_name or configured_name
+    version = package_version or configured_version
+    if not directory.is_dir():
+        raise ValueError(f"release directory does not exist: {directory}")
+
+    paths = sorted(directory.iterdir(), key=lambda path: path.name)
+    if any(not path.is_file() for path in paths):
+        raise ValueError("release directory must contain files only")
+    unexpected = [path.name for path in paths if not (path.name.endswith(".whl") or path.name.endswith(".tar.gz"))]
+    if unexpected:
+        raise ValueError("release directory contains unexpected files: " + ", ".join(unexpected))
+
+    wheels = [path for path in paths if path.name.endswith(".whl")]
+    sdists = [path for path in paths if path.name.endswith(".tar.gz")]
+    if len(wheels) != 1 or len(sdists) != 1:
+        raise ValueError("release directory must contain exactly one wheel and one source distribution")
+
+    wheel, sdist = wheels[0], sdists[0]
+    normalised_name = _normalise_distribution_name(name)
+    if not wheel.name.startswith(f"{normalised_name}-{version}-"):
+        raise ValueError(f"wheel filename does not match {name!r} version {version!r}")
+    expected_sdist = f"{name}-{version}.tar.gz"
+    if sdist.name != expected_sdist:
+        raise ValueError(f"source distribution filename must be {expected_sdist!r}")
+
+    with zipfile.ZipFile(wheel) as archive:
+        metadata_paths = [item for item in archive.namelist() if item.endswith(".dist-info/METADATA")]
+        if len(metadata_paths) != 1:
+            raise ValueError("wheel must contain exactly one dist-info/METADATA file")
+        _validate_distribution_metadata(archive.read(metadata_paths[0]), wheel.name, name, version)
+
+    with tarfile.open(sdist, mode="r:gz") as archive:
+        try:
+            metadata_member = archive.getmember(f"{name}-{version}/PKG-INFO")
+        except KeyError as error:
+            raise ValueError("source distribution does not contain root PKG-INFO") from error
+        if not metadata_member.isfile():
+            raise ValueError("source distribution root PKG-INFO is not a regular file")
+        handle = archive.extractfile(metadata_member)
+        if handle is None:
+            raise ValueError("source distribution PKG-INFO cannot be read")
+        _validate_distribution_metadata(handle.read(), sdist.name, name, version)
+
+    return wheel, sdist
+
+
+def _required_option(arguments: Sequence[str], option: str, usage: str) -> str:
+    if len(arguments) != 2 or arguments[0] != option or not arguments[1]:
+        raise ValueError(f"usage: {usage}")
+    return arguments[1]
 
 
 def _summary_path() -> Path | None:
@@ -185,10 +294,34 @@ def write_job_summary() -> int:
     return 0
 
 
+def run_release_tag_check(arguments: Sequence[str]) -> int:
+    """Check that a published GitHub Release tag matches the package version."""
+    try:
+        tag = _required_option(arguments, "--tag", "ci.py release-tag --tag v<package-version>")
+        version = validate_release_tag(tag)
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print(f"release tag matches package version: {tag} ({version})")
+    return 0
+
+
+def run_release_artifact_check(arguments: Sequence[str]) -> int:
+    """Check the narrow artifact set supplied to the privileged publish job."""
+    try:
+        directory = Path(_required_option(arguments, "--directory", "ci.py release-artifacts --directory release"))
+        wheel, sdist = validate_release_artifacts(directory)
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print(f"release artifacts validated: {wheel.name}, {sdist.name}")
+    return 0
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     values = list(sys.argv[1:] if arguments is None else arguments)
     if not values:
-        print("usage: ci.py {test|validate|summary} [...]", file=sys.stderr)
+        print("usage: ci.py {test|validate|summary|release-tag|release-artifacts} [...]", file=sys.stderr)
         return 2
     command = values.pop(0)
     if command == "test":
@@ -197,7 +330,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return run_validation()
     if command == "summary" and not values:
         return write_job_summary()
-    print("usage: ci.py {test|validate|summary} [...]", file=sys.stderr)
+    if command == "release-tag":
+        return run_release_tag_check(values)
+    if command == "release-artifacts":
+        return run_release_artifact_check(values)
+    print("usage: ci.py {test|validate|summary|release-tag|release-artifacts} [...]", file=sys.stderr)
     return 2
 
 
