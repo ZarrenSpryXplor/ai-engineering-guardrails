@@ -1,5 +1,7 @@
 # AI engineering workstation guardrails (fewer sharp edges)
 
+[![Tests](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml)
+
 AI coding agents can inspect repositories, edit files, run commands, and call external tools. This project gives those agents one vendor-neutral set of engineering expectations and installs product-specific adapters for OpenAI Codex, Anthropic Claude Code, Cursor, GitHub Copilot in Visual Studio Code and Visual Studio, and JetBrains AI Assistant/Copilot for JetBrains. It is designed to make agent-assisted work more predictable: understand the repository first, preserve user changes, avoid secrets and destructive operations, verify the result, and report what actually happened.
 
 In other words, this is a local policy and enforcement kit for AI engineering work—useful guardrails for clever agents, without a tiny committee living in your terminal. The v1 layer covers workstation installation, routing, polyglot development, Ansible, Kubernetes/Helm/Terraform/Spacelift, explainability, waivers, audit receipts, trust, scanning, and risk verification. The v1.1 layer adds containers/OCI, Azure, source control and CI/CD, databases, observability, API/schema compatibility, secrets/PKI, and enterprise examples.
