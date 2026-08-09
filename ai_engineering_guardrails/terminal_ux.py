@@ -251,7 +251,9 @@ def claude_status_line(runtime: Path, profile: str, safety_profile: str, home: P
     return {"type": "command", "command": claude_command(runtime, profile, safety_profile, home)}
 
 
-def statusline_preview(product: str, profile: str, safety_profile: str = "infrastructure-observe") -> dict[str, Any]:
+def statusline_preview(
+    product: str, profile: str, safety_profile: str = "infrastructure-observe", *, ascii_only: bool = False
+) -> dict[str, Any]:
     if product not in STATUSLINE_PRODUCTS:
         raise GuardrailsError("terminal UX supports codex, claude, and cursor")
     if profile not in STATUSLINE_PROFILES:
@@ -268,7 +270,7 @@ def statusline_preview(product: str, profile: str, safety_profile: str = "infras
         "worktree": {"branch": "feature"},
     }
     sample["effort"] = {"level": "high"}
-    return {"product": product, "profile": profile, "integration": "managed", "example": terminal_renderer.render_status_line(sample, load_profiles(), profile, safety_profile, ascii_only=False, columns=120), "note": "Example uses synthetic documented Claude fields; missing native fields are omitted."}
+    return {"product": product, "profile": profile, "integration": "managed", "example": terminal_renderer.render_status_line(sample, load_profiles(), profile, safety_profile, ascii_only=ascii_only, columns=120), "note": "Example uses synthetic documented Claude fields; missing native fields are omitted."}
 
 
 def codex_setup(profile: str) -> str:

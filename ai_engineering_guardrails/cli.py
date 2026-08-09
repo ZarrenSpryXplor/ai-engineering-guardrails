@@ -44,6 +44,16 @@ def add_no_color(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-color", action="store_true", help="disable terminal colour (human output is currently unstyled)")
 
 
+def _human_ascii_only() -> bool:
+    """Use the terminal UX ASCII fallback when stdout cannot encode its symbols."""
+    encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+    try:
+        "🛡✓⚠🔥💨▓░".encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        return True
+    return False
+
+
 def parse_model_overrides(values: Sequence[str]) -> dict[str, dict[str, str]]:
     result: dict[str, dict[str, str]] = {}
     for value in values:
@@ -413,7 +423,10 @@ def _statusline_capabilities(args: argparse.Namespace) -> None:
 
 def _statusline_preview(args: argparse.Namespace) -> None:
     products = _statusline_products(args.product)
-    values = {product: terminal_ux.statusline_preview(product, args.profile) for product in products}
+    values = {
+        product: terminal_ux.statusline_preview(product, args.profile, ascii_only=args.format != "json" and _human_ascii_only())
+        for product in products
+    }
     if args.format == "json":
         print(json.dumps({"schema_version": 1, "products": values}, indent=2, sort_keys=True))
         return
@@ -500,7 +513,8 @@ def _complexity(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return
-    label = "KISS " + ({"clear": "✓", "review": "review", "high-change": "high-change"}[result["classification"]])
+    clear_label = "OK" if _human_ascii_only() else "✓"
+    label = "KISS " + ({"clear": clear_label, "review": "review", "high-change": "high-change"}[result["classification"]])
     print(label)
     if not result.get("available"):
         print("  " + result["limitation"])
@@ -519,7 +533,7 @@ def _receipt(args: argparse.Namespace) -> None:
         return
     if output_format == "compact":
         events = receipt["guardrail_events"]
-        print("🛡 Change summary" if args.fun else "Change summary")
+        print(("[G] Change summary" if _human_ascii_only() else "🛡 Change summary") if args.fun else "Change summary")
         print(f"  Repository          {receipt['repository_identifier_hash'][:12]}")
         print("  Products            " + ", ".join(receipt["products"]))
         print(f"  Files changed       {receipt['files_modified_count']}")
@@ -529,7 +543,7 @@ def _receipt(args: argparse.Namespace) -> None:
         print(f"  Policy              {str(receipt['policy_digest'])[:12]}")
         print("  Verification gaps   " + "; ".join(receipt["unverified_checks"]))
         return
-    print("🛡 Repository/change receipt" if args.fun else "Repository/change receipt")
+    print(("[G] Repository/change receipt" if _human_ascii_only() else "🛡 Repository/change receipt") if args.fun else "Repository/change receipt")
     print(json.dumps(receipt, indent=2, sort_keys=True))
 
 
@@ -579,7 +593,7 @@ def _demo(args: argparse.Namespace) -> None:
             {
                 "synthetic": True,
                 "profile": profile,
-                "line": terminal_ux.statusline_preview("claude", profile)["example"],
+                "line": terminal_ux.statusline_preview("claude", profile, ascii_only=args.format != "json" and _human_ascii_only())["example"],
             }
             for profile in terminal_ux.STATUSLINE_PROFILES
         ]
@@ -592,7 +606,8 @@ def _demo(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
-    print("🛡 Synthetic demonstration — no displayed command was executed" if args.fun else "Synthetic demonstration — no displayed command was executed")
+    header = "[G] Synthetic demonstration - no displayed command was executed" if _human_ascii_only() else "🛡 Synthetic demonstration — no displayed command was executed"
+    print(header if args.fun else "Synthetic demonstration - no displayed command was executed")
     for name, section in rendered.items():
         print(name + ":")
         for item in section:
