@@ -492,15 +492,25 @@ def validate_spacelift_policies() -> str:
     executable = shutil.which("opa")
     if executable is None:
         return "skipped semantic Rego execution (opa executable not available); structural checks passed"
-    result = subprocess.run(
-        [executable, "test", str(spacelift_root)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+
+    fixture = spacelift_root / "fixtures/guardrails.json"
+    policy_directories = sorted(
+        path.parent for path in spacelift_root.glob("*/guardrails.rego")
     )
-    if result.returncode != 0:
-        raise GuardrailsError("OPA semantic policy tests failed; run opa test platform-policies/spacelift for details")
+    for policy_directory in policy_directories:
+        result = subprocess.run(
+            [executable, "test", str(fixture), str(policy_directory)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode != 0:
+            command = shlex.join([executable, "test", str(fixture), str(policy_directory)])
+            raise GuardrailsError(
+                f"OPA semantic policy tests failed for {policy_directory.name}; "
+                f"run {command} for details"
+            )
     return "passed"
 
 

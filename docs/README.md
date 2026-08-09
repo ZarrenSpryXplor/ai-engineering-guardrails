@@ -2,6 +2,22 @@
 
 This is the documentation entry point for people operating, extending, or reviewing AI Engineering Workstation Guardrails. The root [README](../README.md) stays intentionally short; this directory owns the detail.
 
+## What's new in v1.2.0
+
+Version 1.2.0 adds an offline assurance layer without turning the workstation into a paperwork theme park:
+
+| New area | Start here |
+| --- | --- |
+| Opt-in status lines, activity summaries, receipts, complexity signals, and demo mode | [Terminal UX](terminal-ux.md) |
+| Policy evidence metadata and review dates | [Evidence and assurance](evidence-and-assurance.md#maintainer-workflow) |
+| Task contracts, safe halts, and evidence-bound receipts | [Evidence and assurance](evidence-and-assurance.md#task-contracts-and-imported-reports) |
+| Local SARIF, Cobertura, and JUnit comparison | [Operations](operations.md#evidence-task-contracts-and-component-review) |
+| Static component inspection and digest-bound trust records | [Evidence and assurance](evidence-and-assurance.md#component-and-instruction-trust) |
+| Smaller default skill catalogue and skill-efficiency audit | [Skills catalogue](skills.md#how-skills-become-available) |
+| Optional manual guidance probes | [Evidence and assurance](evidence-and-assurance.md#skill-efficiency-and-guidance-probes) |
+
+The complete release summary lives in the [changelog](../CHANGELOG.md#120---2026-08-09), so the details have one home instead of breeding in six documents.
+
 ```mermaid
 flowchart TD
   Start[Start here] --> Need{What are you doing?}

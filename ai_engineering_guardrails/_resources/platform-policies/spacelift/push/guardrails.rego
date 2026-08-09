@@ -9,17 +9,17 @@ supported_event if object.get(input.push, "event", "PUSH") in config.tracked_eve
 
 # Only configured branches and source-control events create apply-capable runs.
 track if {
-  tracked_branch
-  supported_event
+	tracked_branch
+	supported_event
 }
 
 # Feature branches and pull requests produce plan-only proposed runs.
 propose if {
-  is_pull_request
-  not tracked_branch
+	is_pull_request
+	not tracked_branch
 }
 
 ignore if {
-  not track
-  not propose
+	not track
+	not propose
 }
