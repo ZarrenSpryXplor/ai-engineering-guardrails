@@ -16,6 +16,7 @@ It turns one canonical policy into product-appropriate guidance, skills, hooks, 
 - Narrow deterministic checks for high-confidence risks: destructive Git operations, publication, credential exposure, and dangerous infrastructure actions.
 - Portable, on-demand skills and capability packs for application, delivery, and infrastructure work.
 - A local installer that preserves unrelated configuration, creates backups, and uses an immutable runtime independent of the source clone.
+- Optional offline assurance for policy evidence, bounded task contracts, imported test/report summaries, and local instruction or skill review.
 - Optional routing and terminal UX—both off unless you explicitly enable them.
 
 This is defence in depth, not a replacement for product approvals, sandboxing, operating-system permissions, branch protection, cloud IAM, Kubernetes RBAC, or a human release decision.
@@ -69,6 +70,17 @@ ai-guardrails routing show --profile balanced --product codex
 ai-guardrails routing set balanced --product codex --dry-run
 ai-guardrails routing set balanced --product codex
 ```
+
+**Assurance tools** stay local and offline. They inspect metadata, repository state, supplied reports, and bounded component files; they do not run analyzers, execute downloaded instructions, or award a magical “all bugs gone” sticker.
+
+```sh
+ai-guardrails policy audit
+ai-guardrails task init --repo . --dry-run
+ai-guardrails component inspect ./reviewed-skill
+ai-guardrails skills audit
+```
+
+See [evidence and assurance](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/evidence-and-assurance.md) for task setup, report comparison, trust records, and the limits of each result.
 
 ## Find the right detail
 

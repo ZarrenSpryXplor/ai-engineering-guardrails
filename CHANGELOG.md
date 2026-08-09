@@ -4,11 +4,21 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+No user-facing changes yet. The toolbox is having a quiet cup of tea.
+
+## [1.2.1] - 2026-08-09
+
+### Fixed
+
+- Spacelift's Rego v1 checks now test each policy type in its own lane with the shared fixture data, so semantic validation no longer trips over unrelated policy entrypoints.
+
+## [1.2.0] - 2026-08-09
+
 ### Added
 
 - Optional terminal UX: Claude Code status line, Codex native status-line configuration, Cursor native guidance, local activity summaries, complexity signals, compact receipts, and synthetic demo mode.
 - Documentation hub, security-reporting policy, contribution guide, code of conduct, and repository ownership map.
-- For v1.2.0: offline policy-evidence lifecycle metadata and audit, evidence-bound task contracts and safe-halt receipts, local SARIF/Cobertura/JUnit comparison, static component inspection with digest-bound local trust, and portable skill-efficiency audit.
+- Offline policy-evidence lifecycle metadata and audit, evidence-bound task contracts and safe-halt receipts, local SARIF/Cobertura/JUnit comparison, static component inspection with digest-bound local trust, portable skill-efficiency audit, and optional manual guidance probes.
 
 ### Changed
 
@@ -26,4 +36,4 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Release history
 
-Tagged release history and published artifacts are available through the repository's [GitHub Releases](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/releases) and [PyPI project page](https://pypi.org/project/ai-engineering-guardrails/). This changelog records unreleased work without retroactively inventing release notes.
+Tagged release history and published artifacts are available through the repository's [GitHub Releases](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/releases) and [PyPI project page](https://pypi.org/project/ai-engineering-guardrails/). Release sections here describe changes supported by the tagged repository history; they do not invent notes for older releases that were not recorded at the time.

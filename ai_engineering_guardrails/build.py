@@ -483,6 +483,7 @@ def validate_codex_rules(rules: bytes | None = None) -> str:
         raise GuardrailsError("codex execpolicy check did not report the expected forbidden decision")
     return "passed"
 
+
 def validate_spacelift_policies() -> str:
     from .scan import validate_spacelift_policy_structure
 
@@ -505,13 +506,13 @@ def validate_spacelift_policies() -> str:
             check=False,
         )
         if result.returncode != 0:
-            relative_policy = policy_directory.relative_to(RESOURCE_ROOT)
+            command = shlex.join([executable, "test", str(fixture), str(policy_directory)])
             raise GuardrailsError(
-                "OPA semantic policy tests failed; run "
-                "opa test platform-policies/spacelift/fixtures/guardrails.json "
-                f"{relative_policy.as_posix()} for details"
+                f"OPA semantic policy tests failed for {policy_directory.name}; "
+                f"run {command} for details"
             )
     return "passed"
+
 
 def validate(
     products: Sequence[str] = PRODUCTS,

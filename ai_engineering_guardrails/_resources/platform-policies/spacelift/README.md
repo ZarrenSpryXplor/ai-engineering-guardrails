@@ -6,7 +6,7 @@ The examples follow the current Spacelift contracts: Approval policies expose `a
 
 The configuration fixture owns every organisation-specific label, space, team, subject, resource type, region, account, branch, event, threshold, downstream stack, and notification state. Replace all unmistakably synthetic examples before use. Use Spaces/RBAC as the primary access boundary and stack dependencies instead of Trigger Policies when the simpler dependency model is sufficient.
 
-Run `opa test platform-policies/spacelift` when OPA is installed. Repository validation performs structural checks and clearly reports when semantic OPA execution is unavailable. Build, validation, and tests never call Spacelift or attach policy.
+Run `python tools/guardrails.py validate` from the repository root. When OPA is installed, repository validation tests each policy type independently with the shared fixture data; otherwise it clearly reports that semantic Rego execution was skipped. Build, validation, and tests never call Spacelift or attach policy.
 
 Official references:
 

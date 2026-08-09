@@ -36,6 +36,51 @@ class ValidationTests(unittest.TestCase):
         with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
             self.assertIn("skipped", build.validate_codex_rules())
 
+    def test_spacelift_semantic_tests_run_per_policy_with_shared_fixture(self) -> None:
+        executable = "/synthetic/opa"
+        completed = mock.Mock(returncode=0)
+        root = RESOURCE_ROOT / "platform-policies/spacelift"
+        fixture = root / "fixtures/guardrails.json"
+        policy_directories = sorted(path.parent for path in root.glob("*/guardrails.rego"))
+
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=executable),
+            mock.patch("ai_engineering_guardrails.build.subprocess.run", return_value=completed) as run,
+        ):
+            self.assertEqual("passed", build.validate_spacelift_policies())
+
+        self.assertEqual(
+            [
+                mock.call(
+                    [executable, "test", str(fixture), str(policy_directory)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+                for policy_directory in policy_directories
+            ],
+            run.call_args_list,
+        )
+        self.assertEqual(
+            {"approval", "login", "notification", "plan", "push", "trigger"},
+            {path.name for path in policy_directories},
+        )
+
+    def test_spacelift_semantic_tests_stop_and_report_the_failing_policy(self) -> None:
+        executable = "/synthetic/opa"
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=executable),
+            mock.patch(
+                "ai_engineering_guardrails.build.subprocess.run",
+                return_value=mock.Mock(returncode=1),
+            ) as run,
+            self.assertRaisesRegex(GuardrailsError, r"failed for approval; run /synthetic/opa test"),
+        ):
+            build.validate_spacelift_policies()
+
+        self.assertEqual(1, run.call_count)
+
     def test_selected_home_guard_rejects_posix_and_windows_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             selected = Path(temporary)
