@@ -129,3 +129,15 @@ An optional `.ai-guardrails-verification.json` may provide non-sensitive named o
 ```
 
 The file must contain no prompts, source, full commands, raw logs, environment data, or secrets. Static scan cannot infer or prove external review or semantic validation; it only checks that declared categories match the canonical requirement and explicitly reports that limitation.
+
+## First public release checklist
+
+This repository can prepare artifacts locally, but a public release remains a human-controlled GitHub and package-registry operation. Before the first release, a maintainer should:
+
+1. Enable GitHub private vulnerability reporting and confirm that the contact route in [SECURITY.md](../SECURITY.md) works.
+2. Protect `main` with a ruleset or branch-protection rule that requires at least one review, requires review from [CODEOWNERS](../.github/CODEOWNERS), prevents force pushes and deletion, and requires these current checks: `tests`, `Compatibility (Python 3.14)`, `Wheel smoke (ubuntu-latest)`, `Wheel smoke (macos-latest)`, and `Wheel smoke (windows-latest)`. Also require the current CodeQL analysis checks when CodeQL is enabled.
+3. From the intended commit, run the complete build, validation, unit suite, distribution build, metadata check, installed-wheel smoke test, static scan, and final diff review. Record any optional validator that was skipped rather than treating it as passed.
+4. Review [CHANGELOG.md](../CHANGELOG.md), choose the version, create a signed tag only after the checks are green, and preserve the built artifacts for that exact commit.
+5. Attach an SBOM and provenance through the approved release process before publication. Never publish from an unreviewed local checkout or expose registry credentials to an agent.
+
+`CODEOWNERS` and workflow files are repository inputs; they do not enforce review or protected-branch behavior until a GitHub administrator enables the corresponding hosted settings.

@@ -91,4 +91,4 @@ Routing remains off by default. Its five `workstation_` roles are deliberately d
 
 For contributors, canonical skills live in the package resource tree. Do not edit generated copies under `dist/`. New skills need portable `name` and `description` frontmatter, an explicit use/not-use boundary, an evidence-driven procedure, and observable completion criteria. See [policy authoring](policy-authoring.md#add-a-portable-skill) for the minimal format and validation workflow.
 
-For users, use a [local policy overlay](../README.md#installed-baseline-and-local-policy) to add workstation-specific behavioural guidance. It can strengthen deterministic rules but cannot permanently weaken bundled enforcement; use an expiring waiver for a narrow temporary exception.
+For users, use a local policy overlay to add workstation-specific behavioural guidance. It can strengthen deterministic rules but cannot permanently weaken bundled enforcement; use an expiring waiver for a narrow temporary exception. See [operations](operations.md#waivers-and-audit) for the safe lifecycle.

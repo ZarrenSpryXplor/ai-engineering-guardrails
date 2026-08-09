@@ -1,4 +1,4 @@
-include README.md LICENSE
-include docs/terminal-ux.md
+include README.md LICENSE SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md CHANGELOG.md
+recursive-include docs *.md
 include assets/ai_comic_screen_only_corrected.png
 recursive-include ai_engineering_guardrails/_resources *

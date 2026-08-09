@@ -49,6 +49,15 @@ Codex documents `/statusline`, which configures and persists the native TUI foot
 ai-guardrails statusline print-codex-setup --profile standard
 ```
 
+`[tui]` is TOML syntax in Codex's user `config.toml`; it is **not** an item or screen inside the `/statusline` picker. The picker shows the native fields themselves and persists its selection to `tui.status_line` behind the scenes. To have this project make its reviewable marker-owned TOML edit, preview then opt in explicitly:
+
+```sh
+ai-guardrails statusline install --product codex --profile standard --dry-run
+ai-guardrails statusline install --product codex --profile standard
+```
+
+Alternatively, use `/statusline` alone and leave the native selection user-managed. If a user-managed `tui.status_line` already exists, the installer reports an unmanaged collision and leaves it untouched unless `--force` is explicit.
+
 The managed profile uses only exact IDs in the current official sample: `model-with-reasoning`, `context-remaining`, `git-branch`, and `current-dir`. Use the `/statusline` picker to add version-specific rate-limit or token items from the current Codex build. Use `/status` for current model/approval/root/token information and `/usage` for native account token activity. `/pets` is an optional Codex choice and is never enabled here. Codex does not document an arbitrary external footer renderer, so local guardrail counters and complexity signals remain available through `receipt --compact`, `activity`, and `complexity`, not the Codex footer.
 
 ### Cursor CLI: native title indicators only

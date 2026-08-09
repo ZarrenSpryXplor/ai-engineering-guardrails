@@ -182,4 +182,4 @@ ai-guardrails doctor
 ai-guardrails diff-installed
 ```
 
-Use the main [README](../README.md) for architecture, advanced profiles, waivers, scanning, enterprise examples, and contributor commands.
+Continue through the [operator documentation](README.md) for architecture, advanced profiles, waivers, scanning, enterprise examples, and contributor guidance.

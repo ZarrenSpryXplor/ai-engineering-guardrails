@@ -63,7 +63,19 @@ class PackagingTests(unittest.TestCase):
     def test_packaged_readme_uses_absolute_documentation_links(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("](docs/", readme)
+        self.assertIn("docs/README.md", readme)
         self.assertIn("assets/ai_comic_screen_only_corrected.png", (REPOSITORY_ROOT / "MANIFEST.in").read_text(encoding="utf-8"))
+
+    def test_operator_documentation_and_release_governance_entrypoints_exist(self) -> None:
+        for relative in (
+            "docs/README.md",
+            "SECURITY.md",
+            "CONTRIBUTING.md",
+            "CODE_OF_CONDUCT.md",
+            "CHANGELOG.md",
+            ".github/CODEOWNERS",
+        ):
+            self.assertTrue((REPOSITORY_ROOT / relative).is_file(), relative)
 
     @unittest.skipUnless(_package_build_available(), "PyPA build and wheel are not installed")
     def test_wheel_and_sdist_work_outside_source_checkout(self) -> None:
@@ -115,6 +127,14 @@ class PackagingTests(unittest.TestCase):
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
                 self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
+                self.assertTrue(any(name.endswith("docs/README.md") for name in names))
+                for filename in (
+                    "SECURITY.md",
+                    "CONTRIBUTING.md",
+                    "CODE_OF_CONDUCT.md",
+                    "CHANGELOG.md",
+                ):
+                    self.assertTrue(any(name.endswith(filename) for name in names), filename)
                 self.assertFalse(any("/guardrails/" in name for name in names))
                 self.assertFalse(any("/.idea/" in name or "/release/" in name for name in names))
                 resource_marker = "/ai_engineering_guardrails/_resources/"
