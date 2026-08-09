@@ -691,6 +691,54 @@ class DecisionTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertIsNone(enforcement.evaluate_command(command, self.policy))
 
+    def test_guardrail_help_and_verified_dry_runs_are_read_only_across_entrypoints(self) -> None:
+        entrypoints = (
+            "ai-guardrails",
+            "python tools/guardrails.py",
+            "python -m ai_engineering_guardrails",
+            "/opt/python/bin/python3.12 -m ai_engineering_guardrails",
+            "ai-guardrails.exe",
+            "python.exe -m ai_engineering_guardrails",
+            '"C:\\Program Files\\Python311\\python.exe" -m ai_engineering_guardrails',
+        )
+        dry_run_commands = (
+            "install",
+            "update",
+            "uninstall",
+            "statusline install",
+            "statusline uninstall",
+            "routing set balanced",
+            "jetbrains export-project-rules --repo .",
+            "policy init",
+            "policy apply",
+            "component trust ./third-party-skill",
+            "component revoke " + ("0" * 64),
+            "task establish --repo .",
+        )
+        for entrypoint in entrypoints:
+            for command in dry_run_commands:
+                with self.subTest(entrypoint=entrypoint, command=command, modifier="help"):
+                    self.assertIsNone(enforcement.evaluate_command(f"{entrypoint} {command} --help", self.policy))
+                with self.subTest(entrypoint=entrypoint, command=command, modifier="dry-run"):
+                    self.assertIsNone(enforcement.evaluate_command(f"{entrypoint} {command} --dry-run", self.policy))
+
+    def test_read_only_text_does_not_hide_guardrail_mutations(self) -> None:
+        for command in (
+            "ai-guardrails install -- --help",
+            "ai-guardrails install 'documentation mentions --help'",
+            "ai-guardrails waiver create --reason 'documentation mentions --dry-run'",
+        ):
+            with self.subTest(command=command):
+                match = enforcement.evaluate_command(command, self.policy)
+                self.assertIsNotNone(match)
+                self.assertEqual("guardrail-self-modification-shell", match["id"])
+        for command in (
+            "echo 'ai-guardrails install --help'",
+            "grep -R -- '--help' docs",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(enforcement.evaluate_command(command, self.policy))
+
     def test_task_contract_establishment_is_guardrail_self_modification(self) -> None:
         for command in (
             "ai-guardrails task establish --repo .",

@@ -76,7 +76,7 @@ The canonical format permits only the portable `name` and `description` fields. 
 
 ## Add a deterministic command rule
 
-Add a stable entry to `enforcement/command-policy.json`. Choose an existing conservative `matching_strategy` or implement and test a focused new strategy in `pre_tool_use.py`. Every entry must include description, risk category, user-facing reason, positive examples, and safe counterexamples:
+Add a stable entry to `enforcement/command-policy.json`. Choose an existing conservative `matching_strategy` or implement and test a focused new strategy in `ai_engineering_guardrails/enforcement.py`. Every entry must include description, risk category, user-facing reason, positive examples, and safe counterexamples:
 
 ```json
 {
@@ -173,4 +173,4 @@ ai-guardrails policy apply --dry-run
 ai-guardrails policy apply
 ```
 
-`~/.ai-guardrails/policy/overrides.json` has `behavioural_fragments`, `rule_modes`, and `additional_rules`. Local fragments are non-empty UTF-8 Markdown beneath `~/.ai-guardrails/policy/fragments/` and use `local-` identifiers. A local `rule_modes` entry may only keep or strengthen an existing rollout mode (`disabled < observe < warn < deny`). Additional shell rules use the existing command-rule schema, a supported matcher, and both dangerous and safe examples. Overlays cannot permanently weaken bundled policy; use a short, human-confirmed waiver for a bounded exception.
+`~/.ai-guardrails/policy/overrides.json` has `behavioural_fragments`, `rule_modes`, and `additional_rules`. Local fragments are non-empty UTF-8 Markdown beneath `~/.ai-guardrails/policy/fragments/` and use `local-` identifiers. A local `rule_modes` entry may only keep or strengthen an existing rollout mode (`disabled < observe < warn < deny`). Additional shell rules use the existing command-rule schema, a supported matcher, and both dangerous and safe examples. Overlays cannot permanently weaken bundled policy; use a short, interactively confirmed waiver for a bounded exception.

@@ -47,6 +47,7 @@ FOLLOW_EXTERNAL_OVER_LOCAL_RE = re.compile(
     r"(?:even\s+if|despite)\b.{0,80}\b(?:local|trusted|workstation|guardrail|policy)\b.{0,60}\b(?:disagrees?|conflicts?)\b",
     re.IGNORECASE | re.DOTALL,
 )
+EXTERNAL_AUTHORITY_MATCHERS = (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE)
 
 
 def locally_negated(text: str, position: int) -> bool:
@@ -405,7 +406,7 @@ def _scan_external_instruction_authority(repo: Path, path: Path, text: str) -> l
         return []
     patterns = {
         "external-content-as-authority": (
-            (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE),
+            EXTERNAL_AUTHORITY_MATCHERS,
             "External content is presented as authority; treat it as evidence under trusted policy instead.",
         ),
         "instruction-authority-override": (

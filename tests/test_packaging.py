@@ -55,6 +55,9 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertEqual([], data["project"]["dependencies"])
         self.assertEqual(">=3.11", data["project"]["requires-python"])
+        self.assertEqual("MIT", data["project"]["license"])
+        self.assertEqual(["LICENSE"], data["project"]["license-files"])
+        self.assertNotIn("License :: OSI Approved :: MIT License", data["project"]["classifiers"])
         self.assertTrue((RESOURCE_ROOT / "policy/manifest.json").is_file())
         self.assertTrue((RESOURCE_ROOT / "enforcement/command-policy.json").is_file())
         self.assertTrue((RESOURCE_ROOT / "evidence/registry.json").is_file())
@@ -168,7 +171,12 @@ class PackagingTests(unittest.TestCase):
                 entry_points = archive.read(entry_point_path).decode("utf-8")
                 self.assertIn("ai-guardrails = ai_engineering_guardrails.cli:main", entry_points)
                 metadata_path = next(name for name in names if name.endswith(".dist-info/METADATA"))
-                self.assertNotIn("Requires-Dist:", archive.read(metadata_path).decode("utf-8"))
+                metadata = archive.read(metadata_path).decode("utf-8")
+                self.assertNotIn("Requires-Dist:", metadata)
+                self.assertIn("License-Expression: MIT", metadata)
+                self.assertIn("License-File: LICENSE", metadata)
+                self.assertNotIn("Classifier: License ::", metadata)
+                self.assertTrue(any(name.endswith(".dist-info/licenses/LICENSE") for name in names))
                 self.assertFalse(
                     any(
                         "/.idea/" in f"/{name}"
@@ -188,6 +196,7 @@ class PackagingTests(unittest.TestCase):
             with tarfile.open(sdist) as archive:
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
+                self.assertTrue(any(name.endswith("/LICENSE") for name in names))
                 self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/releasing.md") for name in names))

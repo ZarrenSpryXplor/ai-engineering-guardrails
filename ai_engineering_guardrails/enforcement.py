@@ -665,6 +665,22 @@ def _logical_guardrails_arguments(command: Sequence[str]) -> tuple[str, ...] | N
     return None
 
 
+_GUARDRAILS_DRY_RUN_PREFIXES = {
+    ("install",),
+    ("update",),
+    ("uninstall",),
+    ("statusline", "install"),
+    ("statusline", "uninstall"),
+    ("routing", "set"),
+    ("jetbrains", "export-project-rules"),
+    ("policy", "init"),
+    ("policy", "apply"),
+    ("component", "trust"),
+    ("component", "revoke"),
+    ("task", "establish"),
+}
+
+
 def _match_guardrails_mutation(script: ParsedScript, strategy: Mapping[str, Any], cwd: Path | None) -> bool:
     del cwd
     prefixes = [tuple(str(token).lower() for token in item) for item in strategy.get("command_prefixes", [])]
@@ -672,8 +688,18 @@ def _match_guardrails_mutation(script: ParsedScript, strategy: Mapping[str, Any]
         raise PolicyError("guardrails_mutation strategy requires command_prefixes")
     for command in script.commands:
         arguments = _logical_guardrails_arguments(command)
-        if arguments is not None and any(arguments[: len(prefix)] == prefix for prefix in prefixes):
-            return True
+        if arguments is None:
+            continue
+        prefix = next((item for item in prefixes if arguments[: len(item)] == item), None)
+        if prefix is None:
+            continue
+        option_boundary = arguments.index("--") if "--" in arguments else len(arguments)
+        options = arguments[:option_boundary]
+        if any(token in {"-h", "--help"} for token in options):
+            continue
+        if prefix in _GUARDRAILS_DRY_RUN_PREFIXES and "--dry-run" in options:
+            continue
+        return True
     return False
 
 

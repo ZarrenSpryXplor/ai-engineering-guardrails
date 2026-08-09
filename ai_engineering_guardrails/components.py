@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 
 from . import packs, policy, state
 from .resources import RESOURCE_ROOT
-from .scan import DOWNLOAD_EXECUTE_RE, EXTERNAL_AUTHORITY_RE, POWERSHELL_DOWNLOAD_EXECUTE_RE, locally_negated
+from .scan import DOWNLOAD_EXECUTE_RE, EXTERNAL_AUTHORITY_MATCHERS, POWERSHELL_DOWNLOAD_EXECUTE_RE, locally_negated
 from .util import GuardrailsError, is_link_or_reparse, path_within, read_json, sha256
 
 
@@ -88,7 +88,10 @@ PATTERNS = (
         "Instruction or hook modification appears and needs explicit authority.",
     ),
     ("guardrail-weakening", re.compile(r"(?:ignore|disable|bypass|turn\s+off|weaken).{0,80}(?:guardrail|hook|approval|sandbox|permission|network|instruction)", re.I), "Instruction appears to weaken a guardrail, approval, sandbox, or network boundary."),
-    ("external-content-authority", EXTERNAL_AUTHORITY_RE, "External content is presented as authority rather than evidence."),
+    *(
+        ("external-content-authority", pattern, "External content is presented as authority rather than evidence.")
+        for pattern in EXTERNAL_AUTHORITY_MATCHERS
+    ),
     ("absolute-local-path", re.compile(r"(?:[A-Za-z]:[\\/](?:Users|home)[\\/]|/(?:Users|home)/)[^\s'\"`]+"), "Machine-specific absolute path appears; use a portable relative path or documented variable."),
 )
 

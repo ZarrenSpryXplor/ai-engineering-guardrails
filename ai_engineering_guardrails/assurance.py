@@ -159,7 +159,7 @@ def _safe_relative(value: object, label: str) -> str:
     ):
         raise GuardrailsError(f"{label} must be a short repository-relative path")
     lexical = value.replace("\\", "/")
-    if value.startswith("\\") or lexical.startswith("//") or re.match(r"^[A-Za-z]:", value):
+    if value.startswith("\\") or lexical.startswith("/") or re.match(r"^[A-Za-z]:", value):
         raise GuardrailsError(f"{label} must remain beneath the selected repository")
     path = Path(value)
     if path.is_absolute() or PureWindowsPath(value).is_absolute() or ".." in path.parts or path == Path("."):

@@ -370,6 +370,12 @@
         "ai-guardrails task establish --repo ."
       ],
       "must_not_match": [
+        "ai-guardrails install --help",
+        "ai-guardrails install --dry-run",
+        "ai-guardrails component trust --help",
+        "ai-guardrails component trust --dry-run",
+        "python tools/guardrails.py uninstall --dry-run",
+        "python -m ai_engineering_guardrails component trust --help",
         "python tools/guardrails.py status",
         "python -m ai_engineering_guardrails component inspect ./third-party-skill",
         "python3 -m ai_engineering_guardrails component list",
