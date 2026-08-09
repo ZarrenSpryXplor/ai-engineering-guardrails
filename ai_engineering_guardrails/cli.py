@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from . import __version__, build, enforcement, install, packs, policy, routing, scan, state
+from . import __version__, build, complexity, enforcement, install, packs, policy, routing, scan, state, terminal_ux
 from .resources import repository_output_root
 from .util import PRODUCTS, SAFETY_PROFILES, TRUST_MODES, GuardrailsError, home_path
 
@@ -39,6 +39,11 @@ def add_mutation_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--force", action="store_true", help="replace or remove modified managed content after backup")
 
 
+def add_no_color(parser: argparse.ArgumentParser) -> None:
+    """Accept the common explicit accessibility preference; output is unstyled today."""
+    parser.add_argument("--no-color", action="store_true", help="disable terminal colour (human output is currently unstyled)")
+
+
 def parse_model_overrides(values: Sequence[str]) -> dict[str, dict[str, str]]:
     result: dict[str, dict[str, str]] = {}
     for value in values:
@@ -58,6 +63,12 @@ def add_install_options(parser: argparse.ArgumentParser) -> None:
         choices=("none", "economy", "balanced", "quality"),
         default=None,
         help="set routing agents; omission preserves an existing selection and uses none when fresh (balanced is recommended)",
+    )
+    parser.add_argument(
+        "--statusline-profile",
+        choices=terminal_ux.STATUSLINE_PROFILES,
+        default=None,
+        help="opt in to terminal UX; omission preserves existing status-line configuration and fresh installs remain unchanged",
     )
     parser.add_argument(
         "--model-override",
@@ -115,7 +126,13 @@ def _run_consumer_install(
     with contextlib.redirect_stdout(details):
         install.prepare_installation(dry_run=args.dry_run, home=args.home)
         if updating:
-            report = install.update(products, args.home, force=args.force, dry_run=args.dry_run)
+            report = install.update(
+                products,
+                args.home,
+                force=args.force,
+                dry_run=args.dry_run,
+                statusline_profile=args.statusline_profile,
+            )
         else:
             report = install.install(
                 products,
@@ -127,6 +144,7 @@ def _run_consumer_install(
                 routing_profile=args.routing_profile,
                 safety_profile=args.safety_profile,
                 trust_mode=args.trust_mode,
+                statusline_profile=args.statusline_profile,
                 model_overrides=parse_model_overrides(args.model_override) or None,
                 explicit_product=args.product is not None,
             )
@@ -362,6 +380,231 @@ def _policy_apply(args: argparse.Namespace) -> None:
     install.update(products, home, force=args.force, dry_run=args.dry_run)
 
 
+def _statusline_products(value: str) -> tuple[str, ...]:
+    return terminal_ux.STATUSLINE_PRODUCTS if value == "all" else (value,)
+
+
+def _print_value(value: Mapping[str, Any], output_format: str) -> None:
+    if output_format == "json":
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+    for product, details in value.get("products", value).items():
+        if isinstance(details, Mapping):
+            state_value = details.get("state", details.get("integration", "configured"))
+            profile = details.get("profile")
+            suffix = f"; profile={profile}" if isinstance(profile, str) else ""
+            print(f"{product}: {state_value}{suffix}")
+            note = details.get("note") or details.get("manual_step") or details.get("capability")
+            if isinstance(note, str):
+                print(f"  {note}")
+
+
+def _statusline_capabilities(args: argparse.Namespace) -> None:
+    value = {
+        "schema_version": 1,
+        "products": {
+            "claude": {"integration": "managed", "capability": "documented command-based statusLine; activation requires workspace trust and is disabled by disableAllHooks"},
+            "codex": {"integration": "managed-native", "capability": "documented tui.status_line edit with current exact item IDs; no documented arbitrary external renderer"},
+            "cursor": {"integration": "native-manual", "capability": "documented /status-indicators terminal-title control; programmable usage bar unsupported"},
+        },
+    }
+    _print_value(value, args.format)
+
+
+def _statusline_preview(args: argparse.Namespace) -> None:
+    products = _statusline_products(args.product)
+    values = {product: terminal_ux.statusline_preview(product, args.profile) for product in products}
+    if args.format == "json":
+        print(json.dumps({"schema_version": 1, "products": values}, indent=2, sort_keys=True))
+        return
+    for product, value in values.items():
+        print(f"{product}: {value['integration']}")
+        if isinstance(value.get("example"), str):
+            print("  " + value["example"])
+        if isinstance(value.get("native_fields"), list):
+            print("  native fields: " + ", ".join(value["native_fields"]))
+        print("  " + value["note"])
+
+
+def _statusline_install(args: argparse.Namespace) -> None:
+    # Status-line installation is an installation transaction, so use the same
+    # resource/build preflight as the ordinary consumer installer.
+    if args.format == "json":
+        with contextlib.redirect_stdout(io.StringIO()):
+            install.prepare_installation(dry_run=args.dry_run, home=args.home)
+            report = install.statusline_install(
+                _statusline_products(args.product), args.home, profile=args.profile, force=args.force, dry_run=args.dry_run
+            )
+    else:
+        install.prepare_installation(dry_run=args.dry_run, home=args.home)
+        report = install.statusline_install(
+            _statusline_products(args.product), args.home, profile=args.profile, force=args.force, dry_run=args.dry_run
+        )
+    if args.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return
+    print("Terminal UX preview" if args.dry_run else "Terminal UX installed")
+    for product, entry in report["products"].items():
+        print(f"{product}: {entry['integration']}; profile={entry['profile']}")
+        if entry["integration"] == "native-manual":
+            print("  " + entry["manual_step"].splitlines()[0])
+    if args.dry_run:
+        print("No changes were made")
+
+
+def _statusline_status(args: argparse.Namespace) -> None:
+    _print_value({"products": install.statusline_status(_statusline_products(args.product), args.home)}, args.format)
+
+
+def _events_summary(args: argparse.Namespace) -> None:
+    summary = terminal_ux.audit_summary(args.home, window=args.window, product=args.product)
+    terminal_ux.refresh_audit_summary_cache(args.home)
+    if args.format == "json":
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        print(f"{summary['window']}: {summary['warnings']} warning(s), {summary['denials']} denial(s)")
+        if summary["last_event_at"]:
+            print(f"last recorded event: {summary['last_event_at']}")
+
+
+def _activity(args: argparse.Namespace) -> None:
+    product = None if args.product == "all" else args.product
+    summary = terminal_ux.audit_summary(args.home, window=args.since, product=product)
+    terminal_ux.refresh_audit_summary_cache(args.home)
+    value = {
+        **summary,
+        "repository_filter": "not-recorded; all local events in the selected time window are shown",
+        "coverage": {
+            "hook_products": ["codex", "claude", "cursor", "vscode"],
+            "no_deterministic_hook_events_expected": ["visualstudio", "jetbrains"],
+        },
+    }
+    if args.format == "json":
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+    print(f"Activity ({summary['window']})")
+    print(f"  Observed {summary['observed']}; warnings {summary['warnings']}; denials {summary['denials']}")
+    if summary["operation_classes"]:
+        print("  Operation classes " + ", ".join(f"{name}={count}" for name, count in summary["operation_classes"].items()))
+    if summary["rule_ids"]:
+        print("  Rules " + ", ".join(f"{name}={count}" for name, count in summary["rule_ids"].items()))
+    if summary["last_event_at"] is None:
+        print("  No recorded hook events in this window")
+    print("  Visual Studio and JetBrains have no deterministic hook events.")
+
+
+def _complexity(args: argparse.Namespace) -> None:
+    result = complexity.analyse(args.repo, base=args.base, staged=args.staged)
+    if args.write_snapshot:
+        complexity.write_cache(args.home, result, dry_run=False)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return
+    label = "KISS " + ({"clear": "✓", "review": "review", "high-change": "high-change"}[result["classification"]])
+    print(label)
+    if not result.get("available"):
+        print("  " + result["limitation"])
+    for signal in result.get("signals", []):
+        if isinstance(signal, Mapping):
+            print("  - " + str(signal.get("evidence", signal.get("id", "signal"))))
+        else:
+            print("  - " + str(signal))
+
+
+def _receipt(args: argparse.Namespace) -> None:
+    receipt = scan.session_receipt(args.home, args.repo, selected_products(args.product))
+    output_format = args.format or ("compact" if args.compact else ("human" if args.fun else "json"))
+    if output_format == "json":
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        return
+    if output_format == "compact":
+        events = receipt["guardrail_events"]
+        print("🛡 Change summary" if args.fun else "Change summary")
+        print(f"  Repository          {receipt['repository_identifier_hash'][:12]}")
+        print("  Products            " + ", ".join(receipt["products"]))
+        print(f"  Files changed       {receipt['files_modified_count']}")
+        print(f"  Guardrails          {events['warnings']} warning(s), {events['denials']} denial(s) in {events['window']}")
+        print(f"  Complexity          {receipt['complexity']['classification']}")
+        print("  Routing             " + ", ".join(f"{name}={profile}" for name, profile in receipt["model_routing_profiles"].items()))
+        print(f"  Policy              {str(receipt['policy_digest'])[:12]}")
+        print("  Verification gaps   " + "; ".join(receipt["unverified_checks"]))
+        return
+    print("🛡 Repository/change receipt" if args.fun else "Repository/change receipt")
+    print(json.dumps(receipt, indent=2, sort_keys=True))
+
+
+def _demo(args: argparse.Namespace) -> None:
+    policy_data = policy.load_enforcement_policy()
+    metadata = {
+        "safety_profile": "infrastructure-observe", "trust_mode": "trusted-workspace", "home_directory": None,
+        "audit_directory": None, "waiver_directory": None, "targets_path": None, "state_path": None, "managed_paths": [],
+    }
+    scenarios = {
+        "core": ("git status", "git reset --hard", "git push origin feature/example", "git push --force-with-lease"),
+        "development": ("npm test", "npm publish"),
+        "infrastructure": ("terraform plan", "terraform destroy", "kubectl get pods", "kubectl delete namespace payments", "helm template demo", "helm uninstall demo"),
+    }
+    selected_scenarios = scenarios if args.scenario == "all" else ({args.scenario: scenarios[args.scenario]} if args.scenario in scenarios else {})
+    rendered = {
+        scenario: [
+            {
+                "synthetic": True,
+                "command": command,
+                "decision": enforcement.evaluate_request(
+                    {"hook_event_name": "PreToolUse", "tool_name": "shell", "tool_input": {"command": command}},
+                    policy_data=policy_data,
+                    metadata=metadata,
+                ).decision,
+            }
+            for command in commands
+        ]
+        for scenario, commands in selected_scenarios.items()
+    }
+    if args.scenario in {"all", "spacelift"}:
+        requests = (("read-only run inspection", "mcp__spacelift__query"), ("run confirmation", "mcp__spacelift__confirm_stack_run"), ("mutation tool", "mcp__spacelift__mutate"))
+        rendered["spacelift"] = [
+            {
+                "synthetic": True,
+                "operation": label,
+                "decision": enforcement.evaluate_request(
+                    {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": {"operation": "synthetic"}},
+                    policy_data=policy_data,
+                    metadata=metadata,
+                ).decision,
+            }
+            for label, tool in requests
+        ]
+    if args.scenario == "all":
+        rendered["statusline"] = [
+            {
+                "synthetic": True,
+                "profile": profile,
+                "line": terminal_ux.statusline_preview("claude", profile)["example"],
+            }
+            for profile in terminal_ux.STATUSLINE_PROFILES
+        ]
+        rendered["complexity"] = [
+            {"synthetic": True, "classification": "clear", "signal_ids": []},
+            {"synthetic": True, "classification": "review", "signal_ids": ["large-change-surface"]},
+            {"synthetic": True, "classification": "high-change", "signal_ids": ["high-risk-governance-files"]},
+        ]
+    value = {"schema_version": 1, "synthetic": True, "scenarios": rendered, "note": "Synthetic demonstration only; no displayed command was executed."}
+    if args.format == "json":
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+    print("🛡 Synthetic demonstration — no displayed command was executed" if args.fun else "Synthetic demonstration — no displayed command was executed")
+    for name, section in rendered.items():
+        print(name + ":")
+        for item in section:
+            if "decision" in item:
+                label = item.get("command", item.get("operation", "synthetic"))
+                print(f"  {label:<36} {item['decision'].upper() if item['decision'] != 'no-decision' else 'ALLOW'}")
+            elif "line" in item:
+                print(f"  {item['profile']:<36} {item['line']}")
+            else:
+                print(f"  KISS {item['classification']:<31} {', '.join(item['signal_ids']) or 'no signals'}")
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Vendor-neutral AI engineering guardrails")
     parser.add_argument("--version", action="version", version=f"ai-engineering-guardrails {__version__}")
@@ -383,6 +626,7 @@ def create_parser() -> argparse.ArgumentParser:
     add_product(update_parser, detect_by_default=True)
     add_home(update_parser)
     add_mutation_flags(update_parser)
+    update_parser.add_argument("--statusline-profile", choices=terminal_ux.STATUSLINE_PROFILES, default=None)
     update_parser.add_argument("--verbose", action="store_true", help="show internal build and adapter details")
 
     uninstall_parser = sub.add_parser("uninstall", help="remove only managed installation content")
@@ -500,6 +744,71 @@ def create_parser() -> argparse.ArgumentParser:
     add_home(receipt_parser)
     add_product(receipt_parser)
     receipt_parser.add_argument("--repo", type=Path, default=Path.cwd())
+    receipt_parser.add_argument("--format", choices=("json", "human", "compact"))
+    receipt_parser.add_argument("--compact", action="store_true", help="print a concise repository/change summary")
+    receipt_parser.add_argument("--fun", action="store_true", help="add restrained symbols to human receipt output")
+    add_no_color(receipt_parser)
+
+    statusline_parser = sub.add_parser("statusline", help="manage optional terminal UX integrations")
+    statusline_sub = statusline_parser.add_subparsers(dest="statusline_command", required=True)
+    for name in ("capabilities", "status"):
+        command = statusline_sub.add_parser(name)
+        command.add_argument("--product", choices=(*terminal_ux.STATUSLINE_PRODUCTS, "all"), default="all")
+        add_home(command)
+        command.add_argument("--format", choices=("human", "json"), default="human")
+        add_no_color(command)
+    preview = statusline_sub.add_parser("preview")
+    preview.add_argument("--product", choices=(*terminal_ux.STATUSLINE_PRODUCTS, "all"), default="all")
+    preview.add_argument("--profile", choices=terminal_ux.STATUSLINE_PROFILES, default="standard")
+    preview.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(preview)
+    install_statusline = statusline_sub.add_parser("install")
+    install_statusline.add_argument("--product", choices=(*terminal_ux.STATUSLINE_PRODUCTS, "all"), default="all")
+    install_statusline.add_argument("--profile", choices=terminal_ux.STATUSLINE_PROFILES, required=True)
+    add_home(install_statusline)
+    add_mutation_flags(install_statusline)
+    install_statusline.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(install_statusline)
+    uninstall_statusline = statusline_sub.add_parser("uninstall")
+    uninstall_statusline.add_argument("--product", choices=(*terminal_ux.STATUSLINE_PRODUCTS, "all"), default="all")
+    add_home(uninstall_statusline)
+    add_mutation_flags(uninstall_statusline)
+    uninstall_statusline.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(uninstall_statusline)
+    codex_setup = statusline_sub.add_parser("print-codex-setup")
+    codex_setup.add_argument("--profile", choices=terminal_ux.STATUSLINE_PROFILES, default="standard")
+    cursor_setup = statusline_sub.add_parser("print-cursor-setup")
+
+    events_parser = sub.add_parser("events", help="summarise local content-free guardrail events")
+    events_sub = events_parser.add_subparsers(dest="events_command", required=True)
+    events_summary = events_sub.add_parser("summary")
+    add_home(events_summary)
+    events_summary.add_argument("--window", choices=("today", "24h"), default="24h")
+    events_summary.add_argument("--product", choices=PRODUCTS)
+    events_summary.add_argument("--format", choices=("human", "json"), default="human")
+
+    complexity_parser = sub.add_parser("complexity", help="report deterministic repository-change complexity signals")
+    complexity_parser.add_argument("--repo", type=Path, default=Path.cwd())
+    complexity_parser.add_argument("--base")
+    complexity_parser.add_argument("--staged", action="store_true")
+    complexity_parser.add_argument("--format", choices=("human", "json"), default="human")
+    complexity_parser.add_argument("--write-snapshot", "--write-cache", dest="write_snapshot", action="store_true", help="write only a compact local status snapshot")
+    add_home(complexity_parser)
+    add_no_color(complexity_parser)
+
+    activity_parser = sub.add_parser("activity", help="summarise content-free local guardrail activity")
+    activity_parser.add_argument("--since", choices=("1h", "24h", "7d"), default="24h")
+    activity_parser.add_argument("--product", choices=(*PRODUCTS, "all"), default="all")
+    activity_parser.add_argument("--repo", type=Path, default=Path.cwd(), help="accepted for consistent repository-scoped workflows; audit events do not store repository identity")
+    add_home(activity_parser)
+    activity_parser.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(activity_parser)
+
+    demo_parser = sub.add_parser("demo", help="show an entirely synthetic guardrails demonstration")
+    demo_parser.add_argument("--scenario", choices=("all", "core", "development", "infrastructure", "spacelift"), default="all")
+    demo_parser.add_argument("--format", choices=("human", "json"), default="human")
+    demo_parser.add_argument("--fun", action="store_true", help="add restrained symbols to synthetic human output")
+    add_no_color(demo_parser)
     return parser
 
 
@@ -606,7 +915,46 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 _policy_apply(args)
         elif args.command == "receipt":
-            print(json.dumps(scan.session_receipt(args.home, args.repo, selected_products(args.product)), indent=2, sort_keys=True))
+            _receipt(args)
+        elif args.command == "statusline":
+            if args.statusline_command == "capabilities":
+                _statusline_capabilities(args)
+            elif args.statusline_command == "preview":
+                _statusline_preview(args)
+            elif args.statusline_command == "install":
+                _statusline_install(args)
+            elif args.statusline_command == "uninstall":
+                if args.format == "json":
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        report = install.statusline_uninstall(_statusline_products(args.product), args.home, force=args.force, dry_run=args.dry_run)
+                    print(json.dumps(report, indent=2, sort_keys=True))
+                else:
+                    report = install.statusline_uninstall(_statusline_products(args.product), args.home, force=args.force, dry_run=args.dry_run)
+                    outcomes = report["products"]
+                    retained = [product for product, outcome in outcomes.items() if outcome == "retained-modified"]
+                    removed = [product for product, outcome in outcomes.items() if outcome in {"removed", "would-remove"}]
+                    if args.dry_run:
+                        print("Terminal UX uninstall preview complete; no changes were made")
+                    elif retained:
+                        print("Terminal UX uninstall partially complete; retained modified configuration: " + ", ".join(retained))
+                    elif removed:
+                        print("Terminal UX uninstalled")
+                    else:
+                        print("No managed terminal UX configuration was found")
+            elif args.statusline_command == "status":
+                _statusline_status(args)
+            elif args.statusline_command == "print-codex-setup":
+                print(terminal_ux.codex_setup(args.profile))
+            else:
+                print(terminal_ux.cursor_setup())
+        elif args.command == "events":
+            _events_summary(args)
+        elif args.command == "activity":
+            _activity(args)
+        elif args.command == "complexity":
+            _complexity(args)
+        elif args.command == "demo":
+            _demo(args)
         else:
             raise GuardrailsError(f"unsupported command: {args.command}")
     except (GuardrailsError, OSError, UnicodeError, enforcement.PolicyError) as exc:

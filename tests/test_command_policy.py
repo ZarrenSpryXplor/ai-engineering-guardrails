@@ -277,6 +277,32 @@ class CommandPolicyTests(unittest.TestCase):
             self.assertEqual("spacelift-mcp-intent-write-scope", intent["id"])
             self.assertEqual("mutate", intent["operation_class"])
 
+    def test_spacelift_url_inference_accepts_only_http_hostnames(self) -> None:
+        for url in (
+            "https://tenant.app.spacelift.io/mcp",
+            "HTTPS://SPACELIFT.IO:443/mcp",
+            "http://spacelift.io/",
+        ):
+            with self.subTest(url=url):
+                tool, _, _ = enforcement.extract_tool({"tool_name": "mutate", "url": url})
+                self.assertEqual("spacelift.mutate", tool)
+        for url in (
+            "https://spacelift.io.evil.example/mcp",
+            "https://evil-spacelift.io/mcp",
+            "https://example.invalid/?target=spacelift.io",
+            "https://spacelift.io@evil.example/mcp",
+            "mailto:spacelift.io",
+            "spacelift.io",
+            "http://[",
+        ):
+            with self.subTest(url=url):
+                tool, _, _ = enforcement.extract_tool({"tool_name": "mutate", "url": url})
+                self.assertEqual("mutate", tool)
+        tool, _, _ = enforcement.extract_tool(
+            {"tool_name": "mutate", "url": "https://spacelift.io", "mcp_server_name": "explicit"}
+        )
+        self.assertEqual("explicit.mutate", tool)
+
     def test_graphql_operation_is_inspected(self) -> None:
         mutation = enforcement.evaluate_structured_tool(
             "mcp__spacelift__query", {"query": "mutation X { stackDelete(id: \"x\") { id } }"}, self.policy

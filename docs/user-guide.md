@@ -95,6 +95,21 @@ Codex keeps underscore role names; the other rendered products use hyphens, such
 
 Use `routing set none --product codex --dry-run` and then the same command without `--dry-run` to reconfigure the managed product without routing when no model override is stored. Read the [engineer routing guide](routing-and-cost.md) for profile selection, model overrides, and product activation, and review its [disable limitations](routing-and-cost.md#inspect-troubleshoot-and-disable) before applying that full installation transaction.
 
+## Optional terminal UX
+
+Terminal UX is separate from routing and remains off unless selected. It shows distinct local facts—context capacity, product-native token/rate-limit views, a vendor-provided cost estimate where Claude exposes one, content-free guardrail counts, and deterministic complexity signals. It never reads account, billing, or transcript stores.
+
+```sh
+ai-guardrails statusline preview --product all --profile standard
+ai-guardrails statusline install --product all --profile standard --dry-run
+ai-guardrails statusline install --product all --profile standard
+ai-guardrails activity --since 24h
+ai-guardrails complexity --repo . --write-snapshot
+ai-guardrails receipt --repo . --product all --compact
+```
+
+Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behavior, and removal.
+
 ## Ansible
 
 The Ansible pack is detected from distinctive files such as `ansible.cfg`, `.ansible-lint`, `galaxy.yml`, execution-environment metadata, Molecule configuration, or collection/role requirements.

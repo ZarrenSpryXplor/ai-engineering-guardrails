@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from . import build, packs, policy, routing, state
+from . import build, packs, policy, routing, state, terminal_ux
 from .resources import RESOURCE_ROOT
 from .util import (
     LIFECYCLES,
@@ -42,6 +42,15 @@ AUDIT_RELATIVE = Path(".ai-guardrails/audit")
 WAIVERS_RELATIVE = Path(".ai-guardrails/waivers")
 TARGETS_RELATIVE = Path(".ai-guardrails/targets.json")
 RUNTIME_RETENTION = 3
+TERMINAL_UX_KEY = "terminal_ux"
+CODEX_STATUSLINE_BEGIN = "# BEGIN AI ENGINEERING GUARDRAILS STATUSLINE"
+CODEX_STATUSLINE_END = "# END AI ENGINEERING GUARDRAILS STATUSLINE"
+CODEX_STATUSLINE_BLOCK_RE = re.compile(
+    re.escape(CODEX_STATUSLINE_BEGIN) + r"\r?\n.*?" + re.escape(CODEX_STATUSLINE_END), re.DOTALL
+)
+TUI_HEADER_RE = re.compile(r"(?m)^[ \t]*\[tui\][ \t]*(?:#[^\r\n]*)?(?:\r?\n|$)")
+TOML_TABLE_RE = re.compile(r"(?m)^[ \t]*\[[^\r\n]+\]")
+TUI_STATUSLINE_RE = re.compile(r"(?m)^[ \t]*status_line[ \t]*=")
 MANAGED_HOOK_RE = re.compile(
     r"(?:^|[/\\])hook_runtime\.py[\"']?\s+--product\s+(codex|claude|cursor|vscode)\b",
     re.IGNORECASE,
@@ -476,11 +485,18 @@ def _runtime_payloads(
 
 def _validate_runtime_payloads(payloads: Mapping[str, bytes]) -> None:
     try:
-        compile(payloads["hook_runtime.py"].decode("utf-8"), "hook_runtime.py", "exec")
-        json.loads(payloads["command-policy.json"])
-        json.loads(payloads["structured-tool-policy.json"])
-        json.loads(payloads["redaction-policy.json"])
-        json.loads(payloads["metadata.json"])
+        if "hook_runtime.py" in payloads:
+            compile(payloads["hook_runtime.py"].decode("utf-8"), "hook_runtime.py", "exec")
+            json.loads(payloads["command-policy.json"])
+            json.loads(payloads["structured-tool-policy.json"])
+            json.loads(payloads["redaction-policy.json"])
+            json.loads(payloads["metadata.json"])
+        elif set(payloads) == {"terminal_renderer.py", "statusline-profiles.json"}:
+            compile(payloads["terminal_renderer.py"].decode("utf-8"), "terminal_renderer.py", "exec")
+            terminal_ux.validate_resources()
+            json.loads(payloads["statusline-profiles.json"])
+        else:
+            raise GuardrailsError("installed runtime has an unknown payload shape")
     except (UnicodeDecodeError, SyntaxError, json.JSONDecodeError) as exc:
         raise GuardrailsError(f"installed runtime validation failed: {exc.__class__.__name__}") from exc
 
@@ -508,13 +524,567 @@ def _install_runtime(home: Path, digest: str, payloads: Mapping[str, bytes], *, 
     staged = Path(tempfile.mkdtemp(prefix=f".{digest}.", dir=runtime_root))
     try:
         for name, data in payloads.items():
-            mode = 0o555 if name == "hook_runtime.py" else 0o444
+            mode = 0o555 if name.endswith(".py") else 0o444
             atomic_write(staged / name, data, mode=mode)
         os.replace(staged, target)
     finally:
         if staged.exists():
             shutil.rmtree(staged)
     return target
+
+
+def _terminal_ux_payloads() -> tuple[str, dict[str, bytes]]:
+    """Return the small immutable Claude status-line runtime payload."""
+    payloads = {
+        "terminal_renderer.py": Path(__file__).with_name("terminal_renderer.py").read_bytes(),
+        "statusline-profiles.json": terminal_ux.PROFILE_PATH.read_bytes(),
+    }
+    digest_input = b"".join(name.encode("utf-8") + b"\0" + payloads[name] + b"\0" for name in sorted(payloads))
+    return sha256(digest_input), payloads
+
+
+def _terminal_ux_products(value: Mapping[str, Any]) -> dict[str, Any]:
+    terminal = value.setdefault(TERMINAL_UX_KEY, {})
+    if not isinstance(terminal, dict):
+        raise GuardrailsError("terminal UX installation state is invalid")
+    products = terminal.setdefault("products", {})
+    if not isinstance(products, dict):
+        raise GuardrailsError("terminal UX product state is invalid")
+    return products
+
+
+def _selected_statusline_profiles(
+    products: Sequence[str], current_state: Mapping[str, Any], explicit_profile: str | None
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Return explicit UX work, or refresh only already-managed selected products."""
+    selected = tuple(product for product in products if product in terminal_ux.STATUSLINE_PRODUCTS)
+    if explicit_profile is not None:
+        return ((explicit_profile, selected),) if selected else ()
+    stored = current_state.get(TERMINAL_UX_KEY, {}).get("products", {})
+    stored = stored if isinstance(stored, Mapping) else {}
+    grouped: dict[str, list[str]] = {}
+    for product in selected:
+        entry = stored.get(product)
+        profile = entry.get("profile") if isinstance(entry, Mapping) else None
+        if isinstance(profile, str) and profile in terminal_ux.STATUSLINE_PROFILES:
+            grouped.setdefault(profile, []).append(product)
+    return tuple((profile, tuple(grouped[profile])) for profile in sorted(grouped))
+
+
+def _codex_tui_bounds(text: str) -> tuple[int, int, int] | None:
+    """Return header-end, section-end, and header-start for the one [tui] table."""
+    matches = list(TUI_HEADER_RE.finditer(text))
+    if len(matches) > 1:
+        raise GuardrailsError("multiple [tui] tables in Codex configuration")
+    if not matches:
+        return None
+    header = matches[0]
+    next_table = TOML_TABLE_RE.search(text, header.end())
+    return header.end(), next_table.start() if next_table else len(text), header.start()
+
+
+def _toml_assignment_end(text: str, start: int) -> int:
+    """Find one status_line assignment end without normalising unrelated TOML."""
+    equal = text.find("=", start)
+    if equal < 0:
+        return start
+    index = equal + 1
+    depth = 0
+    quote: str | None = None
+    while index < len(text):
+        character = text[index]
+        if quote is not None:
+            if character == "\\" and quote == '"':
+                index += 2
+                continue
+            if character == quote:
+                quote = None
+        elif character in {"'", '"'}:
+            quote = character
+        elif character in "[{":
+            depth += 1
+        elif character in "]}":
+            depth = max(0, depth - 1)
+        elif character == "#" and depth == 0:
+            newline = text.find("\n", index)
+            return len(text) if newline < 0 else newline + 1
+        elif character == "\n" and depth == 0:
+            return index + 1
+        index += 1
+    return len(text)
+
+
+def _codex_newline(text: str) -> str:
+    """Use the file's existing line ending for our one narrow managed block."""
+    return "\r\n" if "\r\n" in text else "\n"
+
+
+def _render_codex_statusline_block(fields: Sequence[str], *, newline: str = "\n") -> str:
+    rendered = ", ".join(json.dumps(field) for field in fields)
+    return f"{CODEX_STATUSLINE_BEGIN}{newline}status_line = [{rendered}]{newline}{CODEX_STATUSLINE_END}"
+
+
+def _update_codex_statusline_text(text: str, fields: Sequence[str], previous: Mapping[str, Any] | None, *, force: bool) -> tuple[str, bool]:
+    """Change only our status_line block while preserving all other TOML text."""
+    try:
+        import tomllib
+
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise GuardrailsError("Codex config.toml is invalid; refusing to change it") from exc
+
+    def verified(updated: str, created_tui: bool) -> tuple[str, bool]:
+        try:
+            candidate = tomllib.loads(updated)
+        except tomllib.TOMLDecodeError as exc:
+            raise GuardrailsError("managed Codex status-line update would produce invalid TOML") from exc
+        configured = candidate.get("tui", {}).get("status_line") if isinstance(candidate.get("tui"), Mapping) else None
+        if configured != list(fields):
+            raise GuardrailsError("managed Codex status-line update did not produce the requested tui.status_line")
+        return updated, created_tui
+
+    bounds = _codex_tui_bounds(text)
+    newline = _codex_newline(text)
+    block = _render_codex_statusline_block(fields, newline=newline)
+    blocks = list(CODEX_STATUSLINE_BLOCK_RE.finditer(text))
+    if len(blocks) > 1:
+        raise GuardrailsError("multiple managed Codex status-line blocks found")
+    if blocks:
+        current = blocks[0]
+        if bounds is None or not (bounds[0] <= current.start() < bounds[1]):
+            raise GuardrailsError("managed Codex status-line block is outside [tui]")
+        expected = previous.get("managed_sha256") if previous else None
+        if expected is None and not force:
+            raise GuardrailsError("unmanaged Codex status-line block collision; refusing to replace without --force")
+        if expected is not None and sha256(current.group(0).encode("utf-8")) != expected and not force:
+            raise GuardrailsError("locally modified managed Codex status line; refusing to replace without --force")
+        updated = text[:current.start()] + block + text[current.end():]
+        return verified(updated, False)
+    tui_value = parsed.get("tui")
+    existing = tui_value.get("status_line") if isinstance(tui_value, Mapping) else None
+    if existing is not None and not force:
+        raise GuardrailsError("unmanaged Codex tui.status_line collision; refusing to replace without --force")
+    if bounds is not None:
+        section_start, section_end, _ = bounds
+        assignment = TUI_STATUSLINE_RE.search(text, section_start, section_end)
+        if assignment:
+            assignment_end = _toml_assignment_end(text, assignment.start())
+            updated = text[:assignment.start()] + block + newline + text[assignment_end:]
+        else:
+            updated = text[:section_start] + block + newline + text[section_start:]
+        return verified(updated, False)
+    separator = "" if not text or text.endswith(("\n", "\r")) else newline
+    prefix = "" if not text.strip() else separator + newline
+    return verified(text + prefix + "[tui]" + newline + block + newline, True)
+
+
+def _install_codex_statusline(
+    home: Path,
+    profile: str,
+    current_state: dict[str, Any],
+    *,
+    force: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    target = codex_home(home) / "config.toml"
+    validate_install_target(target, home)
+    text = target.read_bytes().decode("utf-8") if target.is_file() and not target.is_symlink() else ""
+    if target.exists() and (target.is_symlink() or not target.is_file()):
+        raise GuardrailsError(f"Codex configuration collides with a non-file: {target}")
+    products = _terminal_ux_products(current_state)
+    previous_value = products.get("codex")
+    previous = previous_value if isinstance(previous_value, Mapping) else None
+    fields = terminal_ux.CODEX_NATIVE_FIELDS[profile]
+    updated, created_tui = _update_codex_statusline_text(text, fields, previous, force=force)
+    if updated != text:
+        backup = state.backup_existing(home, target, dry_run=dry_run) if target.exists() else None
+        print(f"{'would update' if dry_run else 'update'} managed Codex status line in {target}")
+        if not dry_run:
+            atomic_write(target, updated.encode("utf-8"))
+    else:
+        backup = previous.get("backup") if previous else None
+        print(f"unchanged {target}")
+    block = _render_codex_statusline_block(fields, newline=_codex_newline(text))
+    entry = {
+        "profile": profile,
+        "integration": "managed-native",
+        "config_path": relative_home(target, home),
+        "managed_sha256": sha256(block.encode("utf-8")),
+        "backup": backup or (previous.get("backup") if previous else None),
+        "created_tui": created_tui if previous is None else bool(previous.get("created_tui")),
+        "activation": "native-configured-unverified",
+        "native_fields": list(fields),
+    }
+    products["codex"] = entry
+    return entry
+
+
+def _statusline_config_status(entry: Mapping[str, Any], home: Path) -> str:
+    target = home_path(home, ".claude/settings.json")
+    if target.is_symlink() or not target.is_file():
+        return "missing"
+    try:
+        data = read_json(target, default={})
+    except GuardrailsError:
+        return "modified"
+    value = data.get("statusLine") if isinstance(data, Mapping) else None
+    if not isinstance(value, Mapping):
+        return "missing"
+    if terminal_ux.profile_hash(value) != entry.get("managed_sha256"):
+        return "modified"
+    runtime_relative = entry.get("runtime_path")
+    runtime = home_path(home, runtime_relative) if isinstance(runtime_relative, str) else None
+    if runtime is None or runtime.is_symlink() or not runtime.is_dir() or any(
+        not (runtime / name).is_file() or (runtime / name).is_symlink()
+        for name in ("terminal_renderer.py", "statusline-profiles.json")
+    ):
+        return "stale"
+    return "configured"
+
+
+def _preflight_claude_statusline(home: Path, profile: str, safety_profile: str, current_state: Mapping[str, Any], *, force: bool) -> None:
+    digest, _ = _terminal_ux_payloads()
+    runtime = home_path(home, RUNTIME_RELATIVE / digest)
+    target = home_path(home, ".claude/settings.json")
+    validate_install_target(target, home)
+    products = current_state.get(TERMINAL_UX_KEY, {}).get("products", {})
+    previous_value = products.get("claude") if isinstance(products, Mapping) else None
+    previous = previous_value if isinstance(previous_value, Mapping) else None
+    data = read_json(target, default={})
+    if not isinstance(data, dict):
+        raise GuardrailsError(f"Claude settings must be a JSON object: {target}")
+    existing = data.get("statusLine")
+    if existing is None:
+        return
+    existing_hash = terminal_ux.profile_hash(existing) if isinstance(existing, Mapping) else "invalid"
+    managed_hash = previous.get("managed_sha256") if previous else None
+    if managed_hash is None and not force:
+        raise GuardrailsError(f"unmanaged Claude statusLine collision; refusing to replace without --force: {target}")
+    if managed_hash is not None and existing_hash != managed_hash and not force:
+        raise GuardrailsError(f"locally modified managed Claude statusLine; refusing to replace without --force: {target}")
+
+
+def _install_claude_statusline(
+    home: Path,
+    profile: str,
+    safety_profile: str,
+    current_state: dict[str, Any],
+    *,
+    force: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    digest, payloads = _terminal_ux_payloads()
+    runtime = home_path(home, RUNTIME_RELATIVE / digest)
+    target = home_path(home, ".claude/settings.json")
+    validate_install_target(target, home)
+    products = _terminal_ux_products(current_state)
+    previous = products.get("claude")
+    previous = previous if isinstance(previous, Mapping) else None
+    original_exists = target.is_file()
+    data = read_json(target, default={})
+    if not isinstance(data, dict):
+        raise GuardrailsError(f"Claude settings must be a JSON object: {target}")
+    desired = terminal_ux.claude_status_line(runtime, profile, safety_profile, home)
+    _preflight_claude_statusline(home, profile, safety_profile, current_state, force=force)
+    # Detect all collisions before creating a runtime directory or cache entry.
+    runtime = _install_runtime(home, digest, payloads, dry_run=dry_run)
+    desired = terminal_ux.claude_status_line(runtime, profile, safety_profile, home)
+    backup = previous.get("backup") if previous else None
+    rendered = json_bytes({**data, "statusLine": desired})
+    if target.is_file() and target.read_bytes() == rendered:
+        print(f"unchanged {target}")
+    else:
+        if target.exists():
+            backup = state.backup_existing(home, target, dry_run=dry_run) or backup
+        print(f"{'would merge' if dry_run else 'merge'} managed Claude statusLine into {target}")
+        if not dry_run:
+            atomic_write(target, rendered)
+    summary = terminal_ux.audit_summary(home)
+    terminal_ux.write_audit_summary_cache(home, summary, dry_run=dry_run)
+    entry = {
+        "profile": profile,
+        "integration": "managed",
+        "runtime_digest": digest,
+        "runtime_path": relative_home(runtime, home),
+        "settings_path": relative_home(target, home),
+        "managed_sha256": terminal_ux.profile_hash(desired),
+        "backup": backup,
+        "created": bool(previous.get("created")) if previous else not original_exists,
+        "activation": "workspace-trust-required",
+        "cache_schema_version": 1,
+    }
+    products["claude"] = entry
+    return entry
+
+
+def _install_statusline_into_state(
+    products: Sequence[str],
+    home: Path,
+    profile: str,
+    current_state: dict[str, Any],
+    *,
+    force: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    if profile not in terminal_ux.STATUSLINE_PROFILES:
+        raise GuardrailsError(f"unknown status-line profile: {profile}")
+    selected = tuple(dict.fromkeys(products))
+    if any(product not in terminal_ux.STATUSLINE_PRODUCTS for product in selected):
+        raise GuardrailsError("terminal UX supports only codex, claude, and cursor")
+    entries = _terminal_ux_products(current_state)
+    report: dict[str, Any] = {}
+    for product in selected:
+        if product == "claude":
+            safety = str(current_state.get("products", {}).get("claude", {}).get("safety_profile", "infrastructure-observe"))
+            report[product] = _install_claude_statusline(home, profile, safety, current_state, force=force, dry_run=dry_run)
+        elif product == "codex":
+            report[product] = _install_codex_statusline(home, profile, current_state, force=force, dry_run=dry_run)
+        else:
+            entry = {
+                "profile": profile,
+                "integration": "native-manual",
+                "manual_step": terminal_ux.codex_setup(profile) if product == "codex" else terminal_ux.cursor_setup(),
+                "activation": "user-controlled",
+            }
+            entries[product] = entry
+            report[product] = entry
+    return {"profile": profile, "products": report, "no_mutation": False}
+
+
+def _preflight_statusline(products: Sequence[str], home: Path, profile: str, current_state: Mapping[str, Any], *, force: bool) -> None:
+    """Reject collisions for every selected product before any status-line write."""
+    entries = current_state.get(TERMINAL_UX_KEY, {}).get("products", {})
+    entries = entries if isinstance(entries, Mapping) else {}
+    for product in products:
+        if product == "claude":
+            safety = str(current_state.get("products", {}).get("claude", {}).get("safety_profile", "infrastructure-observe"))
+            _preflight_claude_statusline(home, profile, safety, current_state, force=force)
+        elif product == "codex":
+            target = codex_home(home) / "config.toml"
+            validate_install_target(target, home)
+            if target.exists() and (target.is_symlink() or not target.is_file()):
+                raise GuardrailsError(f"Codex configuration collides with a non-file: {target}")
+            text = target.read_bytes().decode("utf-8") if target.is_file() else ""
+            previous_value = entries.get("codex")
+            previous = previous_value if isinstance(previous_value, Mapping) else None
+            _update_codex_statusline_text(text, terminal_ux.CODEX_NATIVE_FIELDS[profile], previous, force=force)
+
+
+def statusline_install(products: Sequence[str], home: Path, *, profile: str, force: bool, dry_run: bool) -> dict[str, Any]:
+    home = home.expanduser().resolve(strict=False)
+    terminal_ux.validate_resources()
+    if profile not in terminal_ux.STATUSLINE_PROFILES:
+        raise GuardrailsError(f"unknown status-line profile: {profile}")
+    current = state.load_state(home)
+    new_state = json.loads(json.dumps(current))
+    _preflight_statusline(products, home, profile, new_state, force=force)
+    report = _install_statusline_into_state(products, home, profile, new_state, force=force, dry_run=dry_run)
+    if not report["no_mutation"]:
+        state.save_state(home, new_state, dry_run=dry_run)
+        if not dry_run:
+            _cleanup_runtimes(home, new_state)
+    return report
+
+
+def _uninstall_claude_statusline(entry: Mapping[str, Any], home: Path, *, force: bool, dry_run: bool) -> bool:
+    target = home_path(home, ".claude/settings.json")
+    if target.is_symlink():
+        print(f"retained symbolic-link Claude settings: {target}")
+        return False
+    if not target.is_file():
+        return True
+    try:
+        data = read_json(target, default={})
+    except GuardrailsError:
+        print(f"retained modified Claude settings: {target}")
+        return False
+    if not isinstance(data, dict) or "statusLine" not in data:
+        return True
+    current = data["statusLine"]
+    if not isinstance(current, Mapping) or terminal_ux.profile_hash(current) != entry.get("managed_sha256"):
+        if not force:
+            print(f"retained modified Claude statusLine: {target}")
+            return False
+        state.backup_existing(home, target, dry_run=dry_run)
+    data.pop("statusLine", None)
+    print(f"{'would remove' if dry_run else 'remove'} managed Claude statusLine from {target}")
+    if not dry_run:
+        atomic_write(target, json_bytes(data))
+    return True
+
+
+def _remove_empty_owned_tui(text: str) -> str:
+    bounds = _codex_tui_bounds(text)
+    if bounds is None:
+        return text
+    section_start, section_end, header_start = bounds
+    if text[section_start:section_end].strip():
+        return text
+    return text[:header_start] + text[section_end:].lstrip("\r\n")
+
+
+def _uninstall_codex_statusline(entry: Mapping[str, Any], home: Path, *, force: bool, dry_run: bool) -> bool:
+    target = codex_home(home) / "config.toml"
+    if target.is_symlink():
+        print(f"retained symbolic-link Codex configuration: {target}")
+        return False
+    if not target.is_file():
+        return True
+    try:
+        text = target.read_bytes().decode("utf-8")
+        import tomllib
+
+        tomllib.loads(text)
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        print(f"retained modified Codex status line: {target}")
+        return False
+    blocks = list(CODEX_STATUSLINE_BLOCK_RE.finditer(text))
+    if len(blocks) != 1:
+        print(f"retained modified Codex status line: {target}")
+        return False
+    block = blocks[0]
+    if sha256(block.group(0).encode("utf-8")) != entry.get("managed_sha256") and not force:
+        print(f"retained modified Codex status line: {target}")
+        return False
+    updated = text[:block.start()] + text[block.end():]
+    if entry.get("created_tui"):
+        updated = _remove_empty_owned_tui(updated)
+    try:
+        tomllib.loads(updated)
+    except tomllib.TOMLDecodeError:
+        print(f"retained modified Codex status line: {target}")
+        return False
+    if sha256(block.group(0).encode("utf-8")) != entry.get("managed_sha256"):
+        state.backup_existing(home, target, dry_run=dry_run)
+    print(f"{'would remove' if dry_run else 'remove'} managed Codex status line from {target}")
+    if not dry_run:
+            atomic_write(target, updated.encode("utf-8"))
+    return True
+
+
+def _uninstall_statusline_from_state(
+    products: Sequence[str], home: Path, current_state: dict[str, Any], *, force: bool, dry_run: bool
+) -> dict[str, str]:
+    entries = _terminal_ux_products(current_state)
+    report: dict[str, str] = {}
+    for product in products:
+        entry = entries.get(product)
+        if not isinstance(entry, Mapping):
+            report[product] = "not-managed"
+            continue
+        removed = True
+        if product == "claude" and entry.get("integration") == "managed":
+            removed = _uninstall_claude_statusline(entry, home, force=force, dry_run=dry_run)
+        elif product == "codex" and entry.get("integration") == "managed-native":
+            removed = _uninstall_codex_statusline(entry, home, force=force, dry_run=dry_run)
+        if removed:
+            entries.pop(product, None)
+            report[product] = "would-remove" if dry_run else "removed"
+            if product == "claude":
+                cache = terminal_ux.audit_summary_path(home)
+                if cache.is_file() and not cache.is_symlink():
+                    print(f"{'would remove' if dry_run else 'remove'} managed terminal UX audit cache: {cache}")
+                    if not dry_run:
+                        cache.unlink()
+        else:
+            report[product] = "retained-modified"
+    return report
+
+
+def statusline_uninstall(products: Sequence[str], home: Path, *, force: bool, dry_run: bool) -> dict[str, Any]:
+    home = home.expanduser().resolve(strict=False)
+    current = state.load_state(home)
+    current_entries = current.get(TERMINAL_UX_KEY, {}).get("products", {})
+    if not isinstance(current_entries, Mapping) or not any(product in current_entries for product in products):
+        return {"products": {product: "not-managed" for product in products}, "dry_run": dry_run}
+    new_state = json.loads(json.dumps(current))
+    report = _uninstall_statusline_from_state(products, home, new_state, force=force, dry_run=dry_run)
+    state.save_state(home, new_state, dry_run=dry_run)
+    if not dry_run:
+        _cleanup_runtimes(home, new_state)
+    return {"products": report, "dry_run": dry_run}
+
+
+def statusline_status(products: Sequence[str], home: Path) -> dict[str, Any]:
+    home = home.expanduser().resolve(strict=False)
+    current = state.load_state(home)
+    entries = current.get(TERMINAL_UX_KEY, {}).get("products", {})
+    entries = entries if isinstance(entries, Mapping) else {}
+    report: dict[str, Any] = {}
+    for product in products:
+        entry = entries.get(product)
+        if not isinstance(entry, Mapping):
+            if product == "claude":
+                target = home_path(home, ".claude/settings.json")
+                try:
+                    data = read_json(target, default={}) if target.is_file() and not target.is_symlink() else {}
+                except GuardrailsError:
+                    data = None
+                report[product] = {"state": "unmanaged-collision" if isinstance(data, Mapping) and "statusLine" in data else "not-configured"}
+            elif product == "codex":
+                config = codex_home(home) / "config.toml"
+                native_status_line, native_state = _codex_status_line(config)
+                report[product] = {"state": "native-user-controlled", "config_path": str(config), "native_status_line": native_status_line, "native_status_line_state": native_state}
+            else:
+                report[product] = {"state": "native-user-controlled", "native_title_indicators": "user controlled", "programmable_usage_bar": "unsupported"}
+            continue
+        if product == "claude":
+            report[product] = {
+                "state": _statusline_config_status(entry, home),
+                "audit_cache": terminal_ux.cache_freshness(terminal_ux.audit_summary_path(home)),
+                "complexity_cache": "repository-keyed; checked by the renderer only when Claude supplies a workspace",
+                **dict(entry),
+            }
+        elif product == "codex":
+            configured, native_state = _codex_status_line(codex_home(home) / "config.toml")
+            expected = list(terminal_ux.CODEX_NATIVE_FIELDS.get(str(entry.get("profile")), ()))
+            marker_owned = _codex_marker_is_owned(codex_home(home) / "config.toml", entry)
+            report[product] = {
+                "state": "configured-native" if configured == expected and marker_owned else "modified-or-stale-native-config",
+                "native_status_line": configured,
+                "native_status_line_state": native_state,
+                "matches_selected_profile": configured == expected and marker_owned if configured is not None else None,
+                **dict(entry),
+            }
+        else:
+            report[product] = {
+                "state": "manual-native-step-required",
+                "native_title_indicators": "user controlled",
+                "programmable_usage_bar": "unsupported",
+                **dict(entry),
+            }
+    return report
+
+
+def _codex_status_line(path: Path) -> tuple[list[str] | None, str]:
+    if path.is_symlink() or not path.is_file():
+        return None, "not-configured"
+    try:
+        import tomllib
+
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        return None, "invalid-config"
+    status_line = value.get("tui", {}).get("status_line") if isinstance(value.get("tui"), Mapping) else None
+    if isinstance(status_line, list) and all(isinstance(item, str) for item in status_line):
+        return list(status_line), "configured"
+    return None, "not-configured"
+
+
+def _codex_marker_is_owned(path: Path, entry: Mapping[str, Any]) -> bool:
+    """Check the marker and exact managed bytes before claiming native ownership."""
+    if path.is_symlink() or not path.is_file():
+        return False
+    try:
+        text = path.read_bytes().decode("utf-8")
+        blocks = list(CODEX_STATUSLINE_BLOCK_RE.finditer(text))
+        bounds = _codex_tui_bounds(text)
+    except (OSError, UnicodeError, GuardrailsError):
+        return False
+    if len(blocks) != 1 or bounds is None:
+        return False
+    block = blocks[0]
+    return bounds[0] <= block.start() < bounds[1] and sha256(block.group(0).encode("utf-8")) == entry.get("managed_sha256")
 
 
 def _skill_root(home: Path, product: str) -> Path:
@@ -1013,6 +1583,13 @@ def _cleanup_runtimes(home: Path, installed_state: Mapping[str, Any]) -> None:
         for record in state.product_records(installed_state, product)
         if record.get("kind") == "runtime-directory"
     }
+    terminal_products = installed_state.get(TERMINAL_UX_KEY, {}).get("products", {})
+    if isinstance(terminal_products, Mapping):
+        referenced.update(
+            str(entry.get("runtime_digest"))
+            for entry in terminal_products.values()
+            if isinstance(entry, Mapping) and isinstance(entry.get("runtime_digest"), str)
+        )
     unreferenced = sorted(
         [path for path in runtime_root.iterdir() if path.is_dir() and re.fullmatch(r"[0-9a-f]{64}", path.name)],
         key=lambda path: path.stat().st_mtime,
@@ -1083,6 +1660,7 @@ def install(
     pack_ids: Sequence[str] = (),
     all_packs: bool = False,
     routing_profile: str | None = None,
+    statusline_profile: str | None = None,
     safety_profile: str | None = None,
     trust_mode: str | None = None,
     model_overrides: Mapping[str, Mapping[str, str]] | None = None,
@@ -1099,6 +1677,8 @@ def install(
         raise GuardrailsError(f"unknown trust mode: {trust_mode}")
     if routing_profile is not None and routing_profile not in {"none", "economy", "balanced", "quality"}:
         raise GuardrailsError(f"unknown routing profile: {routing_profile}")
+    if statusline_profile is not None and statusline_profile not in terminal_ux.STATUSLINE_PROFILES:
+        raise GuardrailsError(f"unknown status-line profile: {statusline_profile}")
     if model_overrides and sorted(set(model_overrides) - set(selected_products)):
         raise GuardrailsError("model override references a product outside the selected installation")
     # Validate the overlay before collision detection or any user-home mutation.
@@ -1166,6 +1746,12 @@ def install(
         home,
     )
     new_state = json.loads(json.dumps(current))
+    statusline_profiles = _selected_statusline_profiles(selected_products, current, statusline_profile)
+    # Surface every optional terminal-UX collision before ordinary installation
+    # creates any managed product files.  The later merge still uses new_state so
+    # the renderer reflects the selected product safety profile.
+    for selected_profile, terminal_products in statusline_profiles:
+        _preflight_statusline(terminal_products, home, selected_profile, current, force=force)
     overlay_digest = policy.local_policy_digest(home)
     source_digest = state.source_digest(overlay_digest)
     indicators = _managed_enterprise_indicators()
@@ -1409,6 +1995,21 @@ def install(
                 }
             )
     new_state["manual_steps"] = manual_steps
+    statusline_report: dict[str, Any] | None = None
+    for selected_profile, terminal_products in statusline_profiles:
+        refreshed = _install_statusline_into_state(
+            terminal_products,
+            home,
+            selected_profile,
+            new_state,
+            force=force,
+            dry_run=dry_run,
+        )
+        if statusline_report is None:
+            statusline_report = {"products": {}, "profiles": []}
+        statusline_report["products"].update(refreshed["products"])
+        statusline_report["profiles"].append(selected_profile)
+        already_current = False
     if dry_run:
         print("dry run complete; no files were changed")
         return {
@@ -1428,6 +2029,7 @@ def install(
             "dry_run": True,
             "integrity": "not-run",
             "manual_steps": list(new_state["manual_steps"]),
+            "statusline": statusline_report,
         }
     state.save_state(home, new_state, dry_run=False)
     _post_install_integrity(new_state, selected_products, home)
@@ -1464,6 +2066,7 @@ def install(
         "dry_run": False,
         "integrity": "passed",
         "manual_steps": list(new_state["manual_steps"]),
+        "statusline": statusline_report,
     }
 
 
@@ -1473,12 +2076,13 @@ def update(
     *,
     force: bool,
     dry_run: bool,
+    statusline_profile: str | None = None,
 ) -> dict[str, Any]:
     current = state.load_state(home)
     installed = [product for product in products if product in current.get("products", {})]
     if not installed:
         raise GuardrailsError("no selected product is installed; use install first")
-    return install(tuple(installed), home, force=force, dry_run=dry_run)
+    return install(tuple(installed), home, force=force, dry_run=dry_run, statusline_profile=statusline_profile)
 
 
 def print_consumer_install_summary(
@@ -2216,6 +2820,14 @@ def uninstall(products: Sequence[str], home: Path, *, force: bool, dry_run: bool
     new_state["manual_steps"] = [
         step for step in new_state.get("manual_steps", []) if step.get("product") not in selected
     ]
+    terminal_ux_report = _uninstall_statusline_from_state(
+        tuple(product for product in selected if product in terminal_ux.STATUSLINE_PRODUCTS),
+        home,
+        new_state,
+        force=force,
+        dry_run=dry_run,
+    )
+    retained_any = retained_any or any(outcome == "retained-modified" for outcome in terminal_ux_report.values())
     runtime_products = [
         data
         for data in new_state.get("products", {}).values()

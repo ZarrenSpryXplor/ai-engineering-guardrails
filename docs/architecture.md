@@ -1,5 +1,22 @@
 # Architecture
 
+## Optional terminal UX
+
+The optional terminal UX reuses the canonical resources, existing immutable-runtime ownership, redacted audit stream, receipt, and installation state. It is not a scheduler, vendor telemetry system, or terminal wrapper.
+
+```mermaid
+flowchart LR
+  Profiles[Canonical UX profiles] --> CLI[CLI preview/install/status]
+  CLI --> Claude[Claude managed renderer]
+  CLI --> Codex[Codex marker-owned native configuration]
+  CLI --> Cursor[Cursor manual native title setup]
+  Audit[Redacted audit events] --> Aggregate[Bounded aggregate cache]
+  Complexity[Explicit Git complexity snapshot] --> Aggregate
+  Aggregate --> Claude
+```
+
+Only Claude receives an executable renderer in a content-addressed runtime. Codex receives one explicit, TOML-validated, marker-owned `tui.status_line` edit; Cursor remains user-configured through documented title indicators. Neither path sends data over a network or captures prompt/source content. See [terminal UX](terminal-ux.md) for the current product boundaries.
+
 The repository separates authoring from delivery so product adapters can change without forking behavioural policy.
 
 ```mermaid

@@ -1,6 +1,16 @@
 # Product compatibility
 
-Verified against current official documentation on **2026-08-08**. The linked vendor pages are the compatibility authority; repository behavior below separates documented product behavior, explicitly experimental behavior, product limitations, and local design decisions.
+## Terminal UX capability verification (2026-08-09)
+
+| Product | Documented native capability | This project’s integration | Minimum/version boundary |
+| --- | --- | --- | --- |
+| Codex CLI | `/statusline` picker persists ordered `tui.status_line` fields; `/status` and `/usage` expose native status/usage views. | Explicit narrow marker-owned `tui.status_line` edit using only the current exact documented sample IDs; no external renderer. | Current documented Codex CLI; unlisted rate/token item IDs remain product-controlled and are left to the picker. |
+| Claude Code | `statusLine.type=command` runs a local command with session JSON on stdin; documented fields include model, context, rate limits, estimated cost, duration, and worktree data. | Managed immutable Python renderer and structural user-settings merge. | `COLUMNS` sizing requires Claude Code 2.1.153+; workspace trust is required; `disableAllHooks` disables custom status lines. |
+| Cursor CLI | `/status-indicators` toggles terminal-title indicators. | Manual native guidance only. No documented programmable usage/status line or `/usage` command. | Current documented Cursor CLI; activation is user-controlled. |
+
+Sources: [Codex developer commands](https://developers.openai.com/codex/developer-commands), [Codex configuration reference](https://developers.openai.com/codex/config-reference), [Codex sample configuration](https://developers.openai.com/codex/config-file/config-sample), [Claude Code status line](https://code.claude.com/docs/en/statusline), [Claude Code settings](https://code.claude.com/docs/en/settings), [Claude Code hooks](https://code.claude.com/docs/en/hooks), and [Cursor CLI slash commands](https://cursor.com/docs/cli/reference/slash-commands.md). These are capability documents, not proof of a user’s installed version, account entitlement, workspace trust, or active configuration.
+
+Verified against current official documentation on **2026-08-09**. The linked vendor pages are the compatibility authority; repository behavior below separates documented product behavior, explicitly experimental behavior, product limitations, and local design decisions.
 
 | Product | Global behavioural guidance | Skills | Deterministic controls | Optional native routing agents |
 | --- | --- | --- | --- | --- |
@@ -27,7 +37,7 @@ Experimental behavior: Codex command rules are explicitly documented as experime
 
 Product limitations: Codex describes standalone custom-agent authoring as a format that may evolve. Parent live permission and sandbox overrides can take precedence over custom-agent defaults. Product/account access to a configured model is not established by writing the TOML file.
 
-Repository decisions: the installer compiles all applicable canonical fragments into one managed block in the effective global file because Codex does not automatically import arbitrary global Markdown fragments. It leaves an empty override untouched when a non-empty `AGENTS.md` is effective. It honours `CODEX_HOME` when that directory is inside the selected `--home`; an external location is deliberately rejected to preserve the installer's no-escape guarantee. It uses a catch-all entry in the selected Codex home's `hooks.json` so shell and supported structured calls reach one redacting engine, while semantically merging JSON without rewriting `config.toml`; it never changes approval, sandbox, network, or hooks feature settings. The generated `.rules` file covers only prefix forms that the rules engine can express reliably; the shared hook remains the broader high-confidence control.
+Repository decisions: the installer compiles all applicable canonical fragments into one managed block in the effective global file because Codex does not automatically import arbitrary global Markdown fragments. It leaves an empty override untouched when a non-empty `AGENTS.md` is effective. It honours `CODEX_HOME` when that directory is inside the selected `--home`; an external location is deliberately rejected to preserve the installer's no-escape guarantee. It uses a catch-all entry in the selected Codex home's `hooks.json` so shell and supported structured calls reach one redacting engine. Core installation semantically merges JSON without rewriting `config.toml`; the separately opt-in terminal UX makes only a marker-owned, TOML-validated `tui.status_line` edit. Neither path changes approval, sandbox, network, or hooks feature settings. The generated `.rules` file covers only prefix forms that the rules engine can express reliably; the shared hook remains the broader high-confidence control.
 
 Routing decision: the model map uses `gpt-5.6-luna`/`gpt-5.6-terra`/`gpt-5.6-sol` for economy/balanced/deep and writes those values only into custom-agent files. Read-only roles set `sandbox_mode = "read-only"`; writing roles inherit the parent's sandbox instead of silently broadening it. The installer does not edit `[agents]`, global concurrency, or the primary model in `config.toml`.
 

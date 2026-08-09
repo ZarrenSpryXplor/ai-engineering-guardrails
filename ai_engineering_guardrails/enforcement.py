@@ -18,6 +18,7 @@ import os
 import re
 import shlex
 import sys
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -799,6 +800,21 @@ def _event_supported(payload: Mapping[str, Any]) -> bool:
     }
 
 
+def _is_spacelift_url(value: str) -> bool:
+    """Accept only an HTTP(S) Spacelift hostname, never a loose substring."""
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    if parsed.scheme.lower() not in {"http", "https"}:
+        return False
+    hostname = parsed.hostname
+    if hostname is None:
+        return False
+    hostname = hostname.rstrip(".").lower()
+    return hostname == "spacelift.io" or hostname.endswith(".spacelift.io")
+
+
 def extract_tool(payload: Mapping[str, Any]) -> tuple[str | None, Mapping[str, Any] | None, str | None]:
     if not _event_supported(payload):
         return None, None, "unsupported hook event; allowing request"
@@ -816,7 +832,7 @@ def extract_tool(payload: Mapping[str, Any]) -> tuple[str | None, Mapping[str, A
         url_hint = payload.get("url")
         if isinstance(provider_hint, str):
             tool_name = f"{provider_hint}.{tool_name}"
-        elif isinstance(url_hint, str) and "spacelift.io" in url_hint.lower():
+        elif isinstance(url_hint, str) and _is_spacelift_url(url_hint):
             tool_name = f"spacelift.{tool_name}"
     arguments: Any = None
     for key in ("tool_input", "toolInput", "input", "arguments", "args"):

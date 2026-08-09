@@ -49,6 +49,8 @@ CANONICAL_JSON_FILES = (
     "supply-chain/trusted-components.example.json",
     "trust/content-policy.json",
     "trust/modes.json",
+    "ux/complexity-thresholds.json",
+    "ux/statusline-profiles.json",
     "waivers/schema.json",
 )
 
@@ -677,6 +679,10 @@ def validate_canonical_data() -> None:
     findings = supply_chain_findings(registry)
     if findings:
         raise GuardrailsError(f"trusted component example is unsafe: {findings[0]}")
+
+    from . import terminal_ux
+
+    terminal_ux.validate_resources()
 
     executable_suffixes = {".py", ".sh", ".ps1", ".bat", ".cmd", ".exe"}
     for root in (SKILLS_ROOT, RESOURCE_ROOT / "packs"):

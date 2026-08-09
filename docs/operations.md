@@ -32,6 +32,19 @@ The installer creates `~/.ai-guardrails/runtime/<content-digest>/` before regist
 
 `update` preserves each product's selected packs, routing profile, model overrides, safety profile, and trust mode. It creates a new immutable runtime first and never silently changes the main model, approval policy, sandbox, network access, or permissions. Old unreferenced runtime versions are pruned only after safe path validation; a small retained history supports recovery.
 
+## Optional terminal UX
+
+Terminal UX is disabled unless an engineer selects a status-line profile. Preview before any user-configuration change:
+
+```sh
+ai-guardrails statusline preview --product all --profile standard
+ai-guardrails statusline install --product all --profile standard --dry-run
+ai-guardrails statusline install --product all --profile standard
+ai-guardrails statusline status
+```
+
+The Claude integration structurally merges only a managed `statusLine` command and creates a content-addressed local renderer. An unmanaged or modified status line is preserved unless `--force` is explicit; a replacement is backed up. Codex receives only a marker-owned `tui.status_line` edit after complete-TOML validation; existing unmanaged values are preserved unless forced. Cursor CLI records the exact user-controlled `/status-indicators` step and writes no Cursor file. `statusline uninstall --product all` removes only project-managed Claude/Codex status-line configuration and its aggregate audit cache; it preserves other settings, hooks, receipts, and repository-keyed complexity snapshots. See the [terminal UX guide](terminal-ux.md) for profiles, product boundaries, and activation limits.
+
 ## IDE-specific operational notes
 
 VS Code installs `~/.copilot/instructions/workstation-guardrails.instructions.md` and, unless a project-managed Claude hook already covers VS Code, `~/.copilot/hooks/workstation-guardrails.json`. The hook is Preview: status reports configuration as installed but activation as unverified and notes that an organisation may disable it. If Claude and VS Code are both managed, state records one `shared-claude` hook registration. Removing Claude first restores the native VS Code hook before the shared registration is removed.
@@ -82,7 +95,7 @@ For manual recovery, inspect `~/.ai-guardrails/backups/` and `state.json`; state
 
 Waivers require a TTY and an exact, dynamically displayed confirmation. They bind one rule to one SHA-256 request digest, repository scope, target scope, expiry, and use count. Default lifetime is 15 minutes and one use; maximum lifetime is 24 hours. Do not put a raw command or secret in waiver fields.
 
-Audit is local JSONL under `~/.ai-guardrails/audit/`, rotated during writes at a bounded size. It records hashes and classifications only. `ai-guardrails receipt --repo . --product all` produces a similarly content-free session summary.
+Audit is local JSONL under `~/.ai-guardrails/audit/`, rotated during writes at a bounded size. It records hashes and classifications only. `ai-guardrails events summary --window today` reports only recorded warnings and denials; it is not a session or allowed-operation count. `ai-guardrails receipt --repo . --product all --compact` produces a similarly content-free repository/change summary.
 
 ## Repository scan and risk evidence
 

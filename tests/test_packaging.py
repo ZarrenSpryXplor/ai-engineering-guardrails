@@ -96,6 +96,8 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/vscode.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/visualstudio.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/jetbrains.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/ux/statusline-profiles.json", names)
+                self.assertIn("ai_engineering_guardrails/_resources/ux/complexity-thresholds.json", names)
                 self.assertFalse(any(name.startswith("guardrails/") for name in names))
                 resource_prefix = "ai_engineering_guardrails/_resources/"
                 wheel_resources = {
@@ -112,6 +114,7 @@ class PackagingTests(unittest.TestCase):
             with tarfile.open(sdist) as archive:
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
+                self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
                 self.assertFalse(any("/guardrails/" in name for name in names))
                 self.assertFalse(any("/.idea/" in name or "/release/" in name for name in names))
                 resource_marker = "/ai_engineering_guardrails/_resources/"
@@ -204,6 +207,15 @@ class PackagingTests(unittest.TestCase):
                 ["uninstall", "--product", "codex", "--home", str(home)],
                 ["packs", "list"],
                 ["routing", "validate"],
+                ["statusline", "capabilities"],
+                ["statusline", "preview", "--product", "all", "--profile", "standard"],
+                ["statusline", "install", "--product", "all", "--profile", "standard", "--home", str(home), "--dry-run"],
+                ["statusline", "install", "--product", "all", "--profile", "standard", "--home", str(home)],
+                ["statusline", "status", "--product", "all", "--home", str(home)],
+                ["statusline", "uninstall", "--product", "all", "--home", str(home)],
+                ["complexity", "--repo", str(outside)],
+                ["activity", "--home", str(home)],
+                ["demo", "--scenario", "all"],
                 ["jetbrains", "print-chat-instructions"],
                 ["explain", "--command", "git reset --hard"],
             ):

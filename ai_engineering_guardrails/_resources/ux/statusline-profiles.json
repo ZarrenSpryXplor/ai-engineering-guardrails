@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "compact": {
+      "segments": ["shield", "model", "context", "branch"],
+      "priorities": {"shield": 100, "model": 80, "context": 90, "branch": 30},
+      "fallback": "omit",
+      "description": "Guardrail posture, model or reasoning, context, and Git branch when the product exposes them."
+    },
+    "standard": {
+      "segments": ["shield", "model", "effort", "context", "rate_limits", "cost_duration", "branch", "audit"],
+      "priorities": {"shield": 100, "model": 80, "effort": 65, "context": 90, "rate_limits": 60, "cost_duration": 50, "branch": 30, "audit": 70},
+      "fallback": "omit",
+      "description": "Safety, model, context, native allowance and session estimates, plus local content-free counters."
+    },
+    "fun": {
+      "segments": ["shield", "model", "effort", "context", "heat", "rate_limits", "cost_duration", "branch", "audit", "complexity"],
+      "priorities": {"shield": 100, "model": 80, "effort": 65, "context": 90, "heat": 20, "rate_limits": 60, "cost_duration": 50, "branch": 30, "audit": 70, "complexity": 40},
+      "fallback": "omit",
+      "description": "Balanced information with compact context heat and complexity review signals."
+    }
+  }
+}

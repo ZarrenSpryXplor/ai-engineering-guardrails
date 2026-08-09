@@ -90,6 +90,22 @@ ai-guardrails print-cursor-rules
 
 Open **Cursor Settings / Customize / Rules / User Rules**, paste the complete output, and save it. This command prints authoritative text; it does not claim installation.
 
+## Optional terminal UX
+
+Terminal UX is an explicit opt-in for concise local status and explainability. It does not read vendor billing data, persist vendor session JSON, or send telemetry anywhere.
+
+```sh
+ai-guardrails statusline preview --product all --profile standard
+ai-guardrails statusline install --product all --profile standard --dry-run
+ai-guardrails statusline install --product all --profile standard
+ai-guardrails statusline print-codex-setup
+ai-guardrails statusline print-cursor-setup
+ai-guardrails activity --since 24h
+ai-guardrails receipt --compact --fun
+```
+
+Claude Code receives the managed command-based renderer and needs workspace trust. Codex receives an explicit, narrow marker-owned `tui.status_line` edit using only documented current item IDs; the rest of `config.toml` is preserved. Cursor CLI documents terminal-title `/status-indicators`, not a programmable usage bar. The full profile, safety, performance, complexity-signal, cache, activity, and uninstall details are in the [terminal UX guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/terminal-ux.md).
+
 ## Installed baseline and local policy
 
 The installed baseline is immutable package data. It is never edited in `site-packages` or the pipx environment. To add local guidance or strengthen a deterministic rule, keep a small overlay outside the package:
@@ -110,7 +126,7 @@ The overlay lives at `~/.ai-guardrails/policy/overrides.json`; Markdown fragment
 
 ## Repository model
 
-- `ai_engineering_guardrails/_resources/` is the single canonical, read-only resource tree shipped in wheels and source distributions. It contains `policy/`, `skills/`, `enforcement/`, `routing/`, `packs/`, `config/`, `trust/`, `risk/`, `supply-chain/`, `waivers/`, `audit/`, `platform-policies/`, and `enterprise/`.
+- `ai_engineering_guardrails/_resources/` is the single canonical, read-only resource tree shipped in wheels and source distributions. It contains `policy/`, `skills/`, `enforcement/`, `routing/`, `packs/`, `config/`, `trust/`, `risk/`, `supply-chain/`, `waivers/`, `audit/`, `ux/`, `platform-policies/`, and `enterprise/`.
 - `ai_engineering_guardrails/` contains the Python 3.11+ standard-library implementation. It consumes resources from the one bundled tree whether run from a checkout, editable install, or wheel.
 - `enforcement/pre_tool_use.py` and `tools/guardrails.py` are thin repository development shims. The latter calls the same `ai_engineering_guardrails.cli:main` entry point as `ai-guardrails`.
 - `adapters/` contains generated hook fragments, Codex defence-in-depth rules, and a Cursor CLI recommendation.
@@ -126,7 +142,7 @@ The always-loaded policy is deliberately capped at 8 KiB. Detailed stack workflo
 
 The real install runs the deterministic build and full local validation before touching user configuration. It creates an immutable, content-addressed runtime under `~/.ai-guardrails/runtime/`, validates it, registers hooks using the absolute current Python interpreter, writes state atomically, and verifies every managed path afterwards. Live hooks never point back to the clone. State contains only non-sensitive paths, hashes, profiles, packs, and manual steps; backups are stored under `~/.ai-guardrails/backups/` before pre-existing configuration is first mutated.
 
-Codex receives a managed block in its effective global `AGENTS` file, a dedicated `.rules` file, a structurally merged user hook, and skills under `~/.agents/skills/`. `CODEX_HOME` is honoured when it resolves inside the selected `--home`; an external value is rejected so an alternate-home test cannot escape into real configuration. Review and trust the installed user hook with `/hooks` in Codex if prompted. The installer does not alter `config.toml`, approval mode, sandbox mode, or network access.
+Codex receives a managed block in its effective global `AGENTS` file, a dedicated `.rules` file, a structurally merged user hook, and skills under `~/.agents/skills/`. `CODEX_HOME` is honoured when it resolves inside the selected `--home`; an external value is rejected so an alternate-home test cannot escape into real configuration. Review and trust the installed user hook with `/hooks` in Codex if prompted. Core installation does not alter `config.toml`, approval mode, sandbox mode, or network access; the separately opt-in terminal UX can narrowly manage only marker-owned `tui.status_line`.
 
 Claude Code receives modular files under `~/.claude/rules/`, a structurally merged `~/.claude/settings.json` hook, and skills under `~/.claude/skills/`. Existing keys, permission rules, and unrelated hooks remain intact.
 

@@ -237,6 +237,8 @@ The future-facing content-free metrics schema can represent product, model, task
 
 API-token billing, included subscription usage, product credits, third-party model pools, and list-price estimates are different accounting systems. Lower latency is not the same as lower cost, and extra subagent contexts can increase tokens. Use product-native usage information and compare representative completed tasks; do not promise exact monetary savings.
 
+Terminal UX keeps this distinction explicit: context capacity, native token activity, native rate-limit windows, Claude's session cost estimate, local guardrail events, and complexity signals are independent fields rather than one synthetic usage score. It does not infer a bill from tokens or routing tiers. See [terminal UX](terminal-ux.md) for the opt-in local status-line and compact-receipt workflow.
+
 ## Evaluate before changing routing
 
 Treat a routing change as a small configuration experiment, not a model popularity contest. Start with 10–20 representative, bounded tasks and compare the same tasks against the current profile. Record only outcome, unnecessary files or dependencies, diff size, verification result, retries, duration, and product-native token data when it is available. Include at least one task where the correct answer is to make no code change and one that can expose unnecessary abstraction.

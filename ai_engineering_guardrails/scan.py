@@ -726,42 +726,25 @@ def changed_file_count(repo: Path) -> int:
 
 
 def session_receipt(home: Path, repo: Path, products: Sequence[str]) -> dict[str, Any]:
-    from . import state
+    from . import complexity, state, terminal_ux
 
     selected_home = home.expanduser().resolve(strict=False)
     installed = state.load_state(selected_home)
-    try:
-        audit_path: Path | None = home_path(selected_home, ".ai-guardrails/audit/events.jsonl")
-    except GuardrailsError:
-        audit_path = None
-    counts = {"allowed": 0, "warned": 0, "denied": 0}
     policy_digest = installed.get("policy_digest") or "unknown"
-    audit_lines: list[str] = []
-    if audit_path is not None and audit_path.is_file() and not audit_path.is_symlink():
-        try:
-            audit_lines = audit_path.read_text(encoding="utf-8").splitlines()[-10000:]
-        except (OSError, UnicodeDecodeError):
-            audit_lines = []
-    for line in audit_lines:
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        decision = event.get("decision")
-        if decision == "deny":
-            counts["denied"] += 1
-        elif decision == "warn":
-            counts["warned"] += 1
-        else:
-            counts["allowed"] += 1
-        policy_digest = event.get("policy_digest", policy_digest)
+    summary = terminal_ux.audit_summary(selected_home, window=None)
+    # Hooks do not comprehensively record allowed operations.  Do not turn that
+    # absence into a deceptively precise zero in a receipt.
+    counts = {"warned": summary["warnings"], "denied": summary["denials"]}
     receipt = {
-        "schema_version": 1,
+        "schema_version": 2,
         "repository_identifier_hash": sha256(str(repo.resolve(strict=False)).encode("utf-8")),
         "products": list(products),
         "files_modified_count": changed_file_count(repo),
         "risk_classes": sorted({identifier for _, identifier, _ in _changed_risk_matches(repo)}),
         "decision_counts": counts,
+        "allowed_operation_count": "unavailable; supported hooks do not comprehensively record allowed operations",
+        "guardrail_events": summary,
+        "complexity": complexity.analyse(repo),
         "verification_outcomes": [],
         "model_routing_profiles": {
             product: installed.get("products", {}).get(product, {}).get("routing_profile", "none")

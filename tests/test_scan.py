@@ -164,7 +164,9 @@ class ScanTests(unittest.TestCase):
         audit.parent.mkdir(parents=True)
         audit.symlink_to(external)
         receipt = scan.session_receipt(self.repo, self.repo, ("codex",))
-        self.assertEqual({"allowed": 0, "warned": 0, "denied": 0}, receipt["decision_counts"])
+        self.assertEqual({"warned": 0, "denied": 0}, receipt["decision_counts"])
+        self.assertEqual(2, receipt["schema_version"])
+        self.assertIn("unavailable", receipt["allowed_operation_count"])
 
     def test_scan_does_not_follow_repository_file_symlinks(self) -> None:
         external = self.repo.parent / f"{self.repo.name}-external-package.json"

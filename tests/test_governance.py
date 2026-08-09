@@ -260,12 +260,16 @@ class ExplainAndReceiptTests(unittest.TestCase):
             audit = home / ".ai-guardrails/audit/events.jsonl"
             audit.parent.mkdir(parents=True)
             audit.write_text(
-                json.dumps(
-                    {
-                        "decision": "deny",
-                        "policy_digest": "0" * 64,
-                        "request_digest": "1" * 64,
-                    }
+                "\n".join(
+                    (
+                        json.dumps({
+                            "timestamp": "2026-08-09T10:00:00Z",
+                            "decision": "deny",
+                            "policy_digest": "0" * 64,
+                            "request_digest": "1" * 64,
+                        }),
+                        json.dumps({"decision": "deny", "request_digest": "malformed-without-timestamp"}),
+                    )
                 )
                 + "\n",
                 encoding="utf-8",
@@ -275,6 +279,10 @@ class ExplainAndReceiptTests(unittest.TestCase):
             self.assertNotIn(secret, rendered)
             self.assertNotIn(str(home), rendered)
             self.assertEqual(1, receipt["decision_counts"]["denied"])
+            self.assertEqual(1, receipt["guardrail_events"]["skipped_malformed_events"])
+            self.assertNotIn("allowed", receipt["decision_counts"])
+            self.assertIn("unavailable", receipt["allowed_operation_count"])
+            self.assertEqual(2, receipt["schema_version"])
             self.assertRegex(receipt["repository_identifier_hash"], r"^[0-9a-f]{64}$")
 
 
