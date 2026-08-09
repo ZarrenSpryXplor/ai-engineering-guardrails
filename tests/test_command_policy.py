@@ -752,6 +752,26 @@ class DecisionTests(unittest.TestCase):
                 self.assertIsNotNone(match)
                 self.assertEqual("guardrail-self-modification-shell", match["id"])
 
+    def test_python_interpreter_options_do_not_bypass_guardrail_mutation_denial(self) -> None:
+        options = (
+            "-q",
+            "-b",
+            "-bb",
+            "-d",
+            "-R",
+            "-qbb",
+            "-Werror",
+            "-Xdev",
+            "--check-hash-based-pycs always",
+        )
+        for executable in ("python", "python3", "python.exe", "py"):
+            for option in options:
+                command = f"{executable} {option} -m ai_engineering_guardrails task establish --repo ."
+                with self.subTest(command=command):
+                    match = enforcement.evaluate_command(command, self.policy)
+                    self.assertIsNotNone(match)
+                    self.assertEqual("guardrail-self-modification-shell", match["id"])
+
     def test_windows_executable_suffixes_preserve_guardrails_mutation_boundaries(self) -> None:
         entrypoints = (
             "ai-guardrails.exe",

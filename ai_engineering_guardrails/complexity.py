@@ -20,7 +20,9 @@ from .resources import RESOURCE_ROOT
 from .util import GuardrailsError, atomic_write, is_reparse_point, json_bytes, path_within, sha256
 
 
-TASK_ASSURANCE_IGNORED_PARTS = IGNORED_PARTS - {"build", "dist", "target"}
+# Scanner pruning is useful for ordinary complexity signals.  Task assurance
+# instead accounts for every Git change except its explicit metadata paths.
+TASK_ASSURANCE_IGNORED_PARTS: frozenset[str] = frozenset()
 # Cargo.lock was already part of complexity reporting before capability packs;
 # keep that narrow compatibility case without inventing an unowned Rust pack.
 UNPACKED_DEPENDENCY_MANIFEST_PATTERNS = ("Cargo.toml",)
@@ -265,6 +267,15 @@ def repository_state_digest(repo: Path, *, excluded_paths: Sequence[str] = ()) -
     return digest if isinstance(digest, str) else None
 
 
+def committed_baseline(repo: Path) -> str | None:
+    """Return the current commit identifier for task-scope comparison."""
+    try:
+        value = _git(repo, ("rev-parse", "--verify", "HEAD^{commit}")).decode("ascii").strip()
+    except (GuardrailsError, UnicodeError):
+        return None
+    return value if re.fullmatch(r"[0-9a-f]{40,64}", value) else None
+
+
 def _name_status(repo: Path, diff_args: Sequence[str]) -> list[tuple[str, str]]:
     parts = _split_z(_git(repo, ("diff", "--name-status", "-z", *diff_args)))
     result: list[tuple[str, str]] = []
@@ -303,13 +314,16 @@ def _untracked(repo: Path) -> list[str]:
     ]
 
 
-def _line_count(path: Path) -> int:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576:
-        return 0
+def _line_count(path: Path) -> int | None:
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576:
+            return None
+    except OSError:
+        return None
     try:
         return len(path.read_bytes().splitlines())
     except OSError:
-        return 0
+        return None
 
 
 def _matches(relative: str, pattern: str) -> bool:
@@ -381,6 +395,18 @@ def _dependencies_for(path: str, data: bytes) -> set[str] | None:
                     return None
                 if isinstance(section, dict):
                     result.update(str(name) for name in section if isinstance(name, str))
+            peers = value.get("peerDependencies")
+            peer_metadata = value.get("peerDependenciesMeta", {})
+            if peers is not None and not isinstance(peers, dict):
+                return None
+            if not isinstance(peer_metadata, dict):
+                return None
+            for name in peers or {}:
+                metadata = peer_metadata.get(name, {})
+                if not isinstance(metadata, dict):
+                    return None
+                if metadata.get("optional") is not True:
+                    result.add(str(name))
             return result
         if Path(path).name == "pyproject.toml":
             value = tomllib.loads(data.decode("utf-8"))
@@ -477,7 +503,7 @@ def analyse(
     has_head = _has_head(root)
     if base is None and not staged and not has_head:
         return {"schema_version": 1, "available": False, "repository_identifier_hash": repository_identifier_hash, "classification": "clear", "signals": [], "limitation": "Git HEAD is unavailable; no committed change baseline was inspected."}
-    if not staged and base is None:
+    if not staged:
         records = _porcelain_entries(_git(root, ("status", "--porcelain=v1", "-z", "--untracked-files=all")))
         nested_issue = _nested_repository_issue(root, records)
         if nested_issue is not None:
@@ -498,11 +524,22 @@ def analyse(
     numstat = _numstat(root, diff_args)
     additions = sum(added for added, _, path in numstat if is_in_scope(path))
     removals = sum(removed for _, removed, path in numstat if is_in_scope(path))
-    if not staged and base is None:
+    if not staged:
         for relative in _untracked(root):
             if is_in_scope(relative) and relative not in {path for _, path in changes}:
+                line_count = _line_count(root / relative)
+                if line_count is None and task_assurance:
+                    return {
+                        "schema_version": 1,
+                        "available": False,
+                        "repository_identifier_hash": repository_identifier_hash,
+                        "classification": "clear",
+                        "signals": [],
+                        "nested_repository_state": "supported",
+                        "limitation": f"untracked file line count is unavailable: {relative}",
+                    }
                 changes.append(("A", relative))
-                additions += _line_count(root / relative)
+                additions += line_count or 0
     paths = sorted({path for _, path in changes})
     config = terminal_ux.load_thresholds()
     groups = _paths_by_kind(paths, config)
@@ -572,7 +609,7 @@ def analyse(
     new_manifests = sorted(path for status, path in changes if status == "A" and path in groups["manifests"])
     if new_manifests:
         trigger("new-build-system", "review", f"new manifest files: {len(new_manifests)}", 1, "A new build or package manifest may introduce a new toolchain.")
-    return {
+    result = {
         "schema_version": 1,
         "available": True,
         "nested_repository_state": "supported",
@@ -601,6 +638,9 @@ def analyse(
         "directory_spread": len(directories),
         "high_risk_paths": high_risk,
     }
+    if task_assurance:
+        result["changed_paths"] = paths
+    return result
 
 
 def write_cache(home: Path, result: Mapping[str, Any], *, dry_run: bool = False) -> Path:

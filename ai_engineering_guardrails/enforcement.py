@@ -638,19 +638,25 @@ def _logical_guardrails_arguments(command: Sequence[str]) -> tuple[str, ...] | N
 
     arguments = list(command[1:])
     index = 0
-    options_with_values = {"-W", "-X"}
+    options_with_values = {"-W", "-X", "--check-hash-based-pycs"}
+    terminating_options = {"-h", "-?", "--help", "--help-env", "--help-xoptions", "--help-all", "--version"}
     while index < len(arguments):
         token = arguments[index]
+        if token in terminating_options:
+            return None
         if token in options_with_values:
             index += 2
             continue
         if token.startswith("-W") or token.startswith("-X"):
             index += 1
             continue
+        if token.startswith("--check-hash-based-pycs="):
+            index += 1
+            continue
         if executable == "py" and re.fullmatch(r"-\d+(?:\.\d+)?(?:-\d+)?", token):
             index += 1
             continue
-        if token in {"-B", "-E", "-I", "-O", "-OO", "-P", "-S", "-s", "-u", "-v", "-x"}:
+        if re.fullmatch(r"-[bBdEiIOPqRsSuvx]+", token):
             index += 1
             continue
         break

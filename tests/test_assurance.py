@@ -108,6 +108,17 @@ class AssuranceTests(unittest.TestCase):
         )
         self.assertEqual(["src/**", "schemas:api/**"], result["allowed_paths"])
 
+        with self.assertRaises(GuardrailsError):
+            assurance.validate_contract(
+                {
+                    **base,
+                    "observable_outcomes": [
+                        {"id": "outcome", "description": "Evidence must be declared.", "evidence_id": "missing"}
+                    ],
+                    "required_evidence": [],
+                }
+            )
+
     def test_report_parsers_compare_without_leaking_messages_or_absolute_paths(self) -> None:
         before = {
             "version": "2.1.0",
@@ -218,6 +229,31 @@ class AssuranceTests(unittest.TestCase):
                 )["reports"]["sarif"]
                 self.assertEqual(expected, (comparison["new_findings"], comparison["resolved_findings"], comparison["unchanged_findings"]))
 
+    def test_sarif_severity_escalation_is_a_review_finding(self) -> None:
+        def report(level: str) -> dict[str, object]:
+            return {
+                "version": "2.1.0",
+                "runs": [{"tool": {"driver": {"name": "tool-a"}}, "results": [{
+                    "ruleId": "rule-one",
+                    "level": level,
+                    "partialFingerprints": {"primaryLocationLineHash": "stable"},
+                    "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app.py"}, "region": {"startLine": 1}}}],
+                }]}],
+            }
+
+        self.write_json("reports/before.sarif", report("warning"))
+        self.write_json("reports/after.sarif", report("error"))
+        comparison = assurance.compare_reports(
+            self.repo,
+            baseline_sarif=Path("reports/before.sarif"),
+            current_sarif=Path("reports/after.sarif"),
+        )
+
+        sarif = comparison["reports"]["sarif"]
+        self.assertEqual(1, sarif["severity_escalations"])
+        self.assertEqual(1, sarif["new_error_or_high_severity_findings"])
+        self.assertIn("new-high-severity-findings", {item["id"] for item in comparison["findings"]})
+
     def test_sarif_location_fallback_normalises_portable_uri_paths(self) -> None:
         def report(uri: str) -> dict[str, object]:
             return {
@@ -325,6 +361,8 @@ class AssuranceTests(unittest.TestCase):
     def test_cobertura_present_rates_are_coherent_with_counts(self) -> None:
         contradictory = (
             '<coverage line-rate="1" lines-covered="0" lines-valid="1"/>',
+            '<coverage line-rate="1" lines-covered="1" lines-valid="2"/>',
+            '<coverage line-rate="0" lines-covered="1" lines-valid="2"/>',
             '<coverage line-rate="0.5" branch-rate="1" branches-covered="0" branches-valid="1"/>',
             '<coverage line-rate="0.25" lines-covered="3" lines-valid="4"/>',
         )
@@ -401,6 +439,19 @@ class AssuranceTests(unittest.TestCase):
                 self.assertTrue(result["parsed"])
                 self.assertTrue(result["valid"])
                 self.assertEqual(expected, (result["tests"], result["failures"], result["errors"], result["sufficient_for_completion"]))
+
+    def test_junit_all_skipped_and_excessive_nesting_are_insufficient_or_malformed(self) -> None:
+        (self.repo / "reports.xml").write_text(
+            '<testsuite tests="2" failures="0" errors="0" skipped="2"/>',
+            encoding="utf-8",
+        )
+        skipped = assurance.parse_junit(Path("reports.xml"), self.repo)
+        self.assertFalse(skipped["sufficient_for_completion"])
+
+        nested = "<testsuite>" * (assurance.MAX_JUNIT_NESTING + 2) + "</testsuite>" * (assurance.MAX_JUNIT_NESTING + 2)
+        (self.repo / "reports.xml").write_text(nested, encoding="utf-8")
+        with self.assertRaisesRegex(assurance.EvidenceParseError, "nesting"):
+            assurance.parse_junit(Path("reports.xml"), self.repo)
 
     def test_malformed_junit_with_current_digests_cannot_complete(self) -> None:
         contract_path = self.write_contract()
@@ -686,6 +737,73 @@ class AssuranceTests(unittest.TestCase):
         self.assertIn("package.json:new-runtime", changed["scope"]["dependency_changes"])
         self.assertIn("new-dependency-violates-policy", {item["id"] for item in changed["contract_violations"]})
 
+        receipt = assurance.task_receipt(self.repo, home=self.home)
+        receipt_scope = receipt["task_assurance"]["scope"]
+        self.assertNotIn("dependency_changes", receipt_scope)
+        self.assertNotIn("dependency_files_changed", receipt_scope)
+        self.assertEqual(1, receipt_scope["dependency_change_count"])
+        self.assertEqual(1, receipt_scope["dependency_file_change_count"])
+        self.assertNotIn("package.json", json.dumps(receipt["task_assurance"]))
+        self.assertNotIn("new-runtime", json.dumps(receipt["task_assurance"]))
+
+    def test_task_scope_counts_tracked_ignored_paths_and_committed_changes_from_establishment(self) -> None:
+        vendor = self.repo / "vendor"
+        vendor.mkdir()
+        tracked = vendor / "generated.py"
+        tracked.write_text("base\n", encoding="utf-8")
+        self.git("add", "vendor/generated.py")
+        self.git("commit", "-m", "tracked vendor fixture")
+        self.write_contract(required_evidence=[], allowed_paths=["vendor/**"], maximum_files_changed=0)
+
+        tracked.write_text("base\nchanged\n", encoding="utf-8")
+        self.git("add", "vendor/generated.py")
+        self.git("commit", "-m", "committed task change")
+
+        result = assurance.task_status(self.repo, home=self.home)
+
+        self.assertEqual(1, result["scope"]["files_changed"])
+        self.assertIn("files-changed-limit", {item["id"] for item in result["contract_violations"]})
+        self.assertNotIn("paths-outside-allowed-set", {item["id"] for item in result["contract_violations"]})
+
+    def test_oversized_untracked_file_makes_task_scope_unavailable(self) -> None:
+        self.write_contract(required_evidence=[])
+        (self.repo / "large.txt").write_bytes(b"x\n" * 524_289)
+
+        result = assurance.task_status(self.repo, home=self.home)
+
+        self.assertFalse(result["scope"]["available"])
+        self.assertIn("repository-state-unavailable", {item["id"] for item in result["safe_halt"]["reasons"]})
+
+    def test_outcome_evidence_requires_a_fresh_declared_record(self) -> None:
+        self.write_contract(
+            observable_outcomes=[
+                {"id": "tests-pass", "description": "The declared test evidence remains current.", "evidence_id": "unit-tests"}
+            ]
+        )
+
+        result = assurance.task_status(self.repo, home=self.home)
+
+        self.assertIn("outcome-evidence-unverified", {item["id"] for item in result["evidence_gaps"]})
+
+    def test_coverage_baseline_digest_must_match_established_contract(self) -> None:
+        reports = self.repo / "reports"
+        reports.mkdir()
+        (reports / "before.xml").write_text('<coverage line-rate="0.9"/>', encoding="utf-8")
+        (reports / "after.xml").write_text('<coverage line-rate="0.8"/>', encoding="utf-8")
+        self.write_contract(
+            required_evidence=[],
+            coverage_policy={
+                "baseline_path": "reports/before.xml",
+                "current_path": "reports/after.xml",
+                "maximum_line_rate_regression": 0,
+            },
+        )
+        (reports / "before.xml").write_text('<coverage line-rate="0.8"/>', encoding="utf-8")
+
+        result = assurance.task_status(self.repo, home=self.home)
+
+        self.assertIn("coverage-baseline-changed", {item["id"] for item in result["evidence_gaps"]})
+
     def test_nested_repository_state_prevents_completed_task_assurance(self) -> None:
         self.write_contract(required_evidence=[])
         nested = self.repo / "nested"
@@ -838,6 +956,10 @@ class AssuranceTests(unittest.TestCase):
         self.assertIn("paths-outside-allowed-set", {item["id"] for item in result["contract_violations"]})
 
     def test_coverage_policy_and_invariant_evidence_are_reported_without_running_checks(self) -> None:
+        reports = self.repo / "reports"
+        reports.mkdir()
+        (reports / "before.xml").write_text('<coverage line-rate="0.9" branch-rate="0.8"/>', encoding="utf-8")
+        (reports / "after.xml").write_text('<coverage line-rate="0.8" branch-rate="0.8"/>', encoding="utf-8")
         contract_path = self.write_contract(
             invariants=[
                 {
@@ -852,10 +974,6 @@ class AssuranceTests(unittest.TestCase):
                 "maximum_line_rate_regression": 0,
             },
         )
-        reports = self.repo / "reports"
-        reports.mkdir()
-        (reports / "before.xml").write_text('<coverage line-rate="0.9" branch-rate="0.8"/>', encoding="utf-8")
-        (reports / "after.xml").write_text('<coverage line-rate="0.8" branch-rate="0.8"/>', encoding="utf-8")
         (reports / "tests.xml").write_text('<testsuite><testcase name="ok"/></testsuite>', encoding="utf-8")
         current = assurance.repository_state_digest(self.repo)
         self.assertIsNotNone(current)

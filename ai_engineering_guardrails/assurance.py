@@ -36,6 +36,7 @@ MAX_REPORT_BYTES = 2_000_000
 MAX_REPORT_COUNT = 2_147_483_647
 MAX_REPORT_SECONDS = 1_000_000_000_000.0
 MAX_REPORT_TIMESTAMP = 10_000_000_000_000
+MAX_JUNIT_NESTING = 100
 TASK_METADATA_NAMES = {TASK_CONTRACT_NAME, TASK_EVIDENCE_NAME, TASK_EVIDENCE_EXAMPLE_NAME}
 
 
@@ -314,6 +315,9 @@ def validate_contract(value: object) -> dict[str, Any]:
             raise GuardrailsError("task contract notes must be concise text")
         result["notes"] = str(value["notes"]).strip()
     known_evidence = {item["id"] for item in result["required_evidence"]}
+    for outcome in result["observable_outcomes"]:
+        if outcome.get("evidence_id") and outcome["evidence_id"] not in known_evidence:
+            raise GuardrailsError(f"task outcome references unknown evidence id: {outcome['evidence_id']}")
     for invariant in result.get("invariants", []):
         if invariant.get("evidence_id") and invariant["evidence_id"] not in known_evidence:
             raise GuardrailsError(f"task invariant references unknown evidence id: {invariant['evidence_id']}")
@@ -403,9 +407,19 @@ def _text_digest(value: object) -> str:
     return sha256(str(value).encode("utf-8"))
 
 
-def _assurance_contract_summary(contract: Mapping[str, Any]) -> dict[str, Any]:
+def _coverage_baseline_digest(root: Path, coverage_policy: Mapping[str, Any]) -> str:
+    path = root / str(coverage_policy["baseline_path"])
+    if path.is_symlink() or not path.is_file():
+        raise GuardrailsError("coverage baseline must be a regular repository file before task establishment")
+    try:
+        return file_hash(path)
+    except OSError as exc:
+        raise GuardrailsError("coverage baseline could not be read before task establishment") from exc
+
+
+def _assurance_contract_summary(contract: Mapping[str, Any], root: Path) -> dict[str, Any]:
     """Keep assurance-critical metadata without retaining task prose."""
-    return {
+    summary = {
         "objective_digest": _text_digest(contract["objective"]),
         "outcomes": [
             {
@@ -436,6 +450,9 @@ def _assurance_contract_summary(contract: Mapping[str, Any]) -> dict[str, Any]:
         "risk_class": contract["risk_class"],
         "halt_condition_digests": [_text_digest(item) for item in contract.get("halt_conditions", [])],
     }
+    if isinstance(contract.get("coverage_policy"), Mapping):
+        summary["coverage_baseline_digest"] = _coverage_baseline_digest(root, contract["coverage_policy"])
+    return summary
 
 
 def _validate_contract_provenance(value: object) -> dict[str, Any]:
@@ -453,6 +470,12 @@ def _validate_contract_provenance(value: object) -> dict[str, Any]:
             raise GuardrailsError(f"task-contract provenance {field} is invalid")
     if not isinstance(value.get("assurance_summary"), Mapping):
         raise GuardrailsError("task-contract provenance assurance_summary is invalid")
+    summary = value["assurance_summary"]
+    for field in ("scope_baseline_commit", "coverage_baseline_digest"):
+        if field in summary and (
+            not isinstance(summary[field], str) or re.fullmatch(r"[0-9a-f]{40,64}", summary[field]) is None
+        ):
+            raise GuardrailsError(f"task-contract provenance {field} is invalid")
     established = _parse_timestamp(value.get("established_at"))
     if established is None:
         raise GuardrailsError("task-contract provenance established_at is invalid")
@@ -487,12 +510,17 @@ def establish_contract(
     """Explicitly establish or replace one repository's assurance contract baseline."""
     root = _repository_root(repo)
     contract_file, contract = load_contract(root)
+    scope_baseline_commit = complexity.committed_baseline(root)
+    if scope_baseline_commit is None:
+        raise GuardrailsError("task-contract establishment requires a committed repository baseline")
+    summary = _assurance_contract_summary(contract, root)
+    summary["scope_baseline_commit"] = scope_baseline_commit
     record = _validate_contract_provenance(
         {
             "schema_version": 1,
             "repository_identifier_hash": _repository_identifier(root),
             "contract_digest": _contract_digest(contract_file),
-            "assurance_summary": _assurance_contract_summary(contract),
+            "assurance_summary": summary,
             "established_at": _iso(now or _utc_now()),
         }
     )
@@ -760,7 +788,11 @@ def parse_cobertura(path: Path, repo: Path, *, external_ci_artifact: bool = Fals
         # Reporters commonly round rates.  Permit at most one unit in the
         # declared last decimal place, while keeping exact zero/one aggregates
         # exact so contradictory pass/fail boundaries cannot be hidden.
-        tolerance = Decimal(0) if expected in {Decimal(0), Decimal(1)} else Decimal(1).scaleb(min(0, declared.as_tuple().exponent))
+        tolerance = (
+            Decimal(0)
+            if declared in {Decimal(0), Decimal(1)} or expected in {Decimal(0), Decimal(1)}
+            else Decimal(1).scaleb(min(0, declared.as_tuple().exponent))
+        )
         if abs(declared - expected) > tolerance:
             raise EvidenceParseError(f"Cobertura {rate_field} is inconsistent with {covered} and {valid}")
     if "complexity" in document.attrib:
@@ -800,7 +832,9 @@ def _junit_coherent(counts: Mapping[str, int]) -> None:
         raise EvidenceParseError("JUnit failure, error, and skipped counts exceed total tests")
 
 
-def _junit_summary(element: ET.Element) -> tuple[dict[str, int], float, bool]:
+def _junit_summary(element: ET.Element, *, depth: int = 0) -> tuple[dict[str, int], float, bool]:
+    if depth > MAX_JUNIT_NESTING:
+        raise EvidenceParseError("JUnit suite nesting exceeds the supported limit")
     name = element.tag.rsplit("}", 1)[-1]
     if name == "testcase":
         outcomes = [
@@ -822,7 +856,7 @@ def _junit_summary(element: ET.Element) -> tuple[dict[str, int], float, bool]:
         )
 
     children = [
-        _junit_summary(child)
+        _junit_summary(child, depth=depth + 1)
         for child in element
         if child.tag.rsplit("}", 1)[-1] in {"testcase", "testsuite"}
     ]
@@ -858,7 +892,7 @@ def parse_junit(path: Path, repo: Path, *, external_ci_artifact: bool = False) -
     if document.tag.rsplit("}", 1)[-1] not in {"testsuite", "testsuites"}:
         raise EvidenceParseError("JUnit report must have testsuite or testsuites root")
     counts, duration, has_results = _junit_summary(document)
-    sufficient = has_results and counts["tests"] > 0
+    sufficient = has_results and counts["tests"] > counts["skipped"]
     return {
         "schema_version": PARSER_VERSION,
         "type": "junit",
@@ -903,9 +937,23 @@ def compare_reports(
         new_ids = after_ids - before_ids
         new_count = len(new_ids) + len(after_deficient)
         resolved_count = len(before_ids - after_ids) + len(before_deficient)
+        levels = {"none": 0, "note": 1, "warning": 2, "error": 3}
+        before_levels: dict[str, int] = {}
+        after_levels: dict[str, int] = {}
+        shared_ids = before_ids & after_ids
+        for item in before_reliable:
+            if item["identity"] in shared_ids:
+                before_levels[item["identity"]] = max(before_levels.get(item["identity"], 0), levels[item["level"]])
+        for item in after_reliable:
+            if item["identity"] in shared_ids:
+                after_levels[item["identity"]] = max(after_levels.get(item["identity"], 0), levels[item["level"]])
+        severity_escalations = sum(
+            after_levels[identity] == levels["error"] and before_levels[identity] < levels["error"]
+            for identity in before_levels
+        )
         new_error = sum(item["identity"] in new_ids and item["level"] == "error" for item in after_reliable) + sum(
             item["level"] == "error" for item in after_deficient
-        )
+        ) + severity_escalations
         result["reports"]["sarif"] = {
             "baseline": _public_report(before),
             "current": _public_report(after),
@@ -914,12 +962,13 @@ def compare_reports(
             "unchanged_findings": len(before_ids & after_ids),
             "identity_deficient_baseline": len(before_deficient),
             "identity_deficient_current": len(after_deficient),
+            "severity_escalations": severity_escalations,
             "new_error_or_high_severity_findings": new_error,
         }
         if new_count:
             result["findings"].append({"id": "new-static-analysis-findings", "level": "review", "evidence": f"{new_count} new or identity-deficient SARIF finding(s)"})
         if new_error:
-            result["findings"].append({"id": "new-high-severity-findings", "level": "review", "evidence": f"{new_error} new SARIF error-level finding(s)"})
+            result["findings"].append({"id": "new-high-severity-findings", "level": "review", "evidence": f"{new_error} new or escalated SARIF error-level finding(s)"})
     if baseline_coverage is not None and current_coverage is not None:
         before = parse_cobertura(baseline_coverage, root)
         after = parse_cobertura(current_coverage, root)
@@ -1124,12 +1173,16 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
     current_digest = repository_result["digest"]
     contract_digest = _contract_digest(contract_file)
     continuity, provenance = _contract_continuity(home or Path.home(), root, contract_digest)
+    summary = provenance.get("assurance_summary", {}) if provenance is not None else {}
+    scope_baseline = summary.get("scope_baseline_commit") if isinstance(summary, Mapping) else None
+    has_scope_baseline = isinstance(scope_baseline, str) and re.fullmatch(r"[0-9a-f]{40,64}", scope_baseline) is not None
     complexity_result = complexity.analyse(
         root,
+        base=scope_baseline if has_scope_baseline else None,
         task_assurance=True,
         excluded_paths=tuple(TASK_METADATA_NAMES),
     )
-    paths = _changed_paths(root)
+    paths = list(complexity_result.get("changed_paths", []))
     violations, warnings = _scope_report(contract, complexity_result, paths)
     ledger = _load_evidence_ledger(root)
     entries: dict[str, dict[str, Any]] = {}
@@ -1146,6 +1199,13 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
         entries[entry["id"]] = entry
     evidence: list[dict[str, Any]] = []
     gaps: list[dict[str, str]] = list(ledger_errors)
+    if contract["status"] == "completed" and not has_scope_baseline:
+        gaps.append(
+            {
+                "id": "task-scope-baseline-unavailable",
+                "detail": "establish the task contract against a committed repository baseline before asserting completion",
+            }
+        )
     dependency_policy = contract.get("dependency_policy")
     ambiguous_dependencies = list(complexity_result.get("ambiguous_dependency_manifests", []))
     if dependency_policy == "forbid-new-runtime-dependencies" and ambiguous_dependencies:
@@ -1226,6 +1286,18 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
     coverage: dict[str, Any] | None = None
     coverage_policy = contract.get("coverage_policy")
     if isinstance(coverage_policy, Mapping):
+        established_coverage_digest = summary.get("coverage_baseline_digest") if isinstance(summary, Mapping) else None
+        try:
+            baseline_is_current = established_coverage_digest == _coverage_baseline_digest(root, coverage_policy)
+        except GuardrailsError:
+            baseline_is_current = False
+        if not baseline_is_current:
+            gaps.append(
+                {
+                    "id": "coverage-baseline-changed",
+                    "detail": "coverage baseline differs from the digest established with this task contract",
+                }
+            )
         try:
             comparison = compare_reports(
                 root,
@@ -1261,6 +1333,18 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
                         "detail": f"branch-rate regression {-branch_delta:.6f} exceeds declared allowance {float(branch_allowance):.6f}",
                     }
                 )
+
+    for outcome in contract["observable_outcomes"]:
+        if not isinstance(outcome, Mapping) or not isinstance(outcome.get("evidence_id"), str):
+            continue
+        evidence_id = outcome["evidence_id"]
+        if evidence_states.get(evidence_id) != "fresh":
+            gaps.append(
+                {
+                    "id": "outcome-evidence-unverified",
+                    "detail": f"{outcome['id']} is not backed by fresh evidence {evidence_id}",
+                }
+            )
 
     invariants: list[dict[str, str]] = []
     for invariant in contract.get("invariants", []):
@@ -1378,6 +1462,21 @@ def task_receipt(repo: Path, *, home: Path | None = None, now: dt.datetime | Non
 
     selected_home = home or Path.home()
     status = task_status(repo, home=selected_home, now=now)
+    receipt_scope = {
+        key: value
+        for key, value in status["scope"].items()
+        if key not in {"dependency_changes", "dependency_files_changed"}
+    }
+    receipt_scope["dependency_change_count"] = (
+        len(status["scope"]["dependency_changes"])
+        if isinstance(status["scope"].get("dependency_changes"), list)
+        else None
+    )
+    receipt_scope["dependency_file_change_count"] = (
+        len(status["scope"]["dependency_files_changed"])
+        if isinstance(status["scope"].get("dependency_files_changed"), list)
+        else None
+    )
     task_assurance = {
         "contract_digest": status["contract_digest"],
         "repository_state_digest": status["repository_state_digest"],
@@ -1387,7 +1486,7 @@ def task_receipt(repo: Path, *, home: Path | None = None, now: dt.datetime | Non
         "contract_continuity": status["contract_continuity"],
         "repository_state": status["repository_state"],
         "nested_repository_state": status["nested_repository_state"],
-        "scope": dict(status["scope"]),
+        "scope": receipt_scope,
         "evidence": [
             {"id": item["id"], "type": item["type"], "state": item["state"]}
             for item in status["evidence"]

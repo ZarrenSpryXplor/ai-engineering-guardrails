@@ -129,6 +129,48 @@ class ComplexityTests(unittest.TestCase):
         self.assertEqual([], result["ambiguous_dependency_manifests"])
         self.assertEqual(["package.json"], result["dependency_files_changed"])
 
+    def test_mandatory_peer_dependencies_are_runtime_dependencies(self) -> None:
+        manifest = self.repo / "package.json"
+        manifest.write_text(json.dumps({"peerDependencies": {"existing-peer": "1"}}), encoding="utf-8")
+        self.git("add", "package.json")
+        self.git("commit", "-m", "peer dependency baseline")
+        manifest.write_text(
+            json.dumps(
+                {
+                    "peerDependencies": {"existing-peer": "1", "required-peer": "1", "optional-peer": "1"},
+                    "peerDependenciesMeta": {"optional-peer": {"optional": True}},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = complexity.analyse(self.repo, task_assurance=True)
+
+        self.assertEqual(["package.json:required-peer"], result["new_runtime_dependencies"])
+        self.assertEqual([], result["ambiguous_dependency_manifests"])
+
+    def test_task_assurance_counts_tracked_scanner_ignored_paths_and_rejects_oversized_untracked_lines(self) -> None:
+        vendor = self.repo / "vendor"
+        vendor.mkdir()
+        tracked = vendor / "generated.py"
+        tracked.write_text("base\n", encoding="utf-8")
+        self.git("add", "vendor/generated.py")
+        self.git("commit", "-m", "tracked vendor fixture")
+        tracked.write_text("base\nchanged\n", encoding="utf-8")
+
+        ordinary = complexity.analyse(self.repo)
+        assured = complexity.analyse(self.repo, task_assurance=True)
+
+        self.assertEqual(0, ordinary["files_changed"])
+        self.assertEqual(1, assured["files_changed"])
+        self.assertEqual(["vendor/generated.py"], assured["changed_paths"])
+
+        (self.repo / "large-untracked.txt").write_bytes(b"x\n" * 524_289)
+        unavailable = complexity.analyse(self.repo, task_assurance=True)
+
+        self.assertFalse(unavailable["available"])
+        self.assertIn("line count is unavailable", unavailable["limitation"])
+
     def test_pep621_is_supported_but_dynamic_or_tool_only_pyproject_is_uncertain(self) -> None:
         manifest = self.repo / "pyproject.toml"
         manifest.write_text(
