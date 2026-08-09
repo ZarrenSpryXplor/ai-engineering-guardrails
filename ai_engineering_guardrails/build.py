@@ -483,7 +483,6 @@ def validate_codex_rules(rules: bytes | None = None) -> str:
         raise GuardrailsError("codex execpolicy check did not report the expected forbidden decision")
     return "passed"
 
-
 def validate_spacelift_policies() -> str:
     from .scan import validate_spacelift_policy_structure
 
@@ -492,17 +491,27 @@ def validate_spacelift_policies() -> str:
     executable = shutil.which("opa")
     if executable is None:
         return "skipped semantic Rego execution (opa executable not available); structural checks passed"
-    result = subprocess.run(
-        [executable, "test", str(spacelift_root)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise GuardrailsError("OPA semantic policy tests failed; run opa test platform-policies/spacelift for details")
-    return "passed"
 
+    fixture = spacelift_root / "fixtures/guardrails.json"
+    policy_directories = sorted(
+        path.parent for path in spacelift_root.glob("*/guardrails.rego")
+    )
+    for policy_directory in policy_directories:
+        result = subprocess.run(
+            [executable, "test", str(fixture), str(policy_directory)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode != 0:
+            relative_policy = policy_directory.relative_to(RESOURCE_ROOT)
+            raise GuardrailsError(
+                "OPA semantic policy tests failed; run "
+                "opa test platform-policies/spacelift/fixtures/guardrails.json "
+                f"{relative_policy.as_posix()} for details"
+            )
+    return "passed"
 
 def validate(
     products: Sequence[str] = PRODUCTS,
