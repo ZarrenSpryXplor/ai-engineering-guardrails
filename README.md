@@ -22,16 +22,22 @@ This is defence in depth, not a replacement for product approvals, sandboxing, o
 
 ## Start here
 
-Python 3.11+ is required. Install from a reviewed clone with [pipx](https://pipx.pypa.io/) and preview before writing anything. Do not use `sudo`, Administrator, or an elevated shell.
+Python 3.11+ is required. Install the published package with [pipx](https://pipx.pypa.io/) and preview before writing anything. Do not use `sudo`, Administrator, or an elevated shell.
+
+```sh
+pipx install ai-engineering-guardrails
+
+ai-guardrails install --dry-run
+ai-guardrails install
+ai-guardrails status
+```
+
+For contributor work or a reviewed local checkout instead:
 
 ```sh
 git clone https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git
 cd ai-engineering-guardrails
 pipx install .
-
-ai-guardrails install --dry-run
-ai-guardrails install
-ai-guardrails status
 ```
 
 The default install detects local supported products, uses no cloud login, and changes no main model, approval setting, sandbox, network setting, routing profile, or terminal decoration. If no product is detected, it makes no change and prints the explicit command to use.
@@ -42,7 +48,7 @@ For a direct Git install, pin a reviewed tag or full commit rather than a moving
 pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.git@<reviewed-tag-or-full-commit>'
 ```
 
-PyPI Trusted Publishing is prepared, but this repository does not claim a package is already available there. After the first successful PyPI release, the supported command will be `pipx install ai-engineering-guardrails`; until then, use a reviewed clone or wheel. Maintainers should follow the [release guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/releasing.md).
+The package is published on [PyPI](https://pypi.org/project/ai-engineering-guardrails/) through Trusted Publishing. Maintainers should follow the [release guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/releasing.md) for protected approvals, version/tag checks, and provenance.
 
 ## Optional extras
 

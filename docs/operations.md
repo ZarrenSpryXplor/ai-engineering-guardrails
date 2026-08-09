@@ -130,9 +130,9 @@ An optional `.ai-guardrails-verification.json` may provide non-sensitive named o
 
 The file must contain no prompts, source, full commands, raw logs, environment data, or secrets. Static scan cannot infer or prove external review or semantic validation; it only checks that declared categories match the canonical requirement and explicitly reports that limitation.
 
-## First public release checklist
+## Release checklist
 
-This repository can prepare artifacts locally, but a public release remains a human-controlled GitHub and package-registry operation. Follow [Releasing to PyPI](releasing.md) for the exact Trusted Publisher, protected-environment, tag/version, and approval procedure. Before the first release, a maintainer should:
+This repository can prepare artifacts locally, but every public release remains a human-controlled GitHub and package-registry operation. Follow [Releasing to PyPI](releasing.md) for the exact Trusted Publisher, protected-environment, tag/version, and approval procedure. Before each release, a maintainer should:
 
 1. Enable GitHub private vulnerability reporting and confirm that the contact route in [SECURITY.md](../SECURITY.md) works.
 2. Protect `main` with a ruleset or branch-protection rule that requires at least one review, requires review from [CODEOWNERS](../.github/CODEOWNERS), prevents force pushes and deletion, and requires these current checks: `tests`, `Compatibility (Python 3.14)`, `Wheel smoke (ubuntu-latest)`, `Wheel smoke (macos-latest)`, and `Wheel smoke (windows-latest)`. Also require the current CodeQL analysis checks when CodeQL is enabled.
