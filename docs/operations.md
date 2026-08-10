@@ -185,4 +185,4 @@ This repository can prepare artifacts locally, but every public release remains 
 4. Review [CHANGELOG.md](../CHANGELOG.md), choose the version, create a signed tag only after the checks are green, and preserve the built artifacts for that exact commit.
 5. Use the protected PyPI workflow rather than a local registry credential. It publishes the validated wheel and source distribution with PyPI Trusted Publishing attestations; never publish from an unreviewed local checkout or expose registry credentials to an agent.
 
-`CODEOWNERS` and workflow files are repository inputs; they do not enforce review or protected-branch behavior until a GitHub administrator enables the corresponding hosted settings.
+`CODEOWNERS` and workflow files are repository inputs; they do not enforce review or protected-branch behaviour until a GitHub administrator enables the corresponding hosted settings.

@@ -54,7 +54,7 @@ Work normally. Skills are short, on-demand procedures rather than another giant 
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
-Default behavior:
+Default behaviour:
 
 - local source edits, builds, tests, lint, rendering, validation, and plans are available;
 - remote infrastructure changes, production changes, publication, credential reads, and destructive operations are denied;
@@ -67,15 +67,19 @@ See what is active:
 ai-guardrails status --repo .
 ```
 
-Human output uses compact tables and terminal-aware colour. Use `--no-color` (or the common `NO_COLOR` environment variable) when styling is not useful. Validation, status, and other report-style commands offer deterministic JSON for scripts:
+Human-facing help, progress, reports, and errors use one Rich presentation layer. Comparable records use tables, summaries use compact panels, and exact paths or identifiers fold instead of disappearing behind an ellipsis. Output follows the current terminal width but never exceeds 80 columns.
+
+Put `--no-color` before the command to disable colour everywhere, or use the common `NO_COLOR` environment variable. Commands that already expose the option also accept it after the command. JSON, SARIF, and JUnit formats remain plain and deterministic for scripts:
 
 ```sh
+ai-guardrails --no-color doctor
 ai-guardrails validate --format json
 ai-guardrails status --repo . --format json
 ai-guardrails skills audit --format json
+ai-guardrails effective --format human
 ```
 
-Machine formats write one JSON document to standard output and do not include Rich styling.
+`effective` keeps its historical JSON default; select `--format human` for the Rich view. Machine formats never include Rich styling. Pasteable setup or instruction content and exact interactive confirmation prompts also stay plain so their text remains exact.
 
 For substantive technical prose, use `workstation-technical-writing`. Its ASD-STE100-informed guidance preserves technical terms and facts without claiming formal compliance. The optional offline audit is advisory:
 
@@ -120,7 +124,7 @@ ai-guardrails complexity --repo . --write-snapshot
 ai-guardrails receipt --repo . --product all --compact
 ```
 
-Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behavior, and removal.
+Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behaviour, and removal.
 
 ## Ansible
 

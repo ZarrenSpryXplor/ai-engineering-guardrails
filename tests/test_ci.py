@@ -154,7 +154,7 @@ class SampleTests(unittest.TestCase):
             self.assertIn("| Artifact | Skipped |", text)
             self.assertIn("https://github.example/owner/repository/actions/runs/1234", text)
 
-    def test_validation_summary_reports_optional_validator_outcomes(self) -> None:
+    def test_validation_summary_reports_semantic_rego_pass(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             summary = Path(temporary) / "summary.md"
             result = self.run_ci(
@@ -172,7 +172,7 @@ class SampleTests(unittest.TestCase):
             self.assertIn("| Repository validation | Passed |", text)
             self.assertRegex(text, r"\| Codex execpolicy \| (Passed|Skipped) \|")
             self.assertIn("| Spacelift policy structure | Passed |", text)
-            self.assertRegex(text, r"\| OPA semantic Rego \| (Passed|Skipped) \|")
+            self.assertIn("| OPA semantic Rego | Passed |", text)
             self.assertNotIn(str(REPOSITORY_ROOT), text)
 
     def test_validation_failure_does_not_mislabel_canonical_data(self) -> None:
@@ -199,7 +199,7 @@ class SampleTests(unittest.TestCase):
             self.assertIn("| OPA semantic Rego | Unknown |", text)
             self.assertNotIn("Canonical and generated data", text)
 
-    def test_validation_summary_preserves_explicit_skips(self) -> None:
+    def test_validation_summary_preserves_optional_codex_skip(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             summary = Path(temporary) / "summary.md"
             skipped = subprocess.CompletedProcess(
@@ -215,7 +215,7 @@ class SampleTests(unittest.TestCase):
                             {"id": "capability-packs", "outcome": "passed"},
                             {"id": "routing-agents", "outcome": "passed"},
                             {"id": "codex-execpolicy", "outcome": "skipped"},
-                            {"id": "spacelift-rego", "outcome": "skipped"},
+                            {"id": "spacelift-rego", "outcome": "passed"},
                         ],
                     }
                 ),
@@ -233,7 +233,50 @@ class SampleTests(unittest.TestCase):
             self.assertIn("| Repository validation | Passed |", text)
             self.assertIn("| Codex execpolicy | Skipped |", text)
             self.assertIn("| Spacelift policy structure | Passed |", text)
-            self.assertIn("| OPA semantic Rego | Skipped |", text)
+            self.assertIn("| OPA semantic Rego | Passed |", text)
+
+    def test_validation_rejects_skipped_spacelift_semantics(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=[sys.executable, "tools/guardrails.py", "validate", "--format", "json"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": "passed",
+                    "checks": [
+                        {"id": "generated-output", "outcome": "passed"},
+                        {"id": "policy-fixtures", "outcome": "passed"},
+                        {"id": "capability-packs", "outcome": "passed"},
+                        {"id": "routing-agents", "outcome": "passed"},
+                        {"id": "codex-execpolicy", "outcome": "skipped"},
+                        {"id": "spacelift-rego", "outcome": "skipped"},
+                    ],
+                }
+            ),
+            stderr="",
+        )
+        errors = io.StringIO()
+        with (
+            mock.patch.object(CI_MODULE.subprocess, "run", return_value=completed),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(errors),
+        ):
+            returncode = CI_MODULE.run_validation()
+
+        self.assertEqual(1, returncode)
+        self.assertIn("requires OPA semantic Rego execution", errors.getvalue())
+
+    def test_validation_workflows_provision_pinned_opa(self) -> None:
+        action = "open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0"
+        for relative, expected_uses in (
+            (".github/workflows/tests.yml", 2),
+            (".github/workflows/publish-pypi.yml", 1),
+        ):
+            with self.subTest(workflow=relative):
+                text = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn('OPA_VERSION: "1.19.0"', text)
+                self.assertEqual(expected_uses, text.count(action))
+                self.assertEqual(expected_uses, text.count("version: ${{ env.OPA_VERSION }}"))
 
     def test_validation_summary_rejects_malformed_json_contract(self) -> None:
         checks = [

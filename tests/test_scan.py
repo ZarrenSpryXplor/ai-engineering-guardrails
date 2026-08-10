@@ -203,7 +203,8 @@ class ScanTests(unittest.TestCase):
                     ["receipt", "--home", str(self.repo), "--repo", str(plain), "--format", "compact"]
                 )
             self.assertEqual(0, result)
-            self.assertIn("Files changed       unavailable", output.getvalue())
+            self.assertIn("Files changed", output.getvalue())
+            self.assertIn("unavailable", output.getvalue())
 
             json_output = io.StringIO()
             with contextlib.redirect_stdout(json_output):

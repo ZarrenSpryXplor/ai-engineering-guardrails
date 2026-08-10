@@ -5,7 +5,7 @@ Thanks for helping make agent-assisted engineering a little less exciting in the
 ## Before opening a change
 
 - Read the [operator documentation](docs/README.md), [architecture](docs/architecture.md), [threat model](docs/threat-model.md), and repository `AGENTS.md`.
-- Discuss a material behavior, policy, product-format, or release-process change in an issue before investing in a large patch.
+- Discuss a material behaviour, policy, product-format, or release-process change in an issue before investing in a large patch.
 - Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
 - Keep changes focused. Do not combine a policy change with unrelated refactoring, dependency upgrades, or generated-file edits.
 
@@ -31,7 +31,9 @@ git diff --check
 git diff -- adapters dist
 ```
 
-The documentation audit is advisory. The second build should leave generated output unchanged. Run package and temporary-home checks when changing package resources, installation, state, product adapters, or runtime behavior. State the observed commands, skipped optional validators, compatibility limits, and any documentation change in the pull request.
+The documentation audit is advisory. The second build should leave generated output unchanged. Run package and temporary-home checks when changing package resources, installation, state, product adapters, or runtime behaviour. State the observed commands, skipped optional validators, compatibility limits, and any documentation change in the pull request.
+
+The full contributor suite expects OPA 1.19.0 on `PATH`. Hosted CI installs the pinned binary; local contributors can use the [official OPA installation guidance](https://www.openpolicyagent.org/docs/latest/#running-opa). End-user CLI validation still reports a structural-only skip when OPA is unavailable.
 
 ## Review expectations
 

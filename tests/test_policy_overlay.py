@@ -251,14 +251,18 @@ class LocalPolicyOverlayTests(unittest.TestCase):
         self.write_overlay(data)
         for arguments, expected in (
             (["policy", "list", "--home", str(self.home)], "local-block-demo"),
-            (["policy", "show", "local-block-demo", "--home", str(self.home)], "source: local"),
-            (["policy", "validate", "--home", str(self.home)], "validation passed"),
+            (["policy", "show", "local-block-demo", "--home", str(self.home)], "Source"),
+            (["policy", "validate", "--home", str(self.home)], "Local policy validation"),
             (["policy", "diff", "--home", str(self.home)], "local-block-demo"),
         ):
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 self.assertEqual(0, cli.main(arguments))
             self.assertIn(expected, output.getvalue())
+            if arguments[1] == "show":
+                self.assertIn("local", output.getvalue())
+            if arguments[1] == "validate":
+                self.assertIn("passed", output.getvalue())
         self.assertEqual(0, cli.main(["policy", "apply", "--home", str(self.home), "--dry-run"]))
 
 

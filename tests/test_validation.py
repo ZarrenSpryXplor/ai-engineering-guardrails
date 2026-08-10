@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import contextlib
+import io
 import json
 import tempfile
 import tomllib
@@ -29,8 +31,15 @@ class ValidationTests(unittest.TestCase):
                     tomllib.loads(text)
 
     def test_full_validation_without_optional_executables(self) -> None:
-        with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
-            build.validate(check_codex=True)
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            report = build.validate(check_codex=True)
+
+        spacelift = next(check for check in report["checks"] if check["id"] == "spacelift-rego")
+        self.assertEqual("skipped", spacelift["outcome"])
+        self.assertIn("opa executable not available", spacelift["detail"])
 
     def test_codex_check_skips_when_unavailable(self) -> None:
         with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):

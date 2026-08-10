@@ -47,16 +47,17 @@ class TerminalUxTests(unittest.TestCase):
 
     def test_human_terminal_ux_commands_fall_back_to_ascii_for_legacy_stdout(self) -> None:
         binary = io.BytesIO()
-        legacy_stdout = io.TextIOWrapper(binary, encoding="cp1252")
+        legacy_stdout = io.TextIOWrapper(binary, encoding="ascii")
         with mock.patch.object(sys, "stdout", legacy_stdout):
             self.assertEqual(0, cli.main(["statusline", "preview", "--product", "all", "--profile", "standard"]))
             self.assertEqual(0, cli.main(["demo", "--scenario", "all", "--fun"]))
             self.assertEqual(0, cli.main(["complexity", "--repo", str(self.home)]))
         legacy_stdout.flush()
-        output = binary.getvalue().decode("cp1252")
+        output = binary.getvalue().decode("ascii")
         self.assertIn("[G]", output)
         self.assertIn("KISS OK", output)
         self.assertNotIn("🛡", output)
+        self.assertNotIn("—", output)
 
     def test_renderer_omits_stale_cache(self) -> None:
         cache = terminal_ux.cache_directory(self.home)
@@ -154,7 +155,8 @@ class TerminalUxTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["activity", "--home", str(self.home), "--since", "7d"]))
-        self.assertIn("Observed 1", output.getvalue())
+        self.assertIn("Observed", output.getvalue())
+        self.assertIn("1", output.getvalue())
         self.assertNotIn("secret", output.getvalue())
 
     def test_activity_rejects_malformed_identifiers_and_refreshes_the_renderer_cache(self) -> None:
@@ -395,7 +397,7 @@ class TerminalUxTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["statusline", "uninstall", "--product", "claude", "--home", str(self.home)]))
-        self.assertIn("partially complete", output.getvalue())
+        self.assertIn("partially complete", output.getvalue().casefold())
         result = io.StringIO()
         with contextlib.redirect_stdout(result):
             self.assertEqual(0, cli.main(["statusline", "uninstall", "--product", "claude", "--home", str(self.home), "--format", "json"]))

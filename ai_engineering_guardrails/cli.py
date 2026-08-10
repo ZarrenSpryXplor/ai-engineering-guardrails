@@ -6,6 +6,7 @@ import argparse
 import contextlib
 import io
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -28,7 +29,29 @@ from . import (
     terminal_ux,
 )
 from .resources import repository_output_root
-from .util import PRODUCTS, SAFETY_PROFILES, TRUST_MODES, GuardrailsError, home_path
+from .util import PRODUCTS, SAFETY_PROFILES, TRUST_MODES, GuardrailsError, atomic_write, home_path
+
+
+class RichArgumentParser(argparse.ArgumentParser):
+    """Keep argparse semantics while routing human help through Rich."""
+
+    help_no_color = False
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault(
+            "formatter_class",
+            lambda prog: argparse.HelpFormatter(prog, max_help_position=24, width=78),
+        )
+        if sys.version_info >= (3, 14):
+            # Python 3.14 colours help itself, and `add_parser` propagates that
+            # choice to subparsers. Keep the formatter plain so `--no-color`,
+            # `NO_COLOR`, and the presentation layer remain the only styling owner.
+            kwargs["color"] = False
+        super().__init__(*args, **kwargs)
+
+    def _print_message(self, message: str, file: Any | None = None) -> None:
+        if message:
+            presentation.print_help(message, file=file, no_color=self.help_no_color)
 
 
 def selected_products(value: str) -> tuple[str, ...]:
@@ -61,7 +84,12 @@ def add_mutation_flags(parser: argparse.ArgumentParser) -> None:
 
 def add_no_color(parser: argparse.ArgumentParser) -> None:
     """Accept the common explicit accessibility preference."""
-    parser.add_argument("--no-color", action="store_true", help="disable terminal colour in human output")
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="disable terminal colour in human output",
+    )
 
 
 def _human_ascii_only() -> bool:
@@ -72,6 +100,21 @@ def _human_ascii_only() -> bool:
     except (LookupError, UnicodeEncodeError):
         return True
     return False
+
+
+def _human_options(args: argparse.Namespace) -> dict[str, bool]:
+    """Return the two presentation preferences shared by human renderers."""
+    return {
+        "no_color": bool(getattr(args, "no_color", False)),
+        "ascii_only": _human_ascii_only(),
+    }
+
+
+def _selected_output_format(args: argparse.Namespace) -> str:
+    """Resolve the one command whose legacy default depends on other flags."""
+    if args.command == "receipt" and args.format is None:
+        return "compact" if args.compact else "human" if args.fun else "json"
+    return str(getattr(args, "format", "human"))
 
 
 def parse_model_overrides(values: Sequence[str]) -> dict[str, dict[str, str]]:
@@ -158,8 +201,7 @@ def _run_consumer_install(
     updating: bool,
 ) -> None:
     details = io.StringIO()
-    output = contextlib.nullcontext() if args.verbose else contextlib.redirect_stdout(details)
-    with output:
+    with contextlib.redirect_stdout(details):
         install.prepare_installation(dry_run=args.dry_run, home=args.home)
         if updating:
             report = install.update(
@@ -185,44 +227,109 @@ def _run_consumer_install(
                 model_overrides=parse_model_overrides(args.model_override) or None,
                 explicit_product=args.product is not None,
             )
-    install.print_consumer_install_summary(report, detected)
+    if args.verbose:
+        presentation.print_operation_log(
+            "Installation details",
+            details.getvalue(),
+            **_human_options(args),
+        )
+    summary = io.StringIO()
+    with contextlib.redirect_stdout(summary):
+        install.print_consumer_install_summary(report, detected)
+    presentation.print_operation_log(
+        "Installation preview" if args.dry_run else "Installation summary",
+        summary.getvalue(),
+        **_human_options(args),
+    )
 
 
-def _routing_show(products: Sequence[str], profile_name: str) -> None:
+def _routing_show(args: argparse.Namespace) -> None:
     config = routing.load_config()
-    profile = config["profiles"][profile_name]
-    print(f"profile: {profile_name}: {profile['description']}")
+    profile = config["profiles"][args.profile]
     parallel = profile["parallelism"]
-    print(f"parallelism: {parallel['maximum_read_only_agents']} read-only, 1 writing, no parallel writers")
-    for product in products:
+    presentation.print_properties(
+        "Routing profile",
+        (
+            ("Profile", args.profile),
+            ("Description", profile["description"]),
+            (
+                "Parallelism",
+                f"{parallel['maximum_read_only_agents']} read-only, 1 writing, no parallel writers",
+            ),
+        ),
+        notes=("Model availability is unverified; the main-session model is unchanged.",),
+        **_human_options(args),
+    )
+    rows = []
+    for product in selected_products(args.product):
         models = routing.resolved_models(product, config, None)
-        print(f"{product}: " + ", ".join(f"{tier}={model}" for tier, model in models.items()))
-        print("  availability: unverified; main-session model unchanged")
+        rows.extend((product, tier, model, "unverified") for tier, model in models.items())
+    presentation.print_records(
+        "Resolved model mappings",
+        ("Product", "Tier", "Model", "Availability"),
+        rows,
+        **_human_options(args),
+    )
 
 
-def _packs_list() -> None:
-    for identifier, data in packs.load_packs().items():
-        print(f"{identifier}\t{data['type']}\t{data['description']}")
+def _packs_list(args: argparse.Namespace) -> None:
+    presentation.print_records(
+        "Capability packs",
+        ("Pack", "Type", "Description"),
+        (
+            (identifier, data["type"], data["description"])
+            for identifier, data in packs.load_packs().items()
+        ),
+        **_human_options(args),
+    )
 
 
-def _packs_detect(repo: Path, explain: bool) -> None:
-    result = packs.detect_packs(repo)
-    print("detected packs: " + (", ".join(result.active_packs) if result.active_packs else "none"))
-    if result.package_manager:
-        print(f"Node package manager: {result.package_manager}")
-    if result.build_root:
-        print(f"configured build root: {result.build_root}")
-    if explain:
-        for evidence in result.evidence:
-            print(f"{evidence.pack_id}: {evidence.kind} {evidence.path} matched {evidence.detector}")
-        for warning in result.warnings:
-            print(f"warning: {warning}")
+def _packs_detect(args: argparse.Namespace) -> None:
+    result = packs.detect_packs(args.repo)
+    presentation.print_properties(
+        "Repository capability detection",
+        (
+            ("Repository", result.repo),
+            ("Detected packs", ", ".join(result.active_packs) or "none"),
+            ("Node package manager", result.package_manager or "not detected"),
+            ("Configured build root", result.build_root or "not configured"),
+        ),
+        **_human_options(args),
+    )
+    if args.packs_command == "explain":
+        presentation.print_records(
+            "Detection evidence",
+            ("Pack", "Kind", "Path", "Detector"),
+            (
+                (item.pack_id, item.kind, item.path, item.detector)
+                for item in result.evidence
+            ),
+            **_human_options(args),
+        )
+        if result.warnings:
+            presentation.print_operation_log(
+                "Detection warnings",
+                (f"warning: {warning}" for warning in result.warnings),
+                **_human_options(args),
+            )
         available = packs.load_packs()
+        guidance_rows = []
         for identifier in result.active_packs:
             guidance = packs.pack_guidance(available[identifier])
-            print(f"{identifier}: on-demand policy: {'; '.join(guidance['policy'])}")
-            print(f"{identifier}: verification: {'; '.join(guidance['verification'])}")
-            print(f"{identifier}: routing hints: {'; '.join(guidance['routing'])}")
+            guidance_rows.extend(
+                (identifier, category, "; ".join(guidance[key]))
+                for category, key in (
+                    ("On-demand policy", "policy"),
+                    ("Verification", "verification"),
+                    ("Routing hints", "routing"),
+                )
+            )
+        presentation.print_records(
+            "Pack guidance",
+            ("Pack", "Guidance", "Details"),
+            guidance_rows,
+            **_human_options(args),
+        )
 
 
 def _installed_runtime(home: Path, product: str) -> tuple[Mapping[str, Any], Mapping[str, Any]] | None:
@@ -293,21 +400,26 @@ def _explain(args: argparse.Namespace) -> enforcement.Decision:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
     else:
-        print(f"decision: {value['decision']}")
-        print(f"rollout mode: {value['rollout_mode']}")
-        print(f"rule: {value['rule_id'] or 'none'}")
-        print(f"operation class: {value['operation_class'] or 'unclassified'}")
-        if value["matched_tokens"]:
-            print("matched tokens: " + ", ".join(value["matched_tokens"]))
-        if value["matched_fields"]:
-            print("matched fields: " + ", ".join(value["matched_fields"]))
-        print(f"target: {value['target'] or 'unknown/protected'}")
-        print(f"lifecycle: {value['target_lifecycle']}")
-        print(f"policy source: {value['policy_source'] or 'none'}")
-        print(f"reason: {value['reason'] or 'no deterministic match'}")
-        print(f"waiver: {value['applicable_waiver'] or 'none'}")
-        print(f"safety profile: {value['safety_profile']}; trust mode: {value['trust_mode']}")
-        print("simulation only: no command or tool call was executed")
+        presentation.print_properties(
+            "Deterministic decision",
+            (
+                ("Decision", value["decision"]),
+                ("Rollout mode", value["rollout_mode"]),
+                ("Rule", value["rule_id"] or "none"),
+                ("Operation class", value["operation_class"] or "unclassified"),
+                ("Matched tokens", ", ".join(value["matched_tokens"]) or "none"),
+                ("Matched fields", ", ".join(value["matched_fields"]) or "none"),
+                ("Target", value["target"] or "unknown/protected"),
+                ("Lifecycle", value["target_lifecycle"]),
+                ("Policy source", value["policy_source"] or "none"),
+                ("Reason", value["reason"] or "no deterministic match"),
+                ("Waiver", value["applicable_waiver"] or "none"),
+                ("Safety profile", value["safety_profile"]),
+                ("Trust mode", value["trust_mode"]),
+            ),
+            notes=("Simulation only: no command or tool call was executed.",),
+            **_human_options(args),
+        )
     return decision
 
 
@@ -332,18 +444,36 @@ def _waiver_create(args: argparse.Namespace) -> None:
         expiry_minutes=args.expires_minutes,
         maximum_uses=args.maximum_uses,
     )
-    print(f"created {value['id']} with {value['remaining_uses']} use(s); raw command/tool arguments were not stored")
+    presentation.print_properties(
+        "Waiver created",
+        (
+            ("ID", value["id"]),
+            ("Rule", value["rule_id"]),
+            ("Expires", value["expires_at"]),
+            ("Remaining uses", value["remaining_uses"]),
+        ),
+        notes=("Raw command and tool arguments were not stored.",),
+        **_human_options(args),
+    )
 
 
 def _waiver_list(args: argparse.Namespace) -> None:
     values = state.list_waivers(args.home.expanduser().resolve(strict=False))
-    if not values:
-        print("no local waivers")
-    for value in values:
-        print(
-            f"{value['id']}: rule={value['rule_id']} expires={value['expires_at']} "
-            f"remaining={value['remaining_uses']}/{value['maximum_uses']} change={value['change_reference']}"
-        )
+    presentation.print_records(
+        "Local waivers",
+        ("Waiver", "Details"),
+        (
+            (
+                value["id"],
+                f"rule={value['rule_id']}\nexpires={value['expires_at']}\n"
+                f"remaining={value['remaining_uses']}/{value['maximum_uses']}\n"
+                f"change={value['change_reference']}",
+            )
+            for value in values
+        ),
+        empty_message="No local waivers.",
+        **_human_options(args),
+    )
 
 
 def _policy_source_label(value: object) -> str:
@@ -355,13 +485,23 @@ def _policy_source_label(value: object) -> str:
 
 def _policy_list(args: argparse.Namespace) -> None:
     effective = policy.validate_local_overlay(args.home.expanduser().resolve(strict=False))["policy"]
+    rows = []
     for group in ("rules", "classifications", "structured_tool_rules"):
         for rule in effective[group]:
             mode = str(rule.get("rollout_mode", "n/a"))
-            print(
-                f"{rule['id']}\tsource={_policy_source_label(rule.get('policy_source'))}\t"
-                f"operation={rule.get('operation_class', 'unclassified')}\tmode={mode}"
+            rows.append(
+                (
+                    rule["id"],
+                    f"source={_policy_source_label(rule.get('policy_source'))}; "
+                    f"operation={rule.get('operation_class', 'unclassified')}; mode={mode}",
+                )
             )
+    presentation.print_records(
+        "Effective policy",
+        ("Rule", "Effective classification"),
+        rows,
+        **_human_options(args),
+    )
 
 
 def _policy_show(args: argparse.Namespace) -> None:
@@ -377,33 +517,44 @@ def _policy_show(args: argparse.Namespace) -> None:
     )
     if rule is None:
         raise GuardrailsError(f"unknown effective policy rule: {args.rule_id}")
-    print(f"id: {rule['id']}")
-    print(f"description: {rule.get('description', 'operation classification')}")
-    print(f"source: {_policy_source_label(rule.get('policy_source'))}")
-    print(f"risk category: {rule.get('risk_category', 'not applicable')}")
-    print(f"operation class: {rule.get('operation_class', 'unclassified')}")
-    print(f"effective rollout mode: {rule.get('rollout_mode', 'n/a')}")
-    print(f"local mode strengthening: {'yes' if rule.get('local_mode_strengthening') else 'no'}")
     strategy = rule.get("matching_strategy")
-    if isinstance(strategy, Mapping):
-        print(f"matching strategy: {strategy.get('type', 'unknown')}")
+    presentation.print_properties(
+        "Policy rule",
+        (
+            ("ID", rule["id"]),
+            ("Description", rule.get("description", "operation classification")),
+            ("Source", _policy_source_label(rule.get("policy_source"))),
+            ("Risk category", rule.get("risk_category", "not applicable")),
+            ("Operation class", rule.get("operation_class", "unclassified")),
+            ("Effective rollout mode", rule.get("rollout_mode", "n/a")),
+            ("Local mode strengthening", "yes" if rule.get("local_mode_strengthening") else "no"),
+            ("Matching strategy", strategy.get("type", "unknown") if isinstance(strategy, Mapping) else "n/a"),
+        ),
+        **_human_options(args),
+    )
 
 
 def _policy_validate(args: argparse.Namespace) -> None:
     result = policy.validate_local_overlay(args.home.expanduser().resolve(strict=False))
-    print(
-        "local policy validation passed: "
-        f"{len(result['fragments'])} behavioural fragment(s), "
-        f"{len(result['overlay']['rule_modes'])} mode strengthening(s), "
-        f"{len(result['overlay']['additional_rules'])} additional deterministic rule(s)"
+    presentation.print_properties(
+        "Local policy validation",
+        (
+            ("Result", "passed"),
+            ("Behavioural fragments", len(result["fragments"])),
+            ("Mode strengthenings", len(result["overlay"]["rule_modes"])),
+            ("Additional deterministic rules", len(result["overlay"]["additional_rules"])),
+        ),
+        **_human_options(args),
     )
 
 
 def _policy_diff(args: argparse.Namespace) -> None:
     diff = policy.local_policy_diff(args.home.expanduser().resolve(strict=False))
-    print("Local policy differences from the bundled baseline")
-    for label, values in diff.items():
-        print(f"- {label.replace('_', ' ')}: {', '.join(values) if values else 'none'}")
+    presentation.print_properties(
+        "Local policy differences",
+        ((label.replace("_", " ").title(), ", ".join(values) or "none") for label, values in diff.items()),
+        **_human_options(args),
+    )
 
 
 def _policy_apply(args: argparse.Namespace) -> None:
@@ -412,7 +563,14 @@ def _policy_apply(args: argparse.Namespace) -> None:
     products = install.installed_products(home)
     if not products:
         raise GuardrailsError("no managed installation was found; install a product before applying local policy")
-    install.update(products, home, force=args.force, dry_run=args.dry_run)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        install.update(products, home, force=args.force, dry_run=args.dry_run)
+    presentation.print_operation_log(
+        "Policy apply preview" if args.dry_run else "Policy applied",
+        output.getvalue(),
+        **_human_options(args),
+    )
 
 
 def _policy_audit(args: argparse.Namespace) -> bool:
@@ -420,17 +578,31 @@ def _policy_audit(args: argparse.Namespace) -> bool:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return not result["errors"]
-    print(
-        "Policy evidence audit: "
-        + ("structural checks passed" if not result["errors"] else "structural issues found")
-        + f"; {result['sources']} sources, {result['policy_records']} policy records"
+    presentation.print_properties(
+        "Policy evidence audit",
+        (
+            ("Structural checks", "passed" if not result["errors"] else "issues found"),
+            ("Evidence sources", result["sources"]),
+            ("Policy records", result["policy_records"]),
+            ("Reviews due", len(result["reviews"])),
+        ),
+        **_human_options(args),
     )
-    for item in result["errors"]:
-        print(f"error: {item['id']}: {item['detail']}")
-    for item in result["reviews"]:
-        print(f"review: {item['id']}: {item['detail']}")
-    if not result["errors"] and not result["reviews"]:
-        print("No evidence review dates are overdue.")
+    presentation.print_findings(
+        "Evidence findings",
+        [
+            *(
+                {"level": "error", "id": item["id"], "message": item["detail"]}
+                for item in result["errors"]
+            ),
+            *(
+                {"level": "review", "id": item["id"], "message": item["detail"]}
+                for item in result["reviews"]
+            ),
+        ],
+        clean_message="No evidence review dates are overdue.",
+        **_human_options(args),
+    )
     return not result["errors"]
 
 
@@ -440,14 +612,31 @@ def _policy_evidence(args: argparse.Namespace) -> None:
         print(json.dumps(result, indent=2, sort_keys=True))
         return
     metadata = result["policy"]
-    print(f"policy: {metadata['id']}")
-    print(f"polarity: {metadata['polarity']}; scope: {metadata['scope']}")
-    print(f"rationale: {metadata['rationale']}")
-    print(f"confidence: {metadata['confidence']}; review after: {metadata['review_after']}")
-    for source in result["sources"]:
-        print(f"evidence: {source['id']}: {source['title']} ({source['url']})")
-    for item in result["review_findings"]:
-        print(f"review: {item['detail']}")
+    presentation.print_properties(
+        "Policy evidence",
+        (
+            ("Policy", metadata["id"]),
+            ("Polarity", metadata["polarity"]),
+            ("Scope", metadata["scope"]),
+            ("Rationale", metadata["rationale"]),
+            ("Confidence", metadata["confidence"]),
+            ("Review after", metadata["review_after"]),
+        ),
+        **_human_options(args),
+    )
+    presentation.print_records(
+        "Evidence sources",
+        ("Source", "Title", "URL"),
+        ((source["id"], source["title"], source["url"]) for source in result["sources"]),
+        **_human_options(args),
+    )
+    if result["review_findings"]:
+        presentation.print_findings(
+            "Review findings",
+            ({"level": "review", "id": "review-date", "message": item["detail"]} for item in result["review_findings"]),
+            clean_message="No review findings.",
+            **_human_options(args),
+        )
 
 
 def _task_result(args: argparse.Namespace, *, receipt: bool) -> bool:
@@ -457,40 +646,68 @@ def _task_result(args: argparse.Namespace, *, receipt: bool) -> bool:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         title = "Task receipt" if receipt else "Task status"
-        print(f"{title}: {task_result['effective_status']}")
         scope = task_result["scope"]
-        if scope["available"]:
-            print(
-                "  Scope: "
-                f"{scope['files_changed']} file(s), {scope['lines_added']} added, {scope['lines_removed']} removed, "
-                f"{scope['directories_changed']} directories changed"
-            )
-        else:
-            print("  Scope: unavailable")
-        print("  Evidence: " + (", ".join(f"{item['id']}={item['state']}" for item in task_result["evidence"]) or "none required"))
-        print(f"  Contract continuity: {task_result['contract_continuity']}")
+        scope_detail = (
+            f"{scope['files_changed']} file(s), {scope['lines_added']} added, "
+            f"{scope['lines_removed']} removed, {scope['directories_changed']} directories changed"
+            if scope["available"]
+            else "unavailable"
+        )
+        rows: list[tuple[object, object]] = [
+            ("Effective status", task_result["effective_status"]),
+            ("Scope", scope_detail),
+            (
+                "Evidence",
+                ", ".join(f"{item['id']}={item['state']}" for item in task_result["evidence"])
+                or "none required",
+            ),
+            ("Contract continuity", task_result["contract_continuity"]),
+        ]
         coverage = task_result.get("coverage")
         if isinstance(coverage, Mapping):
-            print(f"  Coverage line-rate delta: {coverage['line_rate_delta']:+.4f}")
+            rows.append(("Coverage line-rate delta", f"{coverage['line_rate_delta']:+.4f}"))
+        presentation.print_properties(title, rows, **_human_options(args))
+        findings: list[dict[str, object]] = []
         for invariant in task_result.get("invariants", []):
             if isinstance(invariant, Mapping) and invariant.get("state") != "declared-evidence-fresh":
-                print(f"  invariant: {invariant.get('id')}={invariant.get('state')}")
+                findings.append(
+                    {
+                        "level": "review",
+                        "id": invariant.get("id", "invariant"),
+                        "message": invariant.get("state", "unknown"),
+                    }
+                )
         for item in task_result.get("contract_violations", []):
-            print(f"  violation: {item['detail']}")
+            findings.append({"level": "error", "id": "contract-violation", "message": item["detail"]})
         for item in task_result.get("evidence_gaps", []):
-            print(f"  evidence gap: {item['detail']}")
+            findings.append({"level": "review", "id": "evidence-gap", "message": item["detail"]})
         for item in task_result.get("warnings", []):
-            print(f"  warning: {item['detail']}")
+            findings.append({"level": "warning", "id": "warning", "message": item["detail"]})
+        if findings:
+            presentation.print_findings(
+                "Assurance findings",
+                findings,
+                clean_message="No assurance findings.",
+                **_human_options(args),
+            )
         if task_result.get("safe_halt", {}).get("required") or task_result.get("halt_reasons"):
-            print("  Safe halt: preserve work; refresh or supply the named evidence before claiming completion.")
+            presentation.print_message(
+                "Safe halt",
+                "Preserve work; refresh or supply the named evidence before claiming completion.",
+                outcome="warning",
+                **_human_options(args),
+            )
     return bool(task_result["completed"] or task_result["contract_status"] != "completed")
 
 
 def _task_init(args: argparse.Namespace) -> None:
     paths = assurance.initialise_task(args.repo, force=args.force, dry_run=args.dry_run)
     prefix = "would create" if args.dry_run else "created"
-    print(f"{prefix} task contract: {paths['contract']}")
-    print(f"evidence ledger example: {paths['evidence_example']}")
+    presentation.print_properties(
+        "Task assurance initialisation",
+        (("Task contract", f"{prefix}: {paths['contract']}"), ("Evidence ledger example", paths["evidence_example"])),
+        **_human_options(args),
+    )
 
 
 def _task_establish(args: argparse.Namespace) -> None:
@@ -499,11 +716,15 @@ def _task_establish(args: argparse.Namespace) -> None:
         print(json.dumps(result, indent=2, sort_keys=True))
         return
     action = "would establish" if args.dry_run else "established"
-    print(f"Task contract {action}: {result['contract_digest']}")
-    if not args.dry_run:
-        print(
-            "Interactive confirmation completed. Supported agent-issued establishment commands are blocked by deterministic command policy; local filesystem control remains outside this boundary."
-        )
+    notes = () if args.dry_run else (
+        "Interactive confirmation completed. Supported agent-issued establishment commands are blocked by deterministic command policy; local filesystem control remains outside this boundary.",
+    )
+    presentation.print_properties(
+        "Task contract",
+        (("Action", action), ("Digest", result["contract_digest"])),
+        notes=notes,
+        **_human_options(args),
+    )
 
 
 def _component_inspect(args: argparse.Namespace) -> bool:
@@ -511,12 +732,22 @@ def _component_inspect(args: argparse.Namespace) -> bool:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return not any(item["level"] == "error" for item in result["findings"])
-    print(f"Component: {result['component_type']}; digest={result['component_digest']}")
-    print(f"Files inspected: {result['files_inspected']}; entry: {result['entry_document'] or 'not found'}")
-    if not result["findings"]:
-        print("No structural or high-confidence indicators found; this is not a safety guarantee.")
-    for item in result["findings"]:
-        print(f"{item['level']}: {item['id']}: {item['path']}:{item['line']}: {item['message']}")
+    presentation.print_properties(
+        "Component inspection",
+        (
+            ("Component type", result["component_type"]),
+            ("Digest", result["component_digest"]),
+            ("Files inspected", result["files_inspected"]),
+            ("Entry document", result["entry_document"] or "not found"),
+        ),
+        **_human_options(args),
+    )
+    presentation.print_findings(
+        "Inspection findings",
+        result["findings"],
+        clean_message="No structural or high-confidence indicators found; this is not a safety guarantee.",
+        **_human_options(args),
+    )
     return not any(item["level"] == "error" for item in result["findings"])
 
 
@@ -525,13 +756,30 @@ def _component_audit(args: argparse.Namespace) -> bool:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return not any("error" in item for item in result["components"])
-    print("Component audit")
-    if not result["components"]:
-        print("  No known component locations were present beneath the selected home.")
-    for item in result["components"]:
-        detail = item.get("component_type", item.get("error", "component"))
-        print(f"  {item['state']}: {item['path']} ({detail})")
-    print("  " + result["limitation"])
+    if result["components"]:
+        presentation.print_records(
+            "Component audit",
+            ("State", "Path", "Type / error"),
+            (
+                (item["state"], item["path"], item.get("component_type", item.get("error", "component")))
+                for item in result["components"]
+            ),
+            outcome_column=0,
+            **_human_options(args),
+        )
+    else:
+        presentation.print_message(
+            "Component audit",
+            "No known component locations were present beneath the selected home.",
+            outcome="warning",
+            **_human_options(args),
+        )
+    presentation.print_message(
+        "Limitation",
+        result["limitation"],
+        outcome="warning",
+        **_human_options(args),
+    )
     return not any("error" in item for item in result["components"])
 
 
@@ -549,8 +797,16 @@ def _component_trust(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(record, indent=2, sort_keys=True))
         return
-    print(("Trust preview" if args.dry_run else "Trusted component") + f": {record['component_digest']}")
-    print(f"  expires: {record['expires_at']}; tier: {record['permission_tier']}")
+    presentation.print_properties(
+        "Trust preview" if args.dry_run else "Trusted component",
+        (
+            ("Digest", record["component_digest"]),
+            ("Expires", record["expires_at"]),
+            ("Permission tier", record["permission_tier"]),
+        ),
+        notes=("Trust is local and digest-bound; it does not grant runtime authority.",),
+        **_human_options(args),
+    )
 
 
 def _component_list(args: argparse.Namespace) -> None:
@@ -558,11 +814,21 @@ def _component_list(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps({"schema_version": 1, "components": values}, indent=2, sort_keys=True))
         return
-    if not values:
-        print("No local component trust records.")
-        return
-    for value in values:
-        print(f"{value['trust_status']}: {value['component_digest']} ({value['component_type']}); expires={value['expires_at']}")
+    presentation.print_records(
+        "Component trust records",
+        ("Status", "Digest", "Details"),
+        (
+            (
+                value["trust_status"],
+                value["component_digest"],
+                f"type={value['component_type']}\nexpires={value['expires_at']}",
+            )
+            for value in values
+        ),
+        outcome_column=0,
+        empty_message="No local component trust records.",
+        **_human_options(args),
+    )
 
 
 def _component_revoke(args: argparse.Namespace) -> None:
@@ -571,7 +837,12 @@ def _component_revoke(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
-    print(("would revoke" if args.dry_run else "revoked") if changed else "trust record not found or already revoked")
+    presentation.print_message(
+        "Component trust",
+        ("Would revoke" if args.dry_run else "Revoked") if changed else "Trust record not found or already revoked",
+        outcome="warning" if args.dry_run or not changed else "passed",
+        **_human_options(args),
+    )
 
 
 def _skills_audit(args: argparse.Namespace) -> bool:
@@ -591,19 +862,24 @@ def _statusline_products(value: str) -> tuple[str, ...]:
     return terminal_ux.STATUSLINE_PRODUCTS if value == "all" else (value,)
 
 
-def _print_value(value: Mapping[str, Any], output_format: str) -> None:
-    if output_format == "json":
+def _print_value(value: Mapping[str, Any], args: argparse.Namespace) -> None:
+    if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
+    rows = []
     for product, details in value.get("products", value).items():
         if isinstance(details, Mapping):
             state_value = details.get("state", details.get("integration", "configured"))
             profile = details.get("profile")
-            suffix = f"; profile={profile}" if isinstance(profile, str) else ""
-            print(f"{product}: {state_value}{suffix}")
             note = details.get("note") or details.get("manual_step") or details.get("capability")
-            if isinstance(note, str):
-                print(f"  {note}")
+            rows.append((product, state_value, profile or "not applicable", note or "none"))
+    presentation.print_records(
+        "Terminal UX",
+        ("Product", "State / integration", "Profile", "Notes"),
+        rows,
+        outcome_column=1,
+        **_human_options(args),
+    )
 
 
 def _statusline_capabilities(args: argparse.Namespace) -> None:
@@ -615,7 +891,7 @@ def _statusline_capabilities(args: argparse.Namespace) -> None:
             "cursor": {"integration": "native-manual", "capability": "documented /status-indicators terminal-title control; programmable usage bar unsupported"},
         },
     }
-    _print_value(value, args.format)
+    _print_value(value, args)
 
 
 def _statusline_preview(args: argparse.Namespace) -> None:
@@ -627,13 +903,18 @@ def _statusline_preview(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps({"schema_version": 1, "products": values}, indent=2, sort_keys=True))
         return
+    rows = []
     for product, value in values.items():
-        print(f"{product}: {value['integration']}")
-        if isinstance(value.get("example"), str):
-            print("  " + value["example"])
-        if isinstance(value.get("native_fields"), list):
-            print("  native fields: " + ", ".join(value["native_fields"]))
-        print("  " + value["note"])
+        example = value.get("example")
+        fields = value.get("native_fields")
+        preview = example if isinstance(example, str) else ", ".join(fields) if isinstance(fields, list) else "none"
+        rows.append((product, value["integration"], preview, value["note"]))
+    presentation.print_records(
+        "Terminal UX preview",
+        ("Product", "Integration", "Preview / native fields", "Notes"),
+        rows,
+        **_human_options(args),
+    )
 
 
 def _statusline_install(args: argparse.Namespace) -> None:
@@ -646,24 +927,37 @@ def _statusline_install(args: argparse.Namespace) -> None:
                 _statusline_products(args.product), args.home, profile=args.profile, force=args.force, dry_run=args.dry_run
             )
     else:
-        install.prepare_installation(dry_run=args.dry_run, home=args.home)
-        report = install.statusline_install(
-            _statusline_products(args.product), args.home, profile=args.profile, force=args.force, dry_run=args.dry_run
-        )
+        details = io.StringIO()
+        with contextlib.redirect_stdout(details):
+            install.prepare_installation(dry_run=args.dry_run, home=args.home)
+            report = install.statusline_install(
+                _statusline_products(args.product), args.home, profile=args.profile, force=args.force, dry_run=args.dry_run
+            )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))
         return
-    print("Terminal UX preview" if args.dry_run else "Terminal UX installed")
-    for product, entry in report["products"].items():
-        print(f"{product}: {entry['integration']}; profile={entry['profile']}")
-        if entry["integration"] == "native-manual":
-            print("  " + entry["manual_step"].splitlines()[0])
+    if details.getvalue():
+        presentation.print_operation_log("Terminal UX changes", details.getvalue(), **_human_options(args))
+    presentation.print_records(
+        "Terminal UX preview" if args.dry_run else "Terminal UX installed",
+        ("Product", "Integration", "Profile", "Manual step"),
+        (
+            (
+                product,
+                entry["integration"],
+                entry["profile"],
+                entry.get("manual_step", "none").splitlines()[0],
+            )
+            for product, entry in report["products"].items()
+        ),
+        **_human_options(args),
+    )
     if args.dry_run:
-        print("No changes were made")
+        presentation.print_message("Dry run", "No changes were made.", outcome="warning", **_human_options(args))
 
 
 def _statusline_status(args: argparse.Namespace) -> None:
-    _print_value({"products": install.statusline_status(_statusline_products(args.product), args.home)}, args.format)
+    _print_value({"products": install.statusline_status(_statusline_products(args.product), args.home)}, args)
 
 
 def _events_summary(args: argparse.Namespace) -> None:
@@ -672,9 +966,16 @@ def _events_summary(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:
-        print(f"{summary['window']}: {summary['warnings']} warning(s), {summary['denials']} denial(s)")
-        if summary["last_event_at"]:
-            print(f"last recorded event: {summary['last_event_at']}")
+        presentation.print_properties(
+            "Guardrail events",
+            (
+                ("Window", summary["window"]),
+                ("Warnings", summary["warnings"]),
+                ("Denials", summary["denials"]),
+                ("Last recorded event", summary["last_event_at"] or "none"),
+            ),
+            **_human_options(args),
+        )
 
 
 def _activity(args: argparse.Namespace) -> None:
@@ -692,15 +993,23 @@ def _activity(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
-    print(f"Activity ({summary['window']})")
-    print(f"  Observed {summary['observed']}; warnings {summary['warnings']}; denials {summary['denials']}")
-    if summary["operation_classes"]:
-        print("  Operation classes " + ", ".join(f"{name}={count}" for name, count in summary["operation_classes"].items()))
-    if summary["rule_ids"]:
-        print("  Rules " + ", ".join(f"{name}={count}" for name, count in summary["rule_ids"].items()))
-    if summary["last_event_at"] is None:
-        print("  No recorded hook events in this window")
-    print("  Visual Studio and JetBrains have no deterministic hook events.")
+    presentation.print_properties(
+        "Guardrail activity",
+        (
+            ("Window", summary["window"]),
+            ("Observed", summary["observed"]),
+            ("Warnings", summary["warnings"]),
+            ("Denials", summary["denials"]),
+            (
+                "Operation classes",
+                ", ".join(f"{name}={count}" for name, count in summary["operation_classes"].items()) or "none",
+            ),
+            ("Rules", ", ".join(f"{name}={count}" for name, count in summary["rule_ids"].items()) or "none"),
+            ("Last recorded event", summary["last_event_at"] or "none"),
+        ),
+        notes=("Visual Studio and JetBrains have no deterministic hook events.",),
+        **_human_options(args),
+    )
 
 
 def _complexity(args: argparse.Namespace) -> None:
@@ -727,21 +1036,37 @@ def _complexity(args: argparse.Namespace) -> None:
         if args.format == "json":
             print(json.dumps(result, indent=2, sort_keys=True))
             return
-        print("Maintainability evidence comparison")
+        rows = []
         sarif = result["reports"].get("sarif")
         if isinstance(sarif, Mapping):
-            print(
-                "  SARIF: "
-                f"{sarif['new_findings']} new, {sarif['resolved_findings']} resolved, {sarif['unchanged_findings']} unchanged"
+            rows.append(
+                (
+                    "SARIF",
+                    f"{sarif['new_findings']} new, {sarif['resolved_findings']} resolved, "
+                    f"{sarif['unchanged_findings']} unchanged",
+                )
             )
         coverage = result["reports"].get("cobertura")
         if isinstance(coverage, Mapping):
-            print(f"  Coverage line-rate delta: {coverage['line_rate_delta']:+.4f}")
+            rows.append(("Coverage line-rate delta", f"{coverage['line_rate_delta']:+.4f}"))
         junit = result["reports"].get("junit")
         if isinstance(junit, Mapping):
-            print(f"  JUnit: {junit['tests']} tests, {junit['failures']} failures, {junit['errors']} errors")
-        for finding in result["findings"]:
-            print(f"  {finding['id']}: {finding['evidence']}")
+            rows.append(("JUnit", f"{junit['tests']} tests, {junit['failures']} failures, {junit['errors']} errors"))
+        presentation.print_properties(
+            "Maintainability evidence comparison",
+            rows,
+            **_human_options(args),
+        )
+        if result["findings"]:
+            presentation.print_findings(
+                "Comparison findings",
+                (
+                    {"level": "review", "id": finding["id"], "message": finding["evidence"]}
+                    for finding in result["findings"]
+                ),
+                clean_message="No comparison findings.",
+                **_human_options(args),
+            )
         return
     result = complexity.analyse(args.repo, base=args.base, staged=args.staged)
     if args.write_snapshot:
@@ -749,39 +1074,80 @@ def _complexity(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return
-    clear_label = "OK" if _human_ascii_only() else "✓"
-    label = "KISS " + ({"clear": clear_label, "review": "review", "high-change": "high-change"}[result["classification"]])
-    print(label)
-    if not result.get("available"):
-        print("  " + result["limitation"])
-    for signal in result.get("signals", []):
-        if isinstance(signal, Mapping):
-            print("  - " + str(signal.get("evidence", signal.get("id", "signal"))))
-        else:
-            print("  - " + str(signal))
+    presentation.print_properties(
+        "KISS complexity",
+        (
+            ("Classification", result["classification"]),
+            ("Available", "yes" if result.get("available") else "no"),
+            ("Limitation", result.get("limitation") or "none"),
+        ),
+        **_human_options(args),
+    )
+    presentation.print_records(
+        "Complexity signals",
+        ("Signal", "Evidence"),
+        (
+            (
+                signal.get("id", "signal") if isinstance(signal, Mapping) else "signal",
+                signal.get("evidence", signal.get("id", "signal")) if isinstance(signal, Mapping) else signal,
+            )
+            for signal in result.get("signals", [])
+        ),
+        empty_message="No complexity signals.",
+        **_human_options(args),
+    )
 
 
 def _receipt(args: argparse.Namespace) -> None:
     receipt = scan.session_receipt(args.home, args.repo, selected_products(args.product))
-    output_format = args.format or ("compact" if args.compact else ("human" if args.fun else "json"))
+    output_format = _selected_output_format(args)
     if output_format == "json":
         print(json.dumps(receipt, indent=2, sort_keys=True))
         return
     if output_format == "compact":
         events = receipt["guardrail_events"]
-        print(("[G] Change summary" if _human_ascii_only() else "🛡 Change summary") if args.fun else "Change summary")
-        print(f"  Repository          {receipt['repository_identifier_hash'][:12]}")
-        print("  Products            " + ", ".join(receipt["products"]))
         files_changed = receipt["files_modified_count"]
-        print(f"  Files changed       {files_changed if files_changed is not None else 'unavailable'}")
-        print(f"  Guardrails          {events['warnings']} warning(s), {events['denials']} denial(s) in {events['window']}")
-        print(f"  Complexity          {receipt['complexity']['classification']}")
-        print("  Routing             " + ", ".join(f"{name}={profile}" for name, profile in receipt["model_routing_profiles"].items()))
-        print(f"  Policy              {str(receipt['policy_digest'])[:12]}")
-        print("  Verification gaps   " + "; ".join(receipt["unverified_checks"]))
+        presentation.print_properties(
+            ("[G] Change summary" if _human_ascii_only() else "🛡 Change summary") if args.fun else "Change summary",
+            (
+                ("Repository", receipt["repository_identifier_hash"][:12]),
+                ("Products", ", ".join(receipt["products"])),
+                ("Files changed", files_changed if files_changed is not None else "unavailable"),
+                ("Guardrails", f"{events['warnings']} warning(s), {events['denials']} denial(s) in {events['window']}"),
+                ("Complexity", receipt["complexity"]["classification"]),
+                ("Routing", ", ".join(f"{name}={profile}" for name, profile in receipt["model_routing_profiles"].items())),
+                ("Policy", str(receipt["policy_digest"])[:12]),
+                ("Verification gaps", "; ".join(receipt["unverified_checks"]) or "none"),
+            ),
+            **_human_options(args),
+        )
         return
-    print(("[G] Repository/change receipt" if _human_ascii_only() else "🛡 Repository/change receipt") if args.fun else "Repository/change receipt")
-    print(json.dumps(receipt, indent=2, sort_keys=True))
+    presentation.print_json_human(
+        ("[G] Repository/change receipt" if _human_ascii_only() else "🛡 Repository/change receipt") if args.fun else "Repository/change receipt",
+        receipt,
+        **_human_options(args),
+    )
+
+
+def _print_repository_scan(args: argparse.Namespace, findings: Sequence[scan.Finding]) -> None:
+    presentation.print_properties(
+        "Repository scan",
+        (
+            ("Repository", args.repo.resolve(strict=False)),
+            ("Semantic analysis", "not claimed"),
+            ("Errors", sum(item.level == "error" for item in findings)),
+            ("Warnings", sum(item.level == "warning" for item in findings)),
+            ("Notes", sum(item.level == "note" for item in findings)),
+        ),
+        notes=("Conservative static checks only; no YAML, Rego, shell, SQL, or schema semantic parser is claimed.",),
+        **_human_options(args),
+    )
+    presentation.print_findings(
+        "Scan findings",
+        (item.as_dict() for item in findings),
+        clean_message="No findings.",
+        **_human_options(args),
+    )
 
 
 def _demo(args: argparse.Namespace) -> None:
@@ -843,24 +1209,41 @@ def _demo(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
-    header = "[G] Synthetic demonstration - no displayed command was executed" if _human_ascii_only() else "🛡 Synthetic demonstration — no displayed command was executed"
-    print(header if args.fun else "Synthetic demonstration - no displayed command was executed")
+    human_options = _human_options(args)
+    ascii_only = human_options["ascii_only"]
+    header = "[G] Synthetic demonstration" if ascii_only else "🛡 Synthetic demonstration"
+    separator = " - " if ascii_only else " — "
     for name, section in rendered.items():
-        print(name + ":")
+        rows = []
         for item in section:
             if "decision" in item:
                 label = item.get("command", item.get("operation", "synthetic"))
-                print(f"  {label:<36} {item['decision'].upper() if item['decision'] != 'no-decision' else 'ALLOW'}")
+                rows.append((label, item["decision"].upper() if item["decision"] != "no-decision" else "ALLOW", "synthetic"))
             elif "line" in item:
-                print(f"  {item['profile']:<36} {item['line']}")
+                rows.append((item["profile"], item["line"], "status line"))
             else:
-                print(f"  KISS {item['classification']:<31} {', '.join(item['signal_ids']) or 'no signals'}")
+                label = "OK" if item["classification"] == "clear" else item["classification"]
+                rows.append((f"KISS {label}", ", ".join(item["signal_ids"]) or "no signals", "complexity"))
+        presentation.print_records(
+            f"{header if args.fun else 'Synthetic demonstration'}{separator}{name}",
+            ("Scenario", "Result", "Kind"),
+            rows,
+            outcome_column=1 if all("decision" in item for item in section) else None,
+            **human_options,
+        )
+    presentation.print_message(
+        "Safety note",
+        "No displayed command was executed.",
+        outcome="passed",
+        **human_options,
+    )
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Vendor-neutral AI engineering guardrails")
+    parser = RichArgumentParser(description="Vendor-neutral AI engineering guardrails")
     parser.add_argument("--version", action="version", version=f"ai-engineering-guardrails {__version__}")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("--no-color", action="store_true", help="disable terminal colour in human output")
+    sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     build_parser = sub.add_parser("build", help="build deterministic generated adapters")
     add_product(build_parser)
@@ -904,6 +1287,13 @@ def create_parser() -> argparse.ArgumentParser:
     add_product(effective_parser)
     add_home(effective_parser)
     effective_parser.add_argument("--repo", type=Path)
+    effective_parser.add_argument(
+        "--format",
+        choices=("human", "json"),
+        default="json",
+        help="output format; JSON remains the compatibility default",
+    )
+    add_no_color(effective_parser)
 
     diff_parser = sub.add_parser("diff-installed", help="compare managed paths to installation state")
     add_product(diff_parser)
@@ -1159,10 +1549,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if sys.version_info < (3, 11):
         print("error: Python 3.11 or newer is required", file=sys.stderr)
         return 1
-    args = create_parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    RichArgumentParser.help_no_color = "--no-color" in arguments or "NO_COLOR" in os.environ
+    args = create_parser().parse_args(arguments)
     try:
         if args.command == "build":
-            build.build(selected_products(args.product))
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                build.build(selected_products(args.product))
+            presentation.print_operation_log("Build", output.getvalue(), **_human_options(args))
         elif args.command == "validate":
             output_root = repository_output_root()
             with contextlib.redirect_stdout(io.StringIO()):
@@ -1187,14 +1582,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             products, detected = _resolve_consumer_products(args.product, args.home, "install")
             if args.product == "all" and sys.platform != "win32" and "visualstudio" in products:
                 products = tuple(product for product in products if product != "visualstudio")
-                print("Visual Studio was skipped: its user-level adapter is supported only on Windows")
+                presentation.print_message(
+                    "Product selection",
+                    "Visual Studio was skipped: its user-level adapter is supported only on Windows.",
+                    outcome="warning",
+                    **_human_options(args),
+                )
             _run_consumer_install(args, products, detected, updating=False)
         elif args.command == "update":
             products, detected = _resolve_consumer_products(args.product, args.home, "update")
             _run_consumer_install(args, products, detected, updating=True)
         elif args.command == "uninstall":
             products, _ = _resolve_consumer_products(args.product, args.home, "uninstall")
-            install.uninstall(products, args.home, force=args.force, dry_run=args.dry_run)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                install.uninstall(products, args.home, force=args.force, dry_run=args.dry_run)
+            presentation.print_operation_log(
+                "Uninstall preview" if args.dry_run else "Uninstall",
+                output.getvalue(),
+                **_human_options(args),
+            )
         elif args.command == "status":
             products, _ = _resolve_consumer_products(args.product, args.home, "status")
             with contextlib.redirect_stdout(io.StringIO()):
@@ -1210,43 +1617,124 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ascii_only=_human_ascii_only(),
                 )
         elif args.command == "doctor":
-            report = install.doctor(selected_products(args.product), args.home)
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = install.doctor(selected_products(args.product), args.home)
+            presentation.print_checks(
+                "AI Guardrails Doctor",
+                report["checks"],
+                **_human_options(args),
+            )
             if any(check["outcome"] == "fail" for check in report["checks"]):
                 return 1
         elif args.command == "effective":
-            install.effective_configuration(selected_products(args.product), args.home, args.repo)
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = install.effective_configuration(selected_products(args.product), args.home, args.repo)
+            if args.format == "json":
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                presentation.print_json_human(
+                    "Effective configuration",
+                    report,
+                    **_human_options(args),
+                )
         elif args.command == "diff-installed":
-            install.diff_installed(selected_products(args.product), args.home)
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = install.diff_installed(selected_products(args.product), args.home)
+            rows = []
+            for product, items in report["products"].items():
+                if not items:
+                    rows.append((product, "not installed", "No managed paths recorded"))
+                    continue
+                rows.extend((product, item["state"], item["path"]) for item in items)
+            presentation.print_records(
+                "Installed content diff",
+                ("Product", "State", "Path"),
+                rows,
+                outcome_column=1,
+                **_human_options(args),
+            )
         elif args.command in {"explain", "simulate"}:
             _explain(args)
         elif args.command == "scan":
-            findings, _ = scan.run_scan(args.repo, args.format, args.output)
+            if args.format == "human":
+                findings = scan.scan_repository(args.repo)
+                if args.output is None:
+                    _print_repository_scan(args, findings)
+                else:
+                    rendered = io.StringIO()
+                    with contextlib.redirect_stdout(rendered):
+                        _print_repository_scan(args, findings)
+                    target = args.output.expanduser().resolve(strict=False)
+                    atomic_write(target, rendered.getvalue().encode("utf-8"))
+                    presentation.print_message(
+                        "Repository scan",
+                        f"Report written to {target}",
+                        **_human_options(args),
+                    )
+            else:
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    findings, _ = scan.run_scan(args.repo, args.format, args.output)
+                print(output.getvalue(), end="")
             if any(item.level == "error" for item in findings):
                 return 1
         elif args.command == "docs":
-            scan.run_documentation_audit(args.repo, args.path, args.format)
+            if args.format == "human":
+                root, findings, audited_files = scan.audit_documentation(args.repo, args.path)
+                presentation.print_properties(
+                    "Documentation audit",
+                    (
+                        ("Scope", root.resolve(strict=False)),
+                        ("Audited Markdown files", audited_files),
+                        ("Assessment", "advisory clarity checks; not ASD-STE100 compliance"),
+                    ),
+                    **_human_options(args),
+                )
+                presentation.print_findings(
+                    "Documentation findings",
+                    (item.as_dict() for item in findings),
+                    clean_message="No technical-writing findings.",
+                    **_human_options(args),
+                )
+            else:
+                scan.run_documentation_audit(args.repo, args.path, args.format)
         elif args.command == "packs":
             if args.packs_command == "list":
-                _packs_list()
+                _packs_list(args)
             elif args.packs_command in {"detect", "explain"}:
-                _packs_detect(args.repo, args.packs_command == "explain")
+                _packs_detect(args)
             else:
                 count, examples = packs.validate_packs()
-                print(f"pack validation passed: {count} packs, {examples} fixtures")
+                presentation.print_properties(
+                    "Capability pack validation",
+                    (("Result", "passed"), ("Packs", count), ("Fixtures", examples)),
+                    **_human_options(args),
+                )
         elif args.command == "routing":
             if args.routing_command == "show":
-                _routing_show(selected_products(args.product), args.profile)
+                _routing_show(args)
             elif args.routing_command == "validate":
                 config = routing.load_config()
-                print(f"routing validation passed: {len(config['agents'])} agents, {len(config['profiles'])} profiles")
+                presentation.print_properties(
+                    "Routing validation",
+                    (("Result", "passed"), ("Agents", len(config["agents"])), ("Profiles", len(config["profiles"]))),
+                    **_human_options(args),
+                )
             else:
-                install.set_routing(
-                    selected_products(args.product),
-                    args.home,
-                    args.profile,
-                    model_overrides=parse_model_overrides(args.model_override) or None,
-                    force=args.force,
-                    dry_run=args.dry_run,
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    install.set_routing(
+                        selected_products(args.product),
+                        args.home,
+                        args.profile,
+                        model_overrides=parse_model_overrides(args.model_override) or None,
+                        force=args.force,
+                        dry_run=args.dry_run,
+                    )
+                presentation.print_operation_log(
+                    "Routing preview" if args.dry_run else "Routing update",
+                    output.getvalue(),
+                    **_human_options(args),
                 )
         elif args.command == "print-cursor-rules":
             install.print_cursor_rules(clipboard=args.clipboard, home=args.home)
@@ -1254,8 +1742,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.jetbrains_command == "print-chat-instructions":
                 install.print_jetbrains_chat_instructions(clipboard=args.clipboard, home=args.home)
             else:
-                install.export_jetbrains_project_rules(
-                    args.repo, dry_run=args.dry_run, force=args.force, home=args.home
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    install.export_jetbrains_project_rules(
+                        args.repo, dry_run=args.dry_run, force=args.force, home=args.home
+                    )
+                presentation.print_operation_log(
+                    "JetBrains project-rule preview" if args.dry_run else "JetBrains project-rule export",
+                    output.getvalue(),
+                    **_human_options(args),
                 )
         elif args.command == "waiver":
             if args.waiver_command == "create":
@@ -1263,14 +1758,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             elif args.waiver_command == "list":
                 _waiver_list(args)
             else:
-                print("revoked" if state.revoke_waiver(args.home, args.id) else "waiver not found")
+                changed = state.revoke_waiver(args.home, args.id)
+                presentation.print_message(
+                    "Waiver",
+                    "Revoked" if changed else "Waiver not found",
+                    outcome="passed" if changed else "warning",
+                    **_human_options(args),
+                )
         elif args.command == "policy":
             if args.policy_command == "list":
                 _policy_list(args)
             elif args.policy_command == "show":
                 _policy_show(args)
             elif args.policy_command == "init":
-                policy.initialise_local_overlay(args.home, force=args.force, dry_run=args.dry_run)
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    policy.initialise_local_overlay(args.home, force=args.force, dry_run=args.dry_run)
+                presentation.print_operation_log(
+                    "Policy initialisation preview" if args.dry_run else "Policy initialisation",
+                    output.getvalue(),
+                    **_human_options(args),
+                )
             elif args.policy_command == "validate":
                 _policy_validate(args)
             elif args.policy_command == "diff":
@@ -1292,7 +1800,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.format == "json":
                     print(json.dumps({"schema_version": 1, "valid": True, "status": contract["status"]}, indent=2, sort_keys=True))
                 else:
-                    print("Task contract validation passed.")
+                    presentation.print_properties(
+                        "Task contract validation",
+                        (("Result", "passed"), ("Status", contract["status"])),
+                        **_human_options(args),
+                    )
             elif not _task_result(args, receipt=args.task_command == "receipt"):
                 return 1
         elif args.command == "component":
@@ -1326,18 +1838,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                         report = install.statusline_uninstall(_statusline_products(args.product), args.home, force=args.force, dry_run=args.dry_run)
                     print(json.dumps(report, indent=2, sort_keys=True))
                 else:
-                    report = install.statusline_uninstall(_statusline_products(args.product), args.home, force=args.force, dry_run=args.dry_run)
+                    output = io.StringIO()
+                    with contextlib.redirect_stdout(output):
+                        report = install.statusline_uninstall(_statusline_products(args.product), args.home, force=args.force, dry_run=args.dry_run)
                     outcomes = report["products"]
                     retained = [product for product, outcome in outcomes.items() if outcome == "retained-modified"]
                     removed = [product for product, outcome in outcomes.items() if outcome in {"removed", "would-remove"}]
+                    if output.getvalue():
+                        presentation.print_operation_log("Terminal UX changes", output.getvalue(), **_human_options(args))
                     if args.dry_run:
-                        print("Terminal UX uninstall preview complete; no changes were made")
+                        message = "Preview complete; no changes were made"
+                        outcome = "warning"
                     elif retained:
-                        print("Terminal UX uninstall partially complete; retained modified configuration: " + ", ".join(retained))
+                        message = "Partially complete; retained modified configuration: " + ", ".join(retained)
+                        outcome = "warning"
                     elif removed:
-                        print("Terminal UX uninstalled")
+                        message = "Uninstalled"
+                        outcome = "passed"
                     else:
-                        print("No managed terminal UX configuration was found")
+                        message = "No managed terminal UX configuration was found"
+                        outcome = "warning"
+                    presentation.print_message("Terminal UX uninstall", message, outcome=outcome, **_human_options(args))
             elif args.statusline_command == "status":
                 _statusline_status(args)
             elif args.statusline_command == "print-codex-setup":
@@ -1355,6 +1876,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             raise GuardrailsError(f"unsupported command: {args.command}")
     except (GuardrailsError, OSError, UnicodeError, enforcement.PolicyError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        if _selected_output_format(args) in {"human", "compact"}:
+            presentation.print_error(exc, no_color=bool(getattr(args, "no_color", False)))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
         return 1
     return 0
