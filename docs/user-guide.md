@@ -22,7 +22,7 @@ pipx install .
 pipx install ./dist/ai_engineering_guardrails-<version>-py3-none-any.whl
 ```
 
-No pack, profile, model, cloud login, or target mapping is required. Installation does not contact remote services.
+No pack, profile, model, cloud login, or target mapping is required. The `ai-guardrails install` command itself does not contact remote services.
 
 ## Cursor: one manual step
 
@@ -50,7 +50,7 @@ Paste the first command's output in **Settings > Tools > AI Assistant > Prompt L
 
 ## Day-to-day use
 
-Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Twelve specialist infrastructure, delivery, and operations skills remain packaged; `install --skill-catalogue all` exposes the complete 28-skill catalogue and `--skill-catalogue contextual` explicitly restores the smaller managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
+Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Thirteen specialist infrastructure, delivery, operations, and technical-writing skills remain packaged; `install --skill-catalogue all` exposes the complete 29-skill catalogue and `--skill-catalogue contextual` explicitly restores the smaller managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
@@ -66,6 +66,25 @@ See what is active:
 ```sh
 ai-guardrails status --repo .
 ```
+
+Human output uses compact tables and terminal-aware colour. Use `--no-color` (or the common `NO_COLOR` environment variable) when styling is not useful. Validation, status, and other report-style commands offer deterministic JSON for scripts:
+
+```sh
+ai-guardrails validate --format json
+ai-guardrails status --repo . --format json
+ai-guardrails skills audit --format json
+```
+
+Machine formats write one JSON document to standard output and do not include Rich styling.
+
+For substantive technical prose, use `workstation-technical-writing`. Its ASD-STE100-informed guidance preserves technical terms and facts without claiming formal compliance. The optional offline audit is advisory:
+
+```sh
+ai-guardrails docs audit --repo .
+ai-guardrails docs audit --path README.md
+```
+
+See [technical writing](technical-writing.md) for scope, exclusions, and the standard provenance boundary.
 
 ## Optional routing
 
@@ -166,7 +185,7 @@ ai-guardrails uninstall
 pipx uninstall ai-engineering-guardrails
 ```
 
-The first command removes only recorded managed product content; the last removes the pipx application. User-modified managed files are retained unless `--force` is explicit.
+The dry run previews removal without writing. The next command removes only recorded managed product content, and the last removes the pipx application. User-modified managed files are retained unless `--force` is explicit.
 
 ## Troubleshoot
 

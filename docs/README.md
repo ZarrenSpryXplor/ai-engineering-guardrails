@@ -36,6 +36,7 @@ flowchart TD
 | --- | --- | --- |
 | Engineer installing the guardrails | [Quick user guide](user-guide.md) | [Operations](operations.md), [compatibility](compatibility.md) |
 | Engineer using installed guardrails day to day | [Quick user guide](user-guide.md#day-to-day-use) | [skills catalogue](skills.md), [capability packs](capability-packs.md) |
+| Engineer writing or reviewing technical documentation | [Technical writing](technical-writing.md) | [skills catalogue](skills.md), [operations](operations.md#documentation-audit) |
 | Engineer enabling status, receipts, or demo mode | [Terminal UX](terminal-ux.md) | [compatibility](compatibility.md#terminal-ux-capability-verification-2026-08-09) |
 | Engineer delegating bounded tasks | [Routing and cost](routing-and-cost.md) | [skills catalogue](skills.md) |
 | Maintainer reviewing policy, task evidence, or a local component | [Evidence and assurance](evidence-and-assurance.md) | [policy authoring](policy-authoring.md), [operations](operations.md) |
@@ -52,6 +53,7 @@ flowchart TD
 - [Terminal UX](terminal-ux.md): opt-in status-line profiles, activity, complexity signals, compact receipts, demo mode, privacy, and removal.
 - [Routing and cost](routing-and-cost.md): profile selection, role use, escalation, native product boundaries, and measurement limits.
 - [Capability packs](capability-packs.md) and [skills catalogue](skills.md): on-demand stack support and portable workflows.
+- [Technical writing](technical-writing.md): ASD-STE100-informed guidance, applicability, provenance, and advisory documentation checks.
 - [Architecture](architecture.md): canonical resources, build, installation, enforcement, and ownership boundaries.
 - [Policy authoring](policy-authoring.md): how maintainers safely extend canonical policy, skills, packs, or command rules.
 - [Evidence and assurance](evidence-and-assurance.md): policy evidence lifecycle, task contracts, imported report limits, component trust, skill audits, and guidance probes.

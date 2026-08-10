@@ -14,7 +14,7 @@ import math
 import re
 import sys
 import xml.etree.ElementTree as ET
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Sequence
 from urllib.parse import unquote, urlsplit
@@ -757,14 +757,30 @@ def parse_cobertura(path: Path, repo: Path, *, external_ci_artifact: bool = Fals
     document = _safe_xml(data, "Cobertura report")
     if document.tag.rsplit("}", 1)[-1] != "coverage":
         raise EvidenceParseError("Cobertura report must have a coverage root element")
-    line = _number(document.attrib.get("line-rate"))
-    branch = _number(document.attrib.get("branch-rate")) if "branch-rate" in document.attrib else None
-    if (
-        line is None
-        or not 0 <= line <= 1
-        or ("branch-rate" in document.attrib and (branch is None or not 0 <= branch <= 1))
-    ):
+    rate_decimals: dict[str, Decimal] = {}
+    rate_numbers: dict[str, float] = {}
+    for field in ("line-rate", "branch-rate"):
+        if field not in document.attrib:
+            continue
+        try:
+            decimal_value = Decimal(document.attrib[field].strip())
+            number = float(decimal_value)
+            valid = (
+                decimal_value.is_finite()
+                and Decimal(0) <= decimal_value <= Decimal(1)
+                and math.isfinite(number)
+                and (decimal_value == 0 or number != 0)
+            )
+        except (DecimalException, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            raise EvidenceParseError("Cobertura rates must be finite values from 0 through 1")
+        rate_decimals[field] = decimal_value
+        rate_numbers[field] = number
+    if "line-rate" not in rate_numbers:
         raise EvidenceParseError("Cobertura rates must be finite values from 0 through 1")
+    line = rate_numbers["line-rate"]
+    branch = rate_numbers.get("branch-rate")
     counts: dict[str, int] = {}
     for field in ("lines-covered", "lines-valid", "branches-covered", "branches-valid", "timestamp"):
         if field not in document.attrib:
@@ -783,17 +799,21 @@ def parse_cobertura(path: Path, repo: Path, *, external_ci_artifact: bool = Fals
     ):
         if rate_field not in document.attrib or covered not in counts or valid not in counts or counts[valid] == 0:
             continue
-        declared = Decimal(document.attrib[rate_field].strip())
-        expected = Decimal(counts[covered]) / Decimal(counts[valid])
-        # Reporters commonly round rates.  Permit at most one unit in the
-        # declared last decimal place, while keeping exact zero/one aggregates
-        # exact so contradictory pass/fail boundaries cannot be hidden.
-        tolerance = (
-            Decimal(0)
-            if declared in {Decimal(0), Decimal(1)} or expected in {Decimal(0), Decimal(1)}
-            else Decimal(1).scaleb(min(0, declared.as_tuple().exponent))
-        )
-        if abs(declared - expected) > tolerance:
+        try:
+            declared = rate_decimals[rate_field]
+            expected = Decimal(counts[covered]) / Decimal(counts[valid])
+            # Reporters commonly round rates.  Permit at most one unit in the
+            # declared last decimal place, while keeping exact zero/one aggregates
+            # exact so contradictory pass/fail boundaries cannot be hidden.
+            tolerance = (
+                Decimal(0)
+                if declared in {Decimal(0), Decimal(1)} or expected in {Decimal(0), Decimal(1)}
+                else Decimal(1).scaleb(min(0, declared.as_tuple().exponent))
+            )
+            inconsistent = abs(declared - expected) > tolerance
+        except DecimalException as exc:
+            raise EvidenceParseError(f"Cobertura {rate_field} cannot be compared safely") from exc
+        if inconsistent:
             raise EvidenceParseError(f"Cobertura {rate_field} is inconsistent with {covered} and {valid}")
     if "complexity" in document.attrib:
         complexity_value = _number(document.attrib["complexity"])
@@ -1173,8 +1193,8 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
     current_digest = repository_result["digest"]
     contract_digest = _contract_digest(contract_file)
     continuity, provenance = _contract_continuity(home or Path.home(), root, contract_digest)
-    summary = provenance.get("assurance_summary", {}) if provenance is not None else {}
-    scope_baseline = summary.get("scope_baseline_commit") if isinstance(summary, Mapping) else None
+    provenance_summary = provenance.get("assurance_summary", {}) if provenance is not None else {}
+    scope_baseline = provenance_summary.get("scope_baseline_commit") if isinstance(provenance_summary, Mapping) else None
     has_scope_baseline = isinstance(scope_baseline, str) and re.fullmatch(r"[0-9a-f]{40,64}", scope_baseline) is not None
     complexity_result = complexity.analyse(
         root,
@@ -1238,9 +1258,9 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
                 }
             )
             continue
-        summary: dict[str, Any]
+        evidence_summary: dict[str, Any]
         try:
-            summary = _evidence_summary(root, entry)
+            evidence_summary = _evidence_summary(root, entry)
         except EvidenceParseError as exc:
             evidence.append({"id": required["id"], "type": required["type"], "state": "malformed"})
             evidence_states[required["id"]] = "malformed"
@@ -1253,9 +1273,9 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
             continue
         captured = _parse_timestamp(entry["captured_at"])
         stale = captured is None or captured > now or captured < now - dt.timedelta(hours=required["maximum_age_hours"])
-        insufficient = summary.get("parsed_summary", {}).get("sufficient_for_completion") is False
-        failed = entry["result"] != "passed" or (summary.get("parsed_passed") is False and not insufficient)
-        report_mismatch = summary.get("report_digest_matches_capture") is False
+        insufficient = evidence_summary.get("parsed_summary", {}).get("sufficient_for_completion") is False
+        failed = entry["result"] != "passed" or (evidence_summary.get("parsed_passed") is False and not insufficient)
+        report_mismatch = evidence_summary.get("report_digest_matches_capture") is False
         state = "failed"
         gap: dict[str, str] | None = {"id": "evidence-failed", "detail": f"{required['id']} did not pass"} if failed else None
         if insufficient:
@@ -1278,7 +1298,7 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
             gap = {"id": "evidence-stale", "detail": f"{required['id']} is outside its allowed freshness window"}
         elif not failed:
             state = "fresh"
-        evidence.append({**summary, "state": state})
+        evidence.append({**evidence_summary, "state": state})
         evidence_states[required["id"]] = state
         if gap is not None:
             gaps.append(gap)
@@ -1286,7 +1306,11 @@ def task_status(repo: Path, *, home: Path | None = None, now: dt.datetime | None
     coverage: dict[str, Any] | None = None
     coverage_policy = contract.get("coverage_policy")
     if isinstance(coverage_policy, Mapping):
-        established_coverage_digest = summary.get("coverage_baseline_digest") if isinstance(summary, Mapping) else None
+        established_coverage_digest = (
+            provenance_summary.get("coverage_baseline_digest")
+            if isinstance(provenance_summary, Mapping)
+            else None
+        )
         try:
             baseline_is_current = established_coverage_digest == _coverage_baseline_digest(root, coverage_policy)
         except GuardrailsError:

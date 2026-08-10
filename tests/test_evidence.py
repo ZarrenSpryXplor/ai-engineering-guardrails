@@ -22,10 +22,22 @@ class PolicyEvidenceTests(unittest.TestCase):
         self.registry.write_text(json.dumps(value), encoding="utf-8")
 
     def test_canonical_registry_is_structurally_valid_and_traceable(self) -> None:
-        result = evidence.audit_registry(policy.load_manifest(), today=dt.date(2026, 8, 9))
+        result = evidence.audit_registry(policy.load_manifest(), today=dt.date(2026, 8, 10))
         self.assertTrue(result["valid"])
         self.assertEqual([], result["errors"])
         self.assertEqual(10, result["policy_records"])
+
+    def test_asd_ste100_official_source_records_issue_and_review_lifecycle(self) -> None:
+        source = next(item for item in self.value["sources"] if item["id"] == "asd-ste100-issue-9")
+        reporting = next(item for item in self.value["policies"] if item["id"] == "reporting")
+
+        self.assertEqual("official-standard-source", source["evidence_type"])
+        self.assertEqual("2025-01-15", source["publication_date"])
+        self.assertEqual("2026-08-10", source["last_reviewed"])
+        self.assertGreater(source["review_after"], source["last_reviewed"])
+        self.assertEqual("https://www.asd-ste100.org/", source["url"])
+        self.assertIn(source["id"], reporting["evidence_source_ids"])
+        self.assertIn("not redistributed", source["limitations"])
 
     def test_structural_errors_and_overdue_reviews_are_distinct(self) -> None:
         value = copy.deepcopy(self.value)
@@ -144,15 +156,15 @@ class PolicyEvidenceTests(unittest.TestCase):
     def test_same_day_and_historical_dates_are_valid_while_expiry_is_review_only(self) -> None:
         value = copy.deepcopy(self.value)
         value["sources"][0].update(
-            {"publication_date": "2026-08-09", "last_reviewed": "2026-08-09", "review_after": "2026-08-09"}
+            {"publication_date": "2026-08-10", "last_reviewed": "2026-08-10", "review_after": "2026-08-10"}
         )
         value["policies"][0].update(
-            {"introduced_date": "2025-01-01", "last_reviewed": "2026-01-01", "review_after": "2026-08-08"}
+            {"introduced_date": "2025-01-01", "last_reviewed": "2026-01-01", "review_after": "2026-08-09"}
         )
         self.write(value)
 
         same_day = evidence.audit_registry(
-            policy.load_manifest(), registry_path=self.registry, today=dt.date(2026, 8, 9)
+            policy.load_manifest(), registry_path=self.registry, today=dt.date(2026, 8, 10)
         )
 
         self.assertNotIn("future-evidence-review", {item["id"] for item in same_day["errors"]})

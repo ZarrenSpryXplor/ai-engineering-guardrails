@@ -358,6 +358,65 @@ class AssuranceTests(unittest.TestCase):
                 with self.assertRaises(assurance.EvidenceParseError):
                     assurance.parse_cobertura(Path("coverage.xml"), self.repo)
 
+    def test_cobertura_scientific_notation_and_extreme_exponents_use_controlled_errors(self) -> None:
+        valid = {
+            "ordinary-decimal": "0.5",
+            "ordinary-scientific": "5e-1",
+        }
+        for name, rate in valid.items():
+            with self.subTest(name=name):
+                (self.repo / "coverage.xml").write_text(
+                    f'<coverage line-rate="{rate}" lines-covered="1" lines-valid="2"/>',
+                    encoding="utf-8",
+                )
+                self.assertEqual(0.5, assurance.parse_cobertura(Path("coverage.xml"), self.repo)["line_rate"])
+
+        malformed = {
+            "extreme-positive": "1e999999999",
+            "extreme-negative": "1e-999999999",
+            "nan": "NaN",
+            "infinity": "Infinity",
+            "negative": "-0.1",
+            "above-one": "1.1",
+        }
+        for name, rate in malformed.items():
+            with self.subTest(name=name):
+                (self.repo / "coverage.xml").write_text(
+                    f'<coverage line-rate="{rate}" lines-covered="1" lines-valid="2"/>',
+                    encoding="utf-8",
+                )
+                with self.assertRaises(assurance.EvidenceParseError):
+                    assurance.parse_cobertura(Path("coverage.xml"), self.repo)
+
+        (self.repo / "coverage.xml").write_text(
+            '<coverage line-rate="1e-999999999" lines-covered="1" lines-valid="2"/>',
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "ai_engineering_guardrails",
+                "complexity",
+                "compare",
+                "--repo",
+                str(self.repo),
+                "--baseline-coverage",
+                "coverage.xml",
+                "--current-coverage",
+                "coverage.xml",
+                "--format",
+                "json",
+            ],
+            cwd=Path(__file__).resolve().parents[1],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(1, result.returncode)
+        self.assertIn("error:", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_cobertura_present_rates_are_coherent_with_counts(self) -> None:
         contradictory = (
             '<coverage line-rate="1" lines-covered="0" lines-valid="1"/>',
@@ -658,6 +717,12 @@ class AssuranceTests(unittest.TestCase):
         self.assertFalse(result["completed"])
         self.assertEqual("unavailable", result["evidence"][0]["state"])
         self.assertIn("repository-state-unavailable", {item["id"] for item in result["safe_halt"]["reasons"]})
+        receipt = assurance.task_receipt(root, home=self.home, now=dt.datetime(2026, 8, 9, 12, tzinfo=dt.timezone.utc))
+        self.assertIsNone(receipt["files_modified_count"])
+        self.assertEqual(
+            receipt["task_assurance"]["scope"]["files_changed"],
+            receipt["files_modified_count"],
+        )
 
     def test_generated_changes_count_toward_all_task_scope_limits(self) -> None:
         (self.repo / "dist").mkdir()
@@ -803,6 +868,95 @@ class AssuranceTests(unittest.TestCase):
         result = assurance.task_status(self.repo, home=self.home)
 
         self.assertIn("coverage-baseline-changed", {item["id"] for item in result["evidence_gaps"]})
+
+    def test_unchanged_coverage_baseline_remains_current_without_required_evidence(self) -> None:
+        reports = self.repo / "reports"
+        reports.mkdir()
+        (reports / "before.xml").write_text('<coverage line-rate="0.9"/>', encoding="utf-8")
+        (reports / "after.xml").write_text('<coverage line-rate="0.9"/>', encoding="utf-8")
+        self.write_contract(
+            required_evidence=[],
+            coverage_policy={
+                "baseline_path": "reports/before.xml",
+                "current_path": "reports/after.xml",
+                "maximum_line_rate_regression": 0,
+            },
+        )
+
+        result = assurance.task_status(self.repo, home=self.home)
+
+        self.assertTrue(result["completed"])
+        self.assertNotIn("coverage-baseline-changed", {item["id"] for item in result["evidence_gaps"]})
+
+    def test_required_evidence_does_not_replace_coverage_provenance(self) -> None:
+        reports = self.repo / "reports"
+        reports.mkdir()
+        (reports / "before.xml").write_text('<coverage line-rate="0.9"/>', encoding="utf-8")
+        (reports / "after.xml").write_text('<coverage line-rate="0.9"/>', encoding="utf-8")
+        junit = reports / "tests.xml"
+        junit.write_text('<testsuite><testcase name="ok"/></testsuite>', encoding="utf-8")
+        contract_path = self.write_contract(
+            required_evidence=[
+                {"id": "review", "type": "manual-review", "maximum_age_hours": 24},
+                {"id": "unit-tests", "type": "junit", "maximum_age_hours": 24},
+            ],
+            coverage_policy={
+                "baseline_path": "reports/before.xml",
+                "current_path": "reports/after.xml",
+                "maximum_line_rate_regression": 0,
+            },
+        )
+        current = assurance.repository_state_digest(self.repo)
+        self.assertIsNotNone(current)
+        self.write_json(
+            assurance.TASK_EVIDENCE_NAME,
+            {
+                "schema_version": 1,
+                "evidence": [
+                    {
+                        "id": "unit-tests",
+                        "type": "junit",
+                        "path": "reports/tests.xml",
+                        "captured_at": "2026-08-09T11:00:00Z",
+                        "repository_state_digest": current,
+                        "contract_digest": file_hash(contract_path),
+                        "report_digest": file_hash(junit),
+                        "parser_version": 1,
+                        "result": "passed",
+                    },
+                    {
+                        "id": "review",
+                        "type": "manual-review",
+                        "manual_review_id": "peer-review-42",
+                        "captured_at": "2026-08-09T11:00:00Z",
+                        "repository_state_digest": current,
+                        "contract_digest": file_hash(contract_path),
+                        "parser_version": 1,
+                        "result": "passed",
+                    },
+                ],
+            },
+        )
+        now = dt.datetime(2026, 8, 9, 12, tzinfo=dt.timezone.utc)
+
+        result = assurance.task_status(self.repo, home=self.home, now=now)
+        receipt = assurance.task_receipt(self.repo, home=self.home, now=now)
+
+        self.assertTrue(result["completed"], result)
+        self.assertEqual(["review", "unit-tests"], [item["id"] for item in result["evidence"]])
+        self.assertEqual(["fresh", "fresh"], [item["state"] for item in result["evidence"]])
+        self.assertNotIn("coverage-baseline-changed", {item["id"] for item in result["evidence_gaps"]})
+        self.assertTrue(receipt["task_assurance"]["completed"])
+        self.assertEqual(["review", "unit-tests"], [item["id"] for item in receipt["task_assurance"]["evidence"]])
+
+        stale = assurance.task_status(
+            self.repo,
+            home=self.home,
+            now=dt.datetime(2026, 8, 11, 12, tzinfo=dt.timezone.utc),
+        )
+        self.assertEqual(["stale", "stale"], [item["state"] for item in stale["evidence"]])
+        self.assertIn("evidence-stale", {item["id"] for item in stale["evidence_gaps"]})
+        self.assertNotIn("coverage-baseline-changed", {item["id"] for item in stale["evidence_gaps"]})
 
     def test_nested_repository_state_prevents_completed_task_assurance(self) -> None:
         self.write_contract(required_evidence=[])

@@ -38,6 +38,16 @@ class ComponentTests(unittest.TestCase):
         )
         (self.component / "helper.py").write_text("# no execution during inspection\n", encoding="utf-8")
 
+    @staticmethod
+    def write_skill(root: Path, name: str) -> Path:
+        root.mkdir(parents=True, exist_ok=True)
+        skill = root / "SKILL.md"
+        skill.write_text(
+            f"---\nname: {name}\ndescription: Inspect the {name} fixture without executing it.\n---\n\n# Fixture\n",
+            encoding="utf-8",
+        )
+        return skill
+
     def test_component_inspection_is_static_and_digest_changes_with_content(self) -> None:
         marker = self.root / "executed"
         (self.component / "helper.py").write_text(f"# {marker}\n", encoding="utf-8")
@@ -148,7 +158,9 @@ class ComponentTests(unittest.TestCase):
         (self.component / "SKILL.md").write_text(
             "---\nname: synthetic\ndescription: Inspect local helper script references.\n---\n\n"
             "Run scripts/helper.py after inspection. Execute ./scripts/install.sh, then tools/check.ps1.\n"
-            "Keep `helper.py` and [the helper](scripts/helper.py) support. example.com and package.module prose are not paths.\n",
+            "Keep `helper.py` and [the helper](scripts/helper.py) support. example.com and package.module prose are not paths.\n"
+            "See http://example.invalid/scripts/remote.py and https://example.invalid/tools/remote.ps1.\n"
+            "Open https://example.invalid/page?next=scripts/query.py and https://example.invalid/page#tools/fragment.ps1.\n",
             encoding="utf-8",
         )
 
@@ -157,6 +169,10 @@ class ComponentTests(unittest.TestCase):
         self.assertTrue({"scripts/helper.py", "scripts/install.sh", "tools/check.ps1", "helper.py"}.issubset(result["referenced_files"]))
         self.assertNotIn("example.com", result["referenced_files"])
         self.assertNotIn("package.module", result["referenced_files"])
+        self.assertFalse(
+            {"scripts/remote.py", "tools/remote.ps1", "scripts/query.py", "tools/fragment.ps1"}
+            & set(result["referenced_files"])
+        )
 
     def test_instruction_risk_indicators_cover_credentials_secrets_and_registries_but_skip_negated_examples(self) -> None:
         (self.component / "SKILL.md").write_text(
@@ -278,6 +294,75 @@ class ComponentTests(unittest.TestCase):
         self.assertIn("skill-symbolic-link", {item["id"] for item in result["findings"]})
         self.assertFalse(result["audit_complete"])
 
+    def test_normal_skill_directory_remains_a_complete_audit(self) -> None:
+        result = components.skills_audit(self.component)
+
+        self.assertTrue(result["audit_complete"])
+        self.assertEqual(1, result["catalogue"]["parsed_skill_count"])
+        self.assertEqual(["synthetic"], [item["name"] for item in result["skills"]])
+
+    def test_skill_catalogue_rejects_symlinked_skill_directories_inside_and_outside_root(self) -> None:
+        outside = self.root / "outside-skill"
+        self.write_skill(outside, "outside-skill")
+
+        for target_name in ("outside", "inside"):
+            with self.subTest(target=target_name):
+                catalogue = self.root / f"catalogue-{target_name}"
+                self.write_skill(catalogue / "valid", "valid")
+                target = outside
+                if target_name == "inside":
+                    target = catalogue / "real-skill"
+                    self.write_skill(target, "real-skill")
+                escaped = catalogue / "linked-skill"
+                try:
+                    escaped.symlink_to(target, target_is_directory=True)
+                except (NotImplementedError, OSError):
+                    self.skipTest("symbolic links are unavailable on this platform")
+
+                result = components.skills_audit(catalogue)
+
+                self.assertFalse(result["audit_complete"])
+                self.assertIn("skill-symbolic-link", {item["id"] for item in result["findings"]})
+                self.assertTrue(any("unsafe component boundary" in item["detail"] for item in result["incomplete_reasons"]))
+                self.assertNotIn("outside-skill", {item["name"] for item in result["skills"]})
+                self.assertNotIn("linked-skill", {item["name"] for item in result["skills"]})
+                self.assertEqual(1 if target_name == "outside" else 2, result["catalogue"]["parsed_skill_count"])
+
+    def test_skill_catalogue_reports_symlinked_nested_ancestor_without_following_it(self) -> None:
+        catalogue = self.root / "nested-catalogue"
+        self.write_skill(catalogue / "valid", "valid")
+        outside = self.root / "nested-outside"
+        self.write_skill(outside / "escaped", "escaped")
+        nested = catalogue / "group"
+        nested.mkdir()
+        try:
+            (nested / "linked-parent").symlink_to(outside, target_is_directory=True)
+        except (NotImplementedError, OSError):
+            self.skipTest("symbolic links are unavailable on this platform")
+
+        result = components.skills_audit(catalogue)
+
+        self.assertFalse(result["audit_complete"])
+        self.assertEqual(["valid"], [item["name"] for item in result["skills"]])
+        self.assertTrue(any(item["path"] == "group/linked-parent" for item in result["incomplete_reasons"]))
+
+    def test_skill_catalogue_reports_symlinked_skill_entry_file_as_incomplete(self) -> None:
+        catalogue = self.root / "entry-link-catalogue"
+        self.write_skill(catalogue / "valid", "valid")
+        external_entry = self.write_skill(self.root / "external-entry", "external-entry")
+        linked_skill = catalogue / "linked-entry"
+        linked_skill.mkdir()
+        try:
+            (linked_skill / "SKILL.md").symlink_to(external_entry)
+        except (NotImplementedError, OSError):
+            self.skipTest("symbolic links are unavailable on this platform")
+
+        result = components.skills_audit(catalogue)
+
+        self.assertFalse(result["audit_complete"])
+        self.assertEqual(["valid"], [item["name"] for item in result["skills"]])
+        self.assertTrue(any(item["path"] == "linked-entry/SKILL.md" for item in result["incomplete_reasons"]))
+
     def test_skill_audit_applies_component_size_count_total_and_depth_bounds_before_reading(self) -> None:
         limits = components.load_thresholds()["component"]
         fixtures: list[tuple[str, Path, str]] = []
@@ -375,8 +460,8 @@ class ComponentTests(unittest.TestCase):
         result = components.skills_audit()
 
         self.assertTrue(result["audit_complete"])
-        self.assertEqual(28, result["catalogue"]["skill_count"])
-        self.assertEqual({"core": 6, "contextual": 10, "specialist": 12}, result["catalogue"]["tier_counts"])
+        self.assertEqual(29, result["catalogue"]["skill_count"])
+        self.assertEqual({"core": 6, "contextual": 10, "specialist": 13}, result["catalogue"]["tier_counts"])
         self.assertEqual("estimate", result["catalogue"]["estimated_catalogue_pressure"]["label"])
         self.assertIn("other installed and plugin skills", result["catalogue"]["estimated_catalogue_pressure"]["limitation"])
         self.assertEqual(16, result["catalogue"]["fresh_default"]["skill_count"])
@@ -387,11 +472,22 @@ class ComponentTests(unittest.TestCase):
         )
         self.assertTrue(result["catalogue"]["longest_descriptions"])
         self.assertNotIn("routing-description-not-front-loaded", {item["id"] for item in result["findings"]})
-        for skill_file in components._skill_files(None):
+        skill_files, boundary_findings = components._skill_files(
+            None, components.load_thresholds()["component"]
+        )
+        self.assertEqual([], boundary_findings)
+        for skill_file in skill_files:
             fields, _ = policy.parse_skill(skill_file)
             with self.subTest(skill=fields["name"]):
                 self.assertIsNone(components._routing_description_issue(fields["name"], fields["description"]))
                 self.assertIsNone(components.GENERIC_ROUTING_PREFIX_RE.match(fields["description"]))
+
+        technical = next(item for item in result["skills"] if item["name"] == "workstation-technical-writing")
+        self.assertEqual("specialist", technical["catalogue_tier"])
+        self.assertLess(technical["description_characters"], components.load_thresholds()["skills"]["description_characters"])
+        self.assertFalse(
+            any("workstation-technical-writing" in item["skills"] for item in result["catalogue"]["routing_overlap_warnings"])
+        )
 
     def test_skill_catalogue_reports_generic_and_overlapping_routing_descriptions(self) -> None:
         root = self.root / "catalogue"

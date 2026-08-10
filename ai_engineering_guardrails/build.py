@@ -521,7 +521,7 @@ def validate(
     require_current: bool = False,
     output_root: Path | None = None,
     home: Path | None = None,
-) -> None:
+) -> dict[str, Any]:
     if set(PRODUCT_LABELS) != set(PRODUCTS) or set(PRODUCT_CAPABILITIES) != set(PRODUCTS):
         raise GuardrailsError("product labels and capability mappings must cover every supported product exactly once")
     required_capabilities = {
@@ -573,6 +573,7 @@ def validate(
 
     policy_data = policy.load_effective_enforcement_policy(home) if home is not None else policy.load_enforcement_policy()
     examples = enforcement.validate_policy_examples(policy_data)
+    routing_agent_count = len(routing.load_config()["agents"])
     codex = "not requested"
     if check_codex and "codex" in products:
         rules_path = Path("dist/codex/rules/workstation-guardrails.rules")
@@ -583,13 +584,58 @@ def validate(
             else "skipped (computed rules are not written during a dry-run)"
         )
     spacelift = validate_spacelift_policies()
+    checks: list[dict[str, str]] = [
+        {
+            "id": "generated-output",
+            "label": "Generated output",
+            "outcome": "passed",
+            "detail": f"{len(artifacts)} files",
+        },
+        {
+            "id": "policy-fixtures",
+            "label": "Policy fixtures",
+            "outcome": "passed",
+            "detail": f"{examples} examples",
+        },
+        {
+            "id": "capability-packs",
+            "label": "Capability packs",
+            "outcome": "passed",
+            "detail": f"{pack_count} packs",
+        },
+        {
+            "id": "routing-agents",
+            "label": "Routing agents",
+            "outcome": "passed",
+            "detail": f"{routing_agent_count} agents",
+        },
+    ]
+    if check_codex and "codex" in products:
+        checks.append(
+            {
+                "id": "codex-execpolicy",
+                "label": "Codex execpolicy",
+                "outcome": "skipped" if codex.startswith("skipped") else "passed",
+                "detail": codex,
+            }
+        )
+    checks.append(
+        {
+            "id": "spacelift-rego",
+            "label": "Spacelift Rego",
+            "outcome": "skipped" if spacelift.startswith("skipped") else "passed",
+            "detail": spacelift,
+        }
+    )
+    report = {"schema_version": 1, "status": "passed", "checks": checks}
     print(
         f"validation passed: {len(artifacts)} generated files, {examples} policy fixtures, "
-        f"{pack_count} packs, {len(routing.load_config()['agents'])} routing agents"
+        f"{pack_count} packs, {routing_agent_count} routing agents"
     )
     if check_codex and "codex" in products:
         print(f"codex execpolicy check: {codex}")
     print(f"Spacelift policy validation: {spacelift}")
+    return report
 
 
 def assert_generated_current(products: Sequence[str] = PRODUCTS, *, output_root: Path | None = None) -> None:

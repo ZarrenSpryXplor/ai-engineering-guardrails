@@ -36,6 +36,7 @@ PLAIN_REFERENCE_RE = re.compile(
     r"(?<![A-Za-z0-9_.-])((?:\./)?(?:scripts|tools|bin|resources?)/[A-Za-z0-9_./-]+\.(?:py|sh|ps1|bat|cmd|js|ts|json|toml|md))(?=$|[\s),.;:])",
     re.IGNORECASE,
 )
+HTTP_URL_TOKEN_RE = re.compile(r"https?://[^\s'\"`<>]+", re.IGNORECASE)
 URL_RE = re.compile(r"https?://([^/\s'\"`?#]+)", re.IGNORECASE)
 PATTERNS = (
     ("download-piped-to-shell", DOWNLOAD_EXECUTE_RE, "Direct download-and-execute instruction or script."),
@@ -304,7 +305,10 @@ def _references(root: Path, path: Path, text: str) -> tuple[set[str], list[tuple
         [*REFERENCE_RE.finditer(text), *PLAIN_REFERENCE_RE.finditer(text)],
         key=lambda match: match.start(),
     )
+    url_tokens = list(HTTP_URL_TOKEN_RE.finditer(text))
     for match in matches:
+        if any(url.start() <= match.start() < url.end() for url in url_tokens):
+            continue
         raw = next((item for item in match.groups() if item), "").strip()
         if not raw or "://" in raw or raw.startswith("#"):
             continue
@@ -732,20 +736,31 @@ def audit(home: Path, *, repo: Path | None = None, now: dt.datetime | None = Non
     return {"schema_version": 1, "components": sorted(values, key=lambda item: (item["state"], item["path"])), "limitation": "Known product instruction, skill, and agent locations only; unrelated user files were not inspected."}
 
 
-def _skill_files(path: Path | None) -> list[Path]:
+def _skill_files(
+    path: Path | None,
+    component_limits: Mapping[str, int],
+) -> tuple[list[Path], list[dict[str, Any]]]:
     if path is None:
         core = policy.discover_skills()
         packed = sorted((RESOURCE_ROOT / "packs").rglob("skills/*/SKILL.md"))
-        return sorted({*core, *packed})
+        return sorted({*core, *packed}), []
     root = _root(path)
     if root.is_file():
         if root.name != "SKILL.md":
             raise GuardrailsError("selected skill path must be SKILL.md or a directory containing skills")
-        return [root]
+        return [root], []
     direct = root / "SKILL.md"
-    if direct.is_file():
-        return [direct]
-    return sorted(item for item in root.glob("*/SKILL.md") if item.is_file() and not item.is_symlink())
+    if direct.is_file() or direct.is_symlink():
+        return [direct], []
+    bounded_files, boundary_findings, _total_bytes = _component_files(root, component_limits)
+    return (
+        sorted(
+            item
+            for item in bounded_files
+            if item.name == "SKILL.md" and item.parent.parent == root
+        ),
+        boundary_findings,
+    )
 
 
 GENERIC_ROUTING_PREFIX_RE = re.compile(
@@ -799,15 +814,22 @@ def skills_audit(path: Path | None = None) -> dict[str, Any]:
     configured = load_thresholds()
     thresholds = configured["skills"]
     component_limits = configured["component"]
-    files = _skill_files(path)
-    if not files:
+    files, catalogue_boundary_findings = _skill_files(path, component_limits)
+    if not files and not catalogue_boundary_findings:
         raise GuardrailsError("no SKILL.md files found")
     findings: list[dict[str, Any]] = []
     items: list[dict[str, Any]] = []
     duplicate_hashes: dict[str, list[str]] = {}
     descriptions: dict[str, str] = {}
     incomplete_reasons: list[dict[str, str]] = []
-    audit_complete = True
+    audit_complete = not catalogue_boundary_findings
+    for boundary in catalogue_boundary_findings:
+        identifier = "skill-symbolic-link" if boundary["id"] == "symbolic-link" else boundary["id"]
+        relative = boundary["path"]
+        skill = Path(relative).parts[0] if relative != "." else "."
+        detail = f"Audit incomplete: unsafe component boundary; {boundary['message']}"
+        findings.append(_finding(identifier, "error", relative, 1, detail))
+        incomplete_reasons.append({"skill": skill, "id": identifier, "path": relative, "detail": detail})
     absolute_path_pattern = next(pattern for identifier, pattern, _ in PATTERNS if identifier == "absolute-local-path")
     for skill_file in files:
         label = skill_file.parent.name

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -19,7 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.11",
 ]
-dependencies = []
+dependencies = ["rich>=15.0.0,<16"]
 
 [project.urls]
 Source = "https://github.com/ZarrenSpryXplor/ai-engineering-guardrails"

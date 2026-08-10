@@ -1,6 +1,6 @@
 # Operations
 
-All lifecycle commands are user-scoped, standard-library Python operations. Never run them with `sudo`, as Administrator, or from an elevated shell. Use `--home` for development and recovery rehearsal; tests must never target the real home.
+All lifecycle mutations are local and user-scoped. Never run them with `sudo`, as Administrator, or from an elevated shell. Use `--home` for development and recovery rehearsal; tests must never target the real home.
 
 ## Build and preflight
 
@@ -129,6 +129,16 @@ An optional `.ai-guardrails-verification.json` may provide non-sensitive named o
 ```
 
 The file must contain no prompts, source, full commands, raw logs, environment data, or secrets. Static scan cannot infer or prove external review or semantic validation; it only checks that declared categories match the canonical requirement and explicitly reports that limitation.
+
+## Documentation audit
+
+```sh
+ai-guardrails docs audit --repo .
+ai-guardrails docs audit --path README.md
+ai-guardrails docs audit --format json
+```
+
+The audit reuses the bounded static scanner and reads Markdown only. It reports advisory `review` and `info` findings for a small transparent set of clarity heuristics; it does not rewrite text, download ASD-STE100, block installation, or certify compliance. See [technical writing](technical-writing.md) for scope and limitations.
 
 ## Evidence, task contracts, and component review
 

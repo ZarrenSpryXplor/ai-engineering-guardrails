@@ -78,6 +78,7 @@ ai-guardrails policy audit
 ai-guardrails task init --repo . --dry-run
 ai-guardrails component inspect ./reviewed-skill
 ai-guardrails skills audit
+ai-guardrails docs audit --path README.md
 ```
 
 See [evidence and assurance](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/evidence-and-assurance.md) for task setup, report comparison, trust records, and the limits of each result.
@@ -94,6 +95,7 @@ The [operator documentation hub](https://github.com/ZarrenSpryXplor/ai-engineeri
 | Audit policy evidence, use a task contract, or inspect an external skill/instruction | [Evidence and assurance](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/evidence-and-assurance.md) |
 | Delegate bounded work safely | [Routing and cost](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/routing-and-cost.md) |
 | Use or extend language and infrastructure support | [Capability packs](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/capability-packs.md) and [skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md) |
+| Write or review substantive technical documentation | [Technical writing](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/technical-writing.md) and [skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md) |
 | Change canonical policy or understand the design | [Policy authoring](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/policy-authoring.md) and [architecture](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/architecture.md) |
 | Review threat boundaries and enterprise examples | [Threat model](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/threat-model.md), [enterprise output](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/enterprise.md), and [Spacelift](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/spacelift.md) |
 

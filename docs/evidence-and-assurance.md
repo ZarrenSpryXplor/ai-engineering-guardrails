@@ -103,7 +103,11 @@ External issues, comments, pull requests, PDFs, web pages, setup instructions, l
 
 ## Evidence considered
 
-The registry was reviewed on **2026-08-09**. These contextual sources explain why the project favours concise guidance plus repeatable evidence, but none is treated as universal truth:
+The general policy sources were reviewed on **2026-08-09**. The official STEMG status and software-tool boundary for ASD-STE100 Issue 9 were reviewed on **2026-08-10**. Evidence records are release-time provenance and never a runtime network dependency.
+
+The ASD-STE100 source supports the small technical-writing pointer and specialist skill. The project does not redistribute the standard or controlled dictionary and does not treat the public page as software authority. See [technical writing](technical-writing.md).
+
+The following contextual sources explain why the project favours concise guidance plus repeatable evidence, but none is treated as universal truth:
 
 - Tessl, [“Your AGENTS.md file isn't the problem. Your lack of AI Agent Evaluations is.”](https://tessl.io/blog/your-agentsmd-file-isnt-the-problem-your-lack-of-evals-is/), 2026-02-24.
 - Tessl, [“What GitHub learned when better tools made Copilot code review worse”](https://tessl.io/blog/what-github-learned-when-better-tools-made-copilot-code-review-worse/), 2026-07-14.
