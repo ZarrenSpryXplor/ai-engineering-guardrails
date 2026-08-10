@@ -174,7 +174,10 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("ai-guardrails = ai_engineering_guardrails.cli:main", entry_points)
                 metadata_path = next(name for name in names if name.endswith(".dist-info/METADATA"))
                 metadata = archive.read(metadata_path).decode("utf-8")
-                self.assertNotIn("Requires-Dist:", metadata)
+                self.assertEqual(
+                    ["Requires-Dist: rich<16,>=15.0.0"],
+                    [line for line in metadata.splitlines() if line.startswith("Requires-Dist:")],
+                )
                 self.assertIn("License-Expression: MIT", metadata)
                 self.assertIn("License-File: LICENSE", metadata)
                 self.assertNotIn("Classifier: License ::", metadata)
@@ -276,7 +279,7 @@ while pending:
     checked.add(key)
     for raw_requirement in metadata.requires(distribution) or ():
         requirement = Requirement(raw_requirement)
-        if requirement.marker is not None and not requirement.marker.evaluate():
+        if requirement.marker is not None and not requirement.marker.evaluate({"extra": ""}):
             continue
         installed = metadata.version(requirement.name)
         if requirement.specifier and installed not in requirement.specifier:
@@ -334,7 +337,7 @@ print("|".join(sorted(checked)))
                     text=True,
                 ).stdout.strip()
             )
-            self.assertTrue(package_dir.is_relative_to(environment_root), package_dir)
+            self.assertTrue(package_dir.resolve().is_relative_to(environment_root.resolve()), package_dir)
             before = _tree_hashes(package_dir)
             module_path = subprocess.run(
                 [str(interpreter), "-c", "import ai_engineering_guardrails as p; print(p.__file__)"],
