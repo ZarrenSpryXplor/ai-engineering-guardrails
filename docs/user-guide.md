@@ -67,15 +67,19 @@ See what is active:
 ai-guardrails status --repo .
 ```
 
-Human output uses compact tables and terminal-aware colour. Use `--no-color` (or the common `NO_COLOR` environment variable) when styling is not useful. Validation, status, and other report-style commands offer deterministic JSON for scripts:
+Human-facing help, progress, reports, and errors use one Rich presentation layer. Comparable records use tables, summaries use compact panels, and exact paths or identifiers fold instead of disappearing behind an ellipsis. Output follows the current terminal width but never exceeds 80 columns.
+
+Put `--no-color` before the command to disable colour everywhere, or use the common `NO_COLOR` environment variable. Commands that already expose the option also accept it after the command. JSON, SARIF, and JUnit formats remain plain and deterministic for scripts:
 
 ```sh
+ai-guardrails --no-color doctor
 ai-guardrails validate --format json
 ai-guardrails status --repo . --format json
 ai-guardrails skills audit --format json
+ai-guardrails effective --format human
 ```
 
-Machine formats write one JSON document to standard output and do not include Rich styling.
+`effective` keeps its historical JSON default; select `--format human` for the Rich view. Machine formats never include Rich styling. Pasteable setup or instruction content and exact interactive confirmation prompts also stay plain so their text remains exact.
 
 For substantive technical prose, use `workstation-technical-writing`. Its ASD-STE100-informed guidance preserves technical terms and facts without claiming formal compliance. The optional offline audit is advisory:
 

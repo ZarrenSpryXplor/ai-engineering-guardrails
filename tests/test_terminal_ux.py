@@ -154,7 +154,8 @@ class TerminalUxTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["activity", "--home", str(self.home), "--since", "7d"]))
-        self.assertIn("Observed 1", output.getvalue())
+        self.assertIn("Observed", output.getvalue())
+        self.assertIn("1", output.getvalue())
         self.assertNotIn("secret", output.getvalue())
 
     def test_activity_rejects_malformed_identifiers_and_refreshes_the_renderer_cache(self) -> None:
@@ -395,7 +396,7 @@ class TerminalUxTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["statusline", "uninstall", "--product", "claude", "--home", str(self.home)]))
-        self.assertIn("partially complete", output.getvalue())
+        self.assertIn("partially complete", output.getvalue().casefold())
         result = io.StringIO()
         with contextlib.redirect_stdout(result):
             self.assertEqual(0, cli.main(["statusline", "uninstall", "--product", "claude", "--home", str(self.home), "--format", "json"]))

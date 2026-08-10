@@ -687,8 +687,8 @@ class ComponentTests(unittest.TestCase):
             )
 
         self.assertEqual(0, result)
-        self.assertIn("Trusted component:", stdout.getvalue())
-        self.assertIn("expires:", stdout.getvalue())
+        self.assertIn("Trusted component", stdout.getvalue())
+        self.assertIn("Expires", stdout.getvalue())
         self.assertNotIn("Type exactly:", stdout.getvalue())
         self.assertIn("Type exactly:", stderr.getvalue())
 

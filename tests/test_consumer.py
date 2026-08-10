@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -83,14 +84,15 @@ class ConsumerJourneyTests(unittest.TestCase):
         self.assertIn("Model/subagent routing: disabled; primary model unchanged", preview)
         self.assertIn("Denied operation classes: destructive, sensitive-read, publish", preview)
         self.assertIn("Managed block", preview)
-        self.assertIn(str(self.home / ".codex/AGENTS.md"), preview)
-        self.assertIn(str(self.home / ".cursor/hooks.json"), preview)
-        self.assertIn(str(self.home / state.STATE_RELATIVE), preview)
+        compact_preview = re.sub(r"[\s|]", "", preview)
+        self.assertIn(str(self.home / ".codex/AGENTS.md"), compact_preview)
+        self.assertIn(str(self.home / ".cursor/hooks.json"), compact_preview)
+        self.assertIn(str(self.home / state.STATE_RELATIVE), compact_preview)
         self.assertIn("Skills to install", preview)
         self.assertIn("workstation-java", preview)
         self.assertIn("Agents to install: none", preview)
         self.assertIn("Backups planned for", preview)
-        self.assertIn(str(self.home / ".cursor/hooks.json"), preview)
+        self.assertIn(str(self.home / ".cursor/hooks.json"), compact_preview)
         self.assertIn("Left unchanged: primary model", preview)
         self.assertIn("Manual step after install", preview)
         self.assertIn("print-cursor-rules", preview)

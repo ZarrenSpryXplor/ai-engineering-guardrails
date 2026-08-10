@@ -3,18 +3,35 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Mapping
+import shutil
+import sys
+from collections.abc import Iterable, Sequence
+from typing import Any, Mapping, TextIO
 
 from rich import box
-from rich.console import Console
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
 
 OUTCOME_STYLES = {
+    "pass": "bold green",
     "passed": "bold green",
+    "ok": "bold green",
+    "clear": "bold green",
+    "allow": "bold green",
+    "allowed": "bold green",
+    "deny": "bold red",
+    "denied": "bold red",
+    "fail": "bold red",
     "skipped": "bold yellow",
+    "skip": "bold yellow",
+    "warn": "bold yellow",
     "warning": "bold yellow",
+    "review": "bold yellow",
+    "high-change": "bold red",
     "failed": "bold red",
     "installed": "bold green",
     "modified": "bold red",
@@ -24,9 +41,20 @@ OUTCOME_STYLES = {
 }
 
 
-def _console(*, no_color: bool) -> Console:
+MAX_HUMAN_WIDTH = 80
+
+
+def _output_width() -> int:
+    """Return a practical terminal width without ever exceeding 80 cells."""
+    return max(20, min(MAX_HUMAN_WIDTH, shutil.get_terminal_size((MAX_HUMAN_WIDTH, 24)).columns))
+
+
+def _console(*, no_color: bool, file: TextIO | None = None, stderr: bool = False) -> Console:
     plain = no_color or "NO_COLOR" in os.environ
     return Console(
+        file=file,
+        stderr=stderr,
+        width=_output_width(),
         color_system=None if plain else "auto",
         no_color=plain,
         markup=False,
@@ -44,7 +72,236 @@ def _text(value: object, style: str | None = None) -> Text:
 
 def _outcome(value: object) -> Text:
     label = str(value)
-    return _text(label.upper(), OUTCOME_STYLES.get(label))
+    return _text(label.upper(), OUTCOME_STYLES.get(label.lower()))
+
+
+def print_help(message: str, *, file: TextIO | None = None, no_color: bool = False) -> None:
+    """Render argparse help through the same bounded console as other human output."""
+    console = _console(no_color=no_color, file=file)
+    for line in message.rstrip().splitlines():
+        stripped = line.strip()
+        style = "bold cyan" if stripped == "usage:" or stripped.endswith(":") else None
+        if stripped.startswith("usage:"):
+            style = "bold cyan"
+        console.print(_text(line, style), overflow="fold")
+
+
+def print_error(message: object, *, no_color: bool = False) -> None:
+    """Write a bounded human error to stderr."""
+    console = _console(no_color=no_color, file=sys.stderr)
+    console.print(_text(f"Error: {message}", "bold red"), overflow="fold")
+
+
+def print_message(
+    title: str,
+    message: object,
+    *,
+    outcome: str = "passed",
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render a single bounded result without inventing a table."""
+    console = _console(no_color=no_color)
+    console.print(
+        Panel(
+            _text(message, OUTCOME_STYLES.get(outcome.lower())),
+            title=_text(title, "bold"),
+            border_style=OUTCOME_STYLES.get(outcome.lower()),
+            box=_box(ascii_only=ascii_only),
+            padding=(0, 1),
+        )
+    )
+
+
+def print_properties(
+    title: str,
+    rows: Iterable[tuple[object, object]],
+    *,
+    notes: Iterable[object] = (),
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render a compact key/value report with folded values."""
+    console = _console(no_color=no_color)
+    table = Table(
+        title=title,
+        box=_box(ascii_only=ascii_only),
+        header_style="bold cyan",
+        show_header=False,
+        expand=True,
+    )
+    table.add_column("Property", style="bold", overflow="fold", ratio=1)
+    table.add_column("Value", overflow="fold", ratio=3)
+    for label, value in rows:
+        table.add_row(_text(label), _text(value))
+    console.print(table)
+    for note in notes:
+        console.print(_text(note, "dim"), overflow="fold")
+
+
+def print_records(
+    title: str,
+    columns: Sequence[str],
+    rows: Iterable[Sequence[object]],
+    *,
+    outcome_column: int | None = None,
+    empty_message: str = "None",
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render comparable records in a full-width, folding table."""
+    console = _console(no_color=no_color)
+    table = Table(
+        title=title,
+        box=_box(ascii_only=ascii_only),
+        header_style="bold cyan",
+        show_lines=False,
+        expand=True,
+    )
+    for index, label in enumerate(columns):
+        table.add_column(label, style="bold" if index == 0 else None, overflow="fold")
+    rendered_rows = 0
+    for row in rows:
+        values = [
+            _outcome(value) if index == outcome_column else _text(value)
+            for index, value in enumerate(row)
+        ]
+        table.add_row(*values)
+        rendered_rows += 1
+    if rendered_rows == 0:
+        table.add_row(_text(empty_message, "dim"), *(_text("") for _ in columns[1:]))
+    console.print(table)
+
+
+def print_checks(
+    title: str,
+    checks: Iterable[Mapping[str, object]],
+    *,
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render checks with their exact outcome and detail."""
+    print_records(
+        title,
+        ("Check", "Result", "Details"),
+        ((check["id"], check["outcome"], check["detail"]) for check in checks),
+        outcome_column=1,
+        no_color=no_color,
+        ascii_only=ascii_only,
+    )
+
+
+def print_findings(
+    title: str,
+    findings: Iterable[Mapping[str, object]],
+    *,
+    clean_message: str,
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render diagnostic findings while keeping paths and messages intact."""
+    values = list(findings)
+    if not values:
+        print_message(
+            title,
+            clean_message,
+            outcome="passed",
+            no_color=no_color,
+            ascii_only=ascii_only,
+        )
+        return
+    console = _console(no_color=no_color)
+    table = Table(
+        title=title,
+        box=_box(ascii_only=ascii_only),
+        header_style="bold cyan",
+        show_lines=False,
+        expand=True,
+    )
+    table.add_column("Level", no_wrap=True, width=9)
+    table.add_column("Finding", overflow="fold", ratio=1)
+    for item in values:
+        location = item.get("path", "")
+        if item.get("line") not in (None, 0, ""):
+            location = f"{location}:{item['line']}"
+        detail = Text()
+        detail.append(str(item.get("id", item.get("rule_id", "finding"))), style="bold")
+        if location:
+            detail.append(f"\n{location}", style="dim")
+        message = item.get("message", item.get("detail", ""))
+        if message:
+            detail.append(f"\n{message}")
+        limitation = item.get("limitation")
+        if limitation:
+            detail.append(f"\nLimitation: {limitation}", style="dim")
+        table.add_row(_outcome(item.get("level", item.get("outcome", "review"))), detail)
+    console.print(table)
+
+
+def print_operation_log(
+    title: str,
+    output: str | Iterable[str],
+    *,
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render an existing line-oriented operation log without parsing shell syntax."""
+    lines = output.splitlines() if isinstance(output, str) else [str(line) for line in output]
+    if lines and lines[0].strip().casefold() == title.strip().casefold():
+        lines = lines[1:]
+    rendered: list[Text] = []
+    for line in lines:
+        stripped = line.strip()
+        lowered = stripped.lower()
+        style = None
+        if lowered.startswith(("error:", "failed", "retained modified")):
+            style = "red"
+        elif lowered.startswith(("warning:", "manual step", "would ", "retained ")):
+            style = "yellow"
+        elif lowered.startswith(("passed", "built ", "installed", "unchanged", "created", "revoked")):
+            style = "green"
+        elif stripped and not line.startswith((" ", "-")) and ":" not in stripped:
+            style = "bold cyan"
+        rendered.append(_text(line, style))
+    if not rendered:
+        rendered.append(_text("No output.", "dim"))
+    console = _console(no_color=no_color)
+    console.print(
+        Panel(
+            Group(*rendered),
+            title=_text(title, "bold"),
+            border_style="cyan",
+            box=_box(ascii_only=ascii_only),
+            padding=(0, 1),
+        )
+    )
+
+
+def print_json_human(
+    title: str,
+    value: Mapping[str, Any],
+    *,
+    no_color: bool = False,
+    ascii_only: bool = False,
+) -> None:
+    """Render structured detail for a human without changing the JSON machine path."""
+    import json
+
+    console = _console(no_color=no_color)
+    console.print(
+        Panel(
+            Syntax(
+                json.dumps(value, indent=2, sort_keys=True),
+                "json",
+                word_wrap=True,
+                background_color="default",
+            ),
+            title=_text(title, "bold"),
+            border_style="cyan",
+            box=_box(ascii_only=ascii_only),
+            padding=(0, 1),
+        )
+    )
 
 
 def print_validation(
@@ -59,10 +316,11 @@ def print_validation(
         box=_box(ascii_only=ascii_only),
         header_style="bold cyan",
         show_lines=False,
+        expand=True,
     )
-    table.add_column("Check", style="bold")
+    table.add_column("Check", style="bold", overflow="fold")
     table.add_column("Result", no_wrap=True)
-    table.add_column("Details")
+    table.add_column("Details", overflow="fold")
     for check in report["checks"]:
         table.add_row(
             _text(check["label"]),
@@ -87,6 +345,7 @@ def print_status(
         box=table_box,
         header_style="bold cyan",
         show_lines=False,
+        expand=True,
     )
     products.add_column("Product", style="bold", overflow="fold")
     products.add_column("State", no_wrap=True)
@@ -117,6 +376,7 @@ def print_status(
         box=table_box,
         header_style="bold cyan",
         show_header=False,
+        expand=True,
     )
     controls.add_column("Control", style="bold")
     controls.add_column("Value", overflow="fold")
@@ -135,6 +395,7 @@ def print_status(
         box=table_box,
         header_style="bold cyan",
         show_lines=False,
+        expand=True,
     )
     details_table.add_column("Product", style="bold")
     details_table.add_column("Enforcement and notes", overflow="fold")
@@ -193,6 +454,7 @@ def print_status(
             box=table_box,
             header_style="bold yellow",
             show_header=False,
+            expand=True,
         )
         attention_table.add_column("Item")
         for item in attention:
@@ -206,6 +468,7 @@ def print_status(
             box=table_box,
             header_style="bold cyan",
             show_header=False,
+            expand=True,
         )
         repository_table.add_column("Measure", style="bold")
         repository_table.add_column("Value", overflow="fold")
@@ -234,6 +497,7 @@ def print_status(
                 box=table_box,
                 header_style="bold cyan",
                 show_lines=False,
+                expand=True,
             )
             evidence_table.add_column("Pack", style="bold", overflow="fold")
             evidence_table.add_column("Kind")
@@ -265,9 +529,10 @@ def print_skills_audit(
         box=table_box,
         header_style="bold cyan",
         show_header=False,
+        expand=True,
     )
     summary.add_column("Measure", style="bold")
-    summary.add_column("Value")
+    summary.add_column("Value", overflow="fold")
     summary.add_row(
         _text(f"Catalogue ({catalogue['scope']})"),
         _text(
@@ -305,11 +570,12 @@ def print_skills_audit(
         box=table_box,
         header_style="bold cyan",
         show_lines=False,
+        expand=True,
     )
     skills.add_column("Skill", style="bold", overflow="fold")
-    skills.add_column("Estimated tokens", justify="right")
-    skills.add_column("References", justify="right")
-    skills.add_column("Reference tokens", justify="right")
+    skills.add_column("Tokens", justify="right")
+    skills.add_column("Refs", justify="right")
+    skills.add_column("Ref tokens", justify="right")
     for skill in report["skills"]:
         skills.add_row(
             _text(skill["name"]),

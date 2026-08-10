@@ -165,10 +165,10 @@ class PackDetectionTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["packs", "explain", "--repo", str(FIXTURES / "maven-single")]))
-        text = output.getvalue()
-        self.assertIn("java: on-demand policy: policy.md: Java capability policy", text)
-        self.assertIn("java: verification: java-targeted-test (test; affected-module-first)", text)
-        self.assertIn("java: routing hints: java-implementation -> balanced/medium (write)", text)
+        text = " ".join(output.getvalue().replace("|", " ").split())
+        self.assertIn("java On-demand policy policy.md: Java capability policy", text)
+        self.assertIn("java Verification java-targeted-test (test; affected-module-first)", text)
+        self.assertIn("java Routing hints java-implementation -> balanced/medium (write)", text)
 
 
 class PackValidationTests(unittest.TestCase):
