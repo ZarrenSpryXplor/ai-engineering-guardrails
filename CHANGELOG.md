@@ -2,7 +2,7 @@
 
 All notable user-facing changes are recorded here. This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) principles and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for tagged releases.
 
-## Unreleased
+## [1.2.3] - 2026-08-10
 
 ### Added
 
@@ -17,6 +17,7 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 ### Fixed
 
 - Help output no longer emits terminal colour that `--no-color` and `NO_COLOR` cannot suppress on Python 3.14, where `argparse` colours help itself and propagates that choice to every subcommand parser.
+- Mixed `diff-installed` reports retain selected products with no managed paths, and synthetic demos use ASCII-safe separators on legacy terminals.
 
 ## [1.2.2] - 2026-08-09
 
