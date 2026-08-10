@@ -2,7 +2,9 @@
 
 All notable user-facing changes are recorded here. This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) principles and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for tagged releases.
 
-## [1.2.3] - 2026-08-10
+## Unreleased
+
+## [1.3.0] - 2026-08-10
 
 ### Added
 
