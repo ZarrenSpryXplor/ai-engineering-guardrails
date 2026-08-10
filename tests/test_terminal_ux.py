@@ -47,16 +47,17 @@ class TerminalUxTests(unittest.TestCase):
 
     def test_human_terminal_ux_commands_fall_back_to_ascii_for_legacy_stdout(self) -> None:
         binary = io.BytesIO()
-        legacy_stdout = io.TextIOWrapper(binary, encoding="cp1252")
+        legacy_stdout = io.TextIOWrapper(binary, encoding="ascii")
         with mock.patch.object(sys, "stdout", legacy_stdout):
             self.assertEqual(0, cli.main(["statusline", "preview", "--product", "all", "--profile", "standard"]))
             self.assertEqual(0, cli.main(["demo", "--scenario", "all", "--fun"]))
             self.assertEqual(0, cli.main(["complexity", "--repo", str(self.home)]))
         legacy_stdout.flush()
-        output = binary.getvalue().decode("cp1252")
+        output = binary.getvalue().decode("ascii")
         self.assertIn("[G]", output)
         self.assertIn("KISS OK", output)
         self.assertNotIn("🛡", output)
+        self.assertNotIn("—", output)
 
     def test_renderer_omits_stale_cache(self) -> None:
         cache = terminal_ux.cache_directory(self.home)

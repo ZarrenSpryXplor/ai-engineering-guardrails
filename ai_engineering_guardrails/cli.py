@@ -1209,7 +1209,10 @@ def _demo(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(value, indent=2, sort_keys=True))
         return
-    header = "[G] Synthetic demonstration" if _human_ascii_only() else "🛡 Synthetic demonstration"
+    human_options = _human_options(args)
+    ascii_only = human_options["ascii_only"]
+    header = "[G] Synthetic demonstration" if ascii_only else "🛡 Synthetic demonstration"
+    separator = " - " if ascii_only else " — "
     for name, section in rendered.items():
         rows = []
         for item in section:
@@ -1222,17 +1225,17 @@ def _demo(args: argparse.Namespace) -> None:
                 label = "OK" if item["classification"] == "clear" else item["classification"]
                 rows.append((f"KISS {label}", ", ".join(item["signal_ids"]) or "no signals", "complexity"))
         presentation.print_records(
-            f"{header if args.fun else 'Synthetic demonstration'} — {name}",
+            f"{header if args.fun else 'Synthetic demonstration'}{separator}{name}",
             ("Scenario", "Result", "Kind"),
             rows,
             outcome_column=1 if all("decision" in item for item in section) else None,
-            **_human_options(args),
+            **human_options,
         )
     presentation.print_message(
         "Safety note",
         "No displayed command was executed.",
         outcome="passed",
-        **_human_options(args),
+        **human_options,
     )
 
 
@@ -1637,26 +1640,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "diff-installed":
             with contextlib.redirect_stdout(io.StringIO()):
                 report = install.diff_installed(selected_products(args.product), args.home)
-            rows = [
-                (product, item["state"], item["path"])
-                for product, items in report["products"].items()
-                for item in items
-            ]
-            if rows:
-                presentation.print_records(
-                    "Installed content diff",
-                    ("Product", "State", "Path"),
-                    rows,
-                    outcome_column=1,
-                    **_human_options(args),
-                )
-            else:
-                presentation.print_message(
-                    "Installed content diff",
-                    "No managed paths are recorded for the selected products.",
-                    outcome="warning",
-                    **_human_options(args),
-                )
+            rows = []
+            for product, items in report["products"].items():
+                if not items:
+                    rows.append((product, "not installed", "No managed paths recorded"))
+                    continue
+                rows.extend((product, item["state"], item["path"]) for item in items)
+            presentation.print_records(
+                "Installed content diff",
+                ("Product", "State", "Path"),
+                rows,
+                outcome_column=1,
+                **_human_options(args),
+            )
         elif args.command in {"explain", "simulate"}:
             _explain(args)
         elif args.command == "scan":

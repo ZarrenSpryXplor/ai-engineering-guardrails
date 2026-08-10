@@ -351,6 +351,32 @@ class CliPresentationTests(unittest.TestCase):
                 self.assertNotIn("…", output)
                 self.assert_bounded_human_output(output)
 
+    def test_diff_installed_preserves_empty_products_in_a_mixed_report(self) -> None:
+        report = {
+            "products": {
+                "codex": [
+                    {
+                        "state": "unchanged",
+                        "path": "/synthetic/home/.codex/AGENTS.md",
+                    }
+                ],
+                "claude": [],
+            }
+        }
+        with mock.patch(
+            "ai_engineering_guardrails.cli.install.diff_installed",
+            return_value=report,
+        ):
+            result, output, errors = self.run_cli(
+                ["--no-color", "diff-installed", "--product", "all", "--home", "/synthetic/home"]
+            )
+
+        self.assertEqual(0, result, errors)
+        self.assertIn("codex", output)
+        self.assertIn("claude", output)
+        self.assertIn("NOT INSTALLED", output)
+        self.assertIn("No managed paths recorded", output)
+
     def test_effective_keeps_json_default_and_offers_explicit_human_output(self) -> None:
         report = {"schema_version": 1, "products": {"codex": {"state": "installed"}}}
         with mock.patch(
