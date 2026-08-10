@@ -143,6 +143,9 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
         raise PackError(f"pack identifier does not match directory: {pack_file}")
     if data["type"] not in PACK_TYPES:
         raise PackError(f"pack {identifier} has unknown type")
+    declared_tier = data.get("catalogue_tier")
+    if declared_tier is not None and declared_tier not in {"contextual", "specialist"}:
+        raise PackError(f"pack {identifier} has invalid catalogue_tier")
     if not isinstance(data["description"], str) or not data["description"].strip():
         raise PackError(f"pack {identifier} has invalid description")
     list_fields = (
@@ -192,6 +195,9 @@ def load_pack(pack_file: Path) -> dict[str, Any]:
 
 def catalogue_tier(pack: Mapping[str, Any]) -> str:
     """Map existing canonical pack types to their skill-catalogue role."""
+    declared = pack.get("catalogue_tier")
+    if declared in {"contextual", "specialist"}:
+        return str(declared)
     return "contextual" if pack.get("type") in {"language", "shared"} else "specialist"
 
 
@@ -609,7 +615,10 @@ def pack_guidance(pack: Mapping[str, Any]) -> dict[str, list[str]]:
 
 def validate_packs(packs_root: Path = PACKS_ROOT) -> tuple[int, int]:
     packs = load_packs(packs_root)
-    skill_names: set[str] = set()
+    skill_names = {
+        skill_file.parent.name
+        for skill_file in (RESOURCE_ROOT / "skills").glob("*/SKILL.md")
+    }
     examples = 0
     for identifier, pack in packs.items():
         root = Path(pack["_root"])

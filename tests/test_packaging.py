@@ -48,12 +48,13 @@ def _package_build_available() -> bool:
 class PackagingTests(unittest.TestCase):
     def test_declarative_metadata_and_resource_tree(self) -> None:
         data = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertEqual(["setuptools>=77.0.3", "wheel"], data["build-system"]["requires"])
         self.assertEqual("ai-engineering-guardrails", data["project"]["name"])
         self.assertEqual(
             "ai_engineering_guardrails.cli:main",
             data["project"]["scripts"]["ai-guardrails"],
         )
-        self.assertEqual([], data["project"]["dependencies"])
+        self.assertEqual(["rich>=15.0.0,<16"], data["project"]["dependencies"])
         self.assertEqual(">=3.11", data["project"]["requires-python"])
         self.assertEqual("MIT", data["project"]["license"])
         self.assertEqual(["LICENSE"], data["project"]["license-files"])
@@ -99,6 +100,7 @@ class PackagingTests(unittest.TestCase):
             "docs/README.md",
             "docs/releasing.md",
             "docs/evidence-and-assurance.md",
+            "docs/technical-writing.md",
             "SECURITY.md",
             "CONTRIBUTING.md",
             "CODE_OF_CONDUCT.md",
@@ -201,6 +203,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/releasing.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/evidence-and-assurance.md") for name in names))
+                self.assertTrue(any(name.endswith("docs/technical-writing.md") for name in names))
                 for filename in (
                     "SECURITY.md",
                     "CONTRIBUTING.md",
@@ -241,7 +244,10 @@ class PackagingTests(unittest.TestCase):
                     self.assertNotIn(private_key_marker, content)
 
             environment_root = temporary_root / "venv"
-            venv.EnvBuilder(with_pip=True).create(environment_root)
+            # CI installs the exact reviewed direct dependency set before this
+            # offline smoke test. Expose that set without consulting an index;
+            # the project wheel itself is still installed only into this venv.
+            venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment_root)
             scripts = environment_root / ("Scripts" if os.name == "nt" else "bin")
             interpreter = scripts / ("python.exe" if os.name == "nt" else "python")
             command = scripts / ("ai-guardrails.exe" if os.name == "nt" else "ai-guardrails")
@@ -252,6 +258,50 @@ class PackagingTests(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+            )
+            dependency_script = """
+import importlib.metadata as metadata
+import markdown_it
+import pygments
+import rich
+from pip._vendor.packaging.requirements import Requirement
+
+pending = ["ai-engineering-guardrails"]
+checked = set()
+while pending:
+    distribution = pending.pop()
+    key = distribution.casefold()
+    if key in checked:
+        continue
+    checked.add(key)
+    for raw_requirement in metadata.requires(distribution) or ():
+        requirement = Requirement(raw_requirement)
+        if requirement.marker is not None and not requirement.marker.evaluate():
+            continue
+        installed = metadata.version(requirement.name)
+        if requirement.specifier and installed not in requirement.specifier:
+            raise RuntimeError(f"{requirement.name} {installed} does not satisfy {requirement.specifier}")
+        pending.append(requirement.name)
+print(metadata.version("rich"))
+print("|".join(sorted(checked)))
+"""
+            dependency_check = subprocess.run(
+                [
+                    str(interpreter),
+                    "-c",
+                    dependency_script,
+                ],
+                cwd=outside,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            dependency_lines = dependency_check.stdout.strip().splitlines()
+            self.assertEqual("15.0.0", dependency_lines[0])
+            self.assertTrue(
+                {"ai-engineering-guardrails", "rich", "markdown-it-py", "pygments", "mdurl"}
+                .issubset(set(dependency_lines[1].split("|")))
             )
             # Do not accidentally use optional validators or AI-product commands
             # from the developer's PATH while proving the isolated wheel.
@@ -284,6 +334,7 @@ class PackagingTests(unittest.TestCase):
                     text=True,
                 ).stdout.strip()
             )
+            self.assertTrue(package_dir.is_relative_to(environment_root), package_dir)
             before = _tree_hashes(package_dir)
             module_path = subprocess.run(
                 [str(interpreter), "-c", "import ai_engineering_guardrails as p; print(p.__file__)"],

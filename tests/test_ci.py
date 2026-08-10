@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -178,7 +179,7 @@ class SampleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             summary = Path(temporary) / "summary.md"
             failed = subprocess.CompletedProcess(
-                args=[sys.executable, "tools/guardrails.py", "validate"],
+                args=[sys.executable, "tools/guardrails.py", "validate", "--format", "json"],
                 returncode=1,
                 stdout="",
                 stderr="error: OPA semantic policy tests failed\n",
@@ -202,13 +203,21 @@ class SampleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             summary = Path(temporary) / "summary.md"
             skipped = subprocess.CompletedProcess(
-                args=[sys.executable, "tools/guardrails.py", "validate"],
+                args=[sys.executable, "tools/guardrails.py", "validate", "--format", "json"],
                 returncode=0,
-                stdout=(
-                    "validation passed: synthetic aggregate\n"
-                    "codex execpolicy check: skipped (codex executable not available)\n"
-                    "Spacelift policy validation: skipped semantic Rego execution "
-                    "(opa executable not available); structural checks passed\n"
+                stdout=json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "passed",
+                        "checks": [
+                            {"id": "generated-output", "outcome": "passed"},
+                            {"id": "policy-fixtures", "outcome": "passed"},
+                            {"id": "capability-packs", "outcome": "passed"},
+                            {"id": "routing-agents", "outcome": "passed"},
+                            {"id": "codex-execpolicy", "outcome": "skipped"},
+                            {"id": "spacelift-rego", "outcome": "skipped"},
+                        ],
+                    }
                 ),
                 stderr="",
             )
@@ -225,6 +234,46 @@ class SampleTests(unittest.TestCase):
             self.assertIn("| Codex execpolicy | Skipped |", text)
             self.assertIn("| Spacelift policy structure | Passed |", text)
             self.assertIn("| OPA semantic Rego | Skipped |", text)
+
+    def test_validation_summary_rejects_malformed_json_contract(self) -> None:
+        checks = [
+            {"id": "generated-output", "outcome": "passed"},
+            {"id": "policy-fixtures", "outcome": "passed"},
+            {"id": "capability-packs", "outcome": "passed"},
+            {"id": "routing-agents", "outcome": "passed"},
+            {"id": "codex-execpolicy", "outcome": "passed"},
+            {"id": "spacelift-rego", "outcome": "passed"},
+        ]
+        malformed = (
+            {"schema_version": 2, "status": "passed", "checks": checks},
+            {"schema_version": 1, "status": "passed", "checks": "not-a-list"},
+            {
+                "schema_version": 1,
+                "status": "passed",
+                "checks": [*checks[:-1], {"id": "spacelift-rego", "outcome": "unknown"}],
+            },
+        )
+        for report in malformed:
+            with self.subTest(report=report), tempfile.TemporaryDirectory() as temporary:
+                summary = Path(temporary) / "summary.md"
+                completed = subprocess.CompletedProcess(
+                    args=[sys.executable, "tools/guardrails.py", "validate", "--format", "json"],
+                    returncode=0,
+                    stdout=json.dumps(report),
+                    stderr="",
+                )
+                errors = io.StringIO()
+                with (
+                    mock.patch.object(CI_MODULE.subprocess, "run", return_value=completed),
+                    mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary)}),
+                    contextlib.redirect_stdout(io.StringIO()),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    returncode = CI_MODULE.run_validation()
+
+                self.assertEqual(1, returncode)
+                self.assertIn("expected JSON report", errors.getvalue())
+                self.assertFalse(summary.exists())
 
     def test_job_summary_rejects_malformed_check_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

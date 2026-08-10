@@ -463,6 +463,7 @@ class InstallTests(unittest.TestCase):
         self.assertTrue((self.home / ".agents/skills/workstation-dependency-management/SKILL.md").is_file())
         self.assertFalse((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").exists())
         self.assertFalse((self.home / ".agents/skills/workstation-spacelift/SKILL.md").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-technical-writing/SKILL.md").exists())
 
         runtime = self.home / ".ai-guardrails/runtime" / installed["runtime_digest"]
         policy_data = json.loads((runtime / "command-policy.json").read_text(encoding="utf-8"))
@@ -479,6 +480,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(set(packs.default_pack_ids()), set(expanded["installed_skill_packs"]))
         self.assertEqual(initial_policy_digest, expanded["policy_digest"])
         self.assertTrue((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").is_file())
+        self.assertTrue((self.home / ".agents/skills/workstation-technical-writing/SKILL.md").is_file())
 
         self.install(("codex",), skill_catalogue="contextual")
         reduced = self.read_state()["products"]["codex"]
@@ -486,6 +488,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(set(packs.default_skill_pack_ids()), set(reduced["installed_skill_packs"]))
         self.assertEqual(initial_policy_digest, reduced["policy_digest"])
         self.assertFalse((self.home / ".agents/skills/workstation-kubernetes").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-technical-writing").exists())
 
     def test_unmanaged_skill_collision_refused_then_force_backed_up(self) -> None:
         collision = self.home / ".agents/skills/workstation-safe-change"

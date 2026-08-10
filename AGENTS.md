@@ -2,7 +2,7 @@
 
 - Treat `ai_engineering_guardrails/_resources/` as the single canonical resource root for policy, skills, enforcement data, routing, packs, configuration, and platform examples.
 - Treat `dist/` and the generated files under `adapters/` as build output; do not edit them directly.
-- Use Python 3.11+ and its standard library for all implementation and tests. Do not add another implementation language, shell helper, runtime dependency, packaging framework, service, or daemon.
+- Use Python 3.11+ and its standard library for domain logic and tests. Rich is the sole approved direct runtime dependency and is confined to human CLI presentation; do not add another implementation language, shell helper, direct runtime dependency, packaging framework, service, or daemon.
 - Apply KISS, DRY, YAGNI, and the Rule of Three: keep control flow explicit, retain one owner for policy knowledge, and do not add speculative abstractions or extension points.
 - Keep product-specific configuration in adapters. Do not duplicate canonical behavioural policy there.
 - Keep vendor model identifiers in `_resources/routing/model-maps/`, never in behavioural policy or portable role instructions.

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import subprocess
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
-from ai_engineering_guardrails import scan
+from ai_engineering_guardrails import cli, scan
+from ai_engineering_guardrails.util import GuardrailsError
 
 
 class ScanTests(unittest.TestCase):
@@ -156,6 +160,77 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(2, receipt["schema_version"])
         self.assertNotIn("task_assurance", receipt)
 
+    def test_session_receipt_distinguishes_known_zero_dirty_count_and_unknown_git_state(self) -> None:
+        self.write("tracked.txt", "base\n")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tracked.txt"], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.repo),
+                "-c",
+                "user.email=tests@example.invalid",
+                "-c",
+                "user.name=Tests",
+                "commit",
+                "-m",
+                "base",
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        clean = scan.session_receipt(self.repo, self.repo, ("codex",))
+        self.assertEqual(0, clean["files_modified_count"])
+        self.assertEqual(0, clean["complexity"]["files_changed"])
+
+        self.write("tracked.txt", "changed\n")
+        self.write("untracked.txt", "new\n")
+        dirty = scan.session_receipt(self.repo, self.repo, ("codex",))
+        self.assertEqual(2, dirty["files_modified_count"])
+        self.assertEqual(dirty["complexity"]["files_changed"], dirty["files_modified_count"])
+
+        with tempfile.TemporaryDirectory() as plain_temporary:
+            plain = Path(plain_temporary)
+            unavailable = scan.session_receipt(self.repo, plain, ("codex",))
+            self.assertIsNone(unavailable["files_modified_count"])
+            self.assertIsNone(json.loads(json.dumps(unavailable))["files_modified_count"])
+            self.assertFalse(unavailable["complexity"]["available"])
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = cli.main(
+                    ["receipt", "--home", str(self.repo), "--repo", str(plain), "--format", "compact"]
+                )
+            self.assertEqual(0, result)
+            self.assertIn("Files changed       unavailable", output.getvalue())
+
+            json_output = io.StringIO()
+            with contextlib.redirect_stdout(json_output):
+                result = cli.main(
+                    ["receipt", "--home", str(self.repo), "--repo", str(plain), "--format", "json"]
+                )
+            self.assertEqual(0, result)
+            self.assertIsNone(json.loads(json_output.getvalue())["files_modified_count"])
+
+            human_output = io.StringIO()
+            with contextlib.redirect_stdout(human_output):
+                result = cli.main(
+                    ["receipt", "--home", str(self.repo), "--repo", str(plain), "--format", "human"]
+                )
+            self.assertEqual(0, result)
+            self.assertIn('"files_modified_count": null', human_output.getvalue())
+
+    def test_session_receipt_reports_unknown_when_git_is_unavailable(self) -> None:
+        with mock.patch(
+            "ai_engineering_guardrails.complexity._git",
+            side_effect=GuardrailsError("synthetic Git failure"),
+        ):
+            receipt = scan.session_receipt(self.repo, self.repo, ("codex",))
+
+        self.assertIsNone(receipt["files_modified_count"])
+        self.assertFalse(receipt["complexity"]["available"])
+
     def test_packaged_guardrail_engine_and_resource_paths_are_governance_paths(self) -> None:
         self.write("ai_engineering_guardrails/_resources/policy/manifest.json", "{}\n")
         self.write("ai_engineering_guardrails/enforcement.py", "# Synthetic enforcement change\n")
@@ -225,6 +300,61 @@ class ScanTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(findings), 4)
         self.assertTrue(all("not semantic" in (item.limitation or "") for item in findings))
+
+    def test_documentation_audit_has_bounded_positive_and_safe_examples(self) -> None:
+        long_step = "1. Validate the configuration " + "carefully " * 46 + ".\n"
+        self.write(
+            "docs/procedure.md",
+            long_step + "It is important to note that validation is advisory.\n",
+        )
+        root, findings, audited_files = scan.audit_documentation(self.repo)
+
+        self.assertEqual(self.repo, root)
+        self.assertEqual(1, audited_files)
+        self.assertEqual({"DOC001", "DOC002"}, {item.rule_id for item in findings})
+        self.assertTrue(all(item.level in {"review", "info"} for item in findings))
+
+        self.write(
+            "docs/procedure.md",
+            "# Please note that this is a heading\n\n"
+            "> It is important to note that this is quoted text.\n\n"
+            '"Please note that this sentence is quoted."\n\n'
+            "Ordinary prose can contain many words without becoming a procedural finding because this audit does not guess whether descriptive text is an instruction or apply a universal sentence limit.\n\n"
+            "1. Run `ExtremelyLongTechnicalIdentifierThatMustRemainExact`.\n\n"
+            "See https://example.invalid/please-note-that/path for the external example.\n\n"
+            "```sh\n"
+            "please note that this command-like fixture is code\n"
+            "run --very-long-command --with-many-arguments\n"
+            "```\n\n"
+            "    Please note that indented command examples are also code.\n",
+        )
+        _, safe_findings, _ = scan.audit_documentation(self.repo)
+
+        self.assertEqual([], safe_findings)
+
+    def test_documentation_audit_path_json_is_advisory_and_deterministic(self) -> None:
+        self.write("README.md", "Please note that this preface can be direct.\n")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = cli.main(["docs", "audit", "--path", str(self.repo / "README.md"), "--format", "json"])
+
+        report = json.loads(output.getvalue())
+        self.assertEqual(0, result)
+        self.assertTrue(report["advisory"])
+        self.assertFalse(report["formal_asd_ste100_compliance_assessed"])
+        self.assertEqual({"info": 1, "review": 0}, report["summary"])
+        self.assertEqual("DOC002", report["findings"][0]["rule_id"])
+
+    def test_documentation_audit_does_not_follow_selected_path_symlink(self) -> None:
+        self.write("README.md", "Please note that this target must not be read through a link.\n")
+        link = self.repo / "linked.md"
+        try:
+            link.symlink_to(self.repo / "README.md")
+        except (NotImplementedError, OSError):
+            self.skipTest("symbolic links are unavailable on this platform")
+
+        with self.assertRaisesRegex(GuardrailsError, "symbolic link"):
+            scan.audit_documentation(selected_path=link)
 
 
 if __name__ == "__main__":

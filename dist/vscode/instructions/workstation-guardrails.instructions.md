@@ -89,6 +89,7 @@ Canonical source: policy/manifest.json and policy/fragments/
 
 - Distinguish completed work, assumptions, limitations, warnings, partial failures, and unverified items.
 - Summarise material files changed.
+- Write technical documentation clearly and concisely. Use `workstation-technical-writing` for substantive technical documentation.
 - Do not conceal warnings or claim a command succeeded unless its result was observed.
 
 Deterministic command denials, when hooks are enabled, are separate from these behavioural instructions.

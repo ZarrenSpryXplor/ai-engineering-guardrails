@@ -1,10 +1,24 @@
 # Changelog
 
-All notable user-facing changes are recorded here. This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) principles and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once tagged releases begin.
+All notable user-facing changes are recorded here. This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) principles and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for tagged releases.
 
 ## Unreleased
 
-No user-facing changes yet. The toolbox is having a quiet cup of tea.
+### Added
+
+- A specialist `workstation-technical-writing` skill provides ASD-STE100-informed guidance without redistributing the standard or claiming formal compliance.
+- `docs audit` adds offline advisory checks for very long procedural sentences and explicit filler prefaces.
+
+## [1.2.2] - 2026-08-09
+
+### Added
+
+- Rich-backed, terminal-aware tables make validation, installation status, and skill audits easier to scan without changing their underlying decisions.
+- `validate` and `status` now support deterministic `--format json` output for scripts, matching the existing machine-output convention used by other reporting commands.
+
+### Changed
+
+- Rich 15 is now the sole direct runtime dependency and is isolated to human CLI presentation; machine formats continue to emit plain structured data without styling.
 
 ## [1.2.1] - 2026-08-09
 

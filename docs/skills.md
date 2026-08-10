@@ -2,11 +2,11 @@
 
 Skills are short, on-demand procedures for a bounded kind of work. They are not a second global policy, a command runner, or a permission grant. They tell a compatible agent how to investigate, change, verify, and report work safely; deterministic hooks and product-native approvals remain separate controls.
 
-The distribution contains 28 portable skills: six core workstation skills and one skill for each of 22 capability packs. Canonical pack type supplies a small catalogue tier: the six base skills are **core**, language/shared pack skills are **contextual**, and infrastructure/delivery/operations skills are **specialist**. The canonical `SKILL.md` files under `ai_engineering_guardrails/_resources/` remain authoritative.
+The distribution contains 29 portable skills: six core workstation skills and one skill for each of 23 capability packs. Canonical pack type supplies the default catalogue tier: the six base skills are **core**, language/shared pack skills are normally **contextual**, and infrastructure/delivery/operations skills are **specialist**. A cross-cutting pack can explicitly remain specialist when default exposure would waste catalogue budget. The canonical `SKILL.md` files under `ai_engineering_guardrails/_resources/` remain authoritative.
 
 ## How skills become available
 
-Fresh default installation copies the six core and ten contextual skills while retaining deterministic enforcement from every stable pack. It keeps ordinary language and cross-stack development guidance discoverable without globally exposing all twelve specialist skills. Use `ai-guardrails install --skill-catalogue all` to expose all selected pack skills, or `--skill-catalogue contextual` to return managed exposure to the smaller set without weakening pack enforcement. Repeatable `--pack ID` remains a deliberately reduced policy/skill installation. Existing installations keep their prior selections during update, and validation never edits Codex configuration or disables user-owned skills.
+Fresh default installation copies the six core and ten contextual skills while retaining deterministic enforcement from every stable pack. It keeps ordinary language and cross-stack development guidance discoverable without globally exposing all thirteen specialist skills. Use `ai-guardrails install --skill-catalogue all` to expose all selected pack skills, or `--skill-catalogue contextual` to return managed exposure to the smaller set without weakening pack enforcement. Repeatable `--pack ID` remains a deliberately reduced policy/skill installation. Existing installations keep their prior selections during update, and validation never edits Codex configuration or disables user-owned skills.
 
 | Product or surface | Installed location | Important activation boundary |
 | --- | --- | --- |
@@ -74,6 +74,7 @@ Use `ai-guardrails packs detect --repo .` to see which packs have evidence in a 
 | `workstation-package-publication` | Local release-candidate preparation and verification without upload or publication. |
 | `workstation-secrets-pki` | Secret/certificate metadata, expiry, issuer, fingerprint, rotation, and access-policy review without values. |
 | `workstation-sensitive-output` | Minimising, redacting, and summarising sensitive logs, plans, state, and configuration evidence. |
+| `workstation-technical-writing` | ASD-STE100-informed READMEs, runbooks, procedures, architecture documents, troubleshooting, and CLI/help text. |
 
 ## Skills, packs, rules, and routing are different things
 

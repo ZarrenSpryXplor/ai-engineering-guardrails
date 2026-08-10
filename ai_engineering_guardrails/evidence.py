@@ -21,6 +21,7 @@ SOURCE_TYPES = {
     "research-preprint",
     "peer-reviewed",
     "official-engineering-report",
+    "official-standard-source",
     "incident-study",
     "project-design-decision",
 }

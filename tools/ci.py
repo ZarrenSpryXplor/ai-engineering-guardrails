@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from email.parser import BytesParser
+import json
 import os
 import platform
 import re
@@ -211,7 +212,13 @@ def run_tests(arguments: Sequence[str]) -> int:
 def run_validation() -> int:
     """Run repository validation and summarize its fixed, content-free outcomes."""
     result = subprocess.run(
-        [sys.executable, str(REPOSITORY_ROOT / "tools/guardrails.py"), "validate"],
+        [
+            sys.executable,
+            str(REPOSITORY_ROOT / "tools/guardrails.py"),
+            "validate",
+            "--format",
+            "json",
+        ],
         cwd=REPOSITORY_ROOT,
         check=False,
         capture_output=True,
@@ -219,28 +226,57 @@ def run_validation() -> int:
     )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
-    codex = next(
-        (line.partition(":")[2].strip() for line in result.stdout.splitlines() if line.startswith("codex execpolicy check:")),
-        None,
-    )
-    spacelift = next(
-        (
-            line.partition(":")[2].strip()
-            for line in result.stdout.splitlines()
-            if line.startswith("Spacelift policy validation:")
-        ),
-        None,
-    )
-    if result.returncode == 0 and (codex is None or spacelift is None):
-        print("error: validation output did not contain expected fixed outcome lines", file=sys.stderr)
+    report: dict[str, object] | None = None
+    try:
+        parsed = json.loads(result.stdout)
+        if isinstance(parsed, dict):
+            report = parsed
+    except json.JSONDecodeError:
+        pass
+    raw_checks = report.get("checks") if report is not None else None
+    checks = raw_checks if isinstance(raw_checks, list) else []
+    checks_by_id = {
+        str(check.get("id")): check
+        for check in checks if isinstance(check, dict) and isinstance(check.get("id"), str)
+    }
+    codex = checks_by_id.get("codex-execpolicy")
+    spacelift = checks_by_id.get("spacelift-rego")
+    required_passes = {
+        "generated-output",
+        "policy-fixtures",
+        "capability-packs",
+        "routing-agents",
+    }
+    required_checks = required_passes | {"codex-execpolicy", "spacelift-rego"}
+    valid_outcomes = {"passed", "skipped"}
+    if result.returncode == 0 and (
+        report is None
+        or report.get("schema_version") != 1
+        or report.get("status") != "passed"
+        or not isinstance(raw_checks, list)
+        or len(checks_by_id) != len(checks)
+        or not required_checks.issubset(checks_by_id)
+        or any(check.get("outcome") not in valid_outcomes for check in checks_by_id.values())
+        or any(checks_by_id[check_id].get("outcome") != "passed" for check_id in required_passes)
+        or not isinstance(codex, dict)
+        or not isinstance(spacelift, dict)
+    ):
+        print("error: validation output was not the expected JSON report", file=sys.stderr)
         return 1
     checks = [
         ("Repository validation", "Passed" if result.returncode == 0 else "Failed"),
-        ("Codex execpolicy", "Skipped" if codex and "skipped" in codex else "Passed" if codex else "Unknown"),
+        (
+            "Codex execpolicy",
+            "Skipped" if isinstance(codex, dict) and codex.get("outcome") == "skipped"
+            else "Passed" if isinstance(codex, dict) and codex.get("outcome") == "passed"
+            else "Unknown",
+        ),
         ("Spacelift policy structure", "Passed" if spacelift else "Unknown"),
         (
             "OPA semantic Rego",
-            "Skipped" if spacelift and "skipped semantic" in spacelift else "Passed" if spacelift else "Unknown",
+            "Skipped" if isinstance(spacelift, dict) and spacelift.get("outcome") == "skipped"
+            else "Passed" if isinstance(spacelift, dict) and spacelift.get("outcome") == "passed"
+            else "Unknown",
         ),
     ]
     lines = [

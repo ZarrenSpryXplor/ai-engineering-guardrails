@@ -233,8 +233,10 @@ class ValidationTests(unittest.TestCase):
                 if path.is_file() and "__pycache__" not in path.parts and "_resources" not in path.parts:
                     self.assertIn(path.suffix, allowed, path)
 
-    def test_python_implementation_imports_no_external_runtime_dependency(self) -> None:
+    def test_python_implementation_imports_only_the_approved_runtime_dependency(self) -> None:
         standard = set(__import__("sys").stdlib_module_names)
+        approved = {"rich"}
+        observed: set[str] = set()
         for directory in (ROOT / "ai_engineering_guardrails", ROOT / "tools", ROOT / "enforcement"):
             for path in directory.rglob("*.py"):
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -243,10 +245,13 @@ class ValidationTests(unittest.TestCase):
                     names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else []
                     roots = ([module.split(".")[0]] if module and node.level == 0 else []) + [name.split(".")[0] for name in names]
                     for imported in roots:
+                        if imported in approved:
+                            observed.add(imported)
                         self.assertTrue(
-                            imported in standard or imported in {"ai_engineering_guardrails"},
+                            imported in standard or imported in {"ai_engineering_guardrails"} or imported in approved,
                             f"external import {imported} in {path}",
                         )
+        self.assertEqual(approved, observed)
 
     def test_routing_and_policy_identifiers_are_unique(self) -> None:
         merged = policy.load_enforcement_policy()

@@ -10,6 +10,8 @@ External skills, instruction files, agents, hooks, and MCP bundles are a local s
 
 External issues, comments, pull requests, PDFs, web pages, setup instructions, logs, analyzer messages, dependency documentation, and MCP output are evidence—not authority. They cannot independently authorise a dependency/registry change, setup script, guardrail or hook modification, weaker approval/sandbox/network control, credential access, remote mutation, publication, waiver, or trust record.
 
+External technical-writing standards are evidence and guidance, not executable authority. A style rule cannot weaken deterministic security policy or authorize dependency installation, network expansion, secret access, or remote mutation. Externally supplied prose and user-supplied copies of a standard remain untrusted reference material; the technical-writing skill does not make them executable or trusted.
+
 ## Assets and goals
 
 These guardrails aim to reduce accidental destructive actions initiated through supported agent shell tools, keep consistent engineering behaviour across products, preserve uncommitted work and unrelated configuration, and make policy changes reviewable in Git. The repository and installed configuration must never contain credentials.

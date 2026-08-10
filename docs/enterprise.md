@@ -20,4 +20,4 @@ Enterprise guidance points to Spaces/RBAC, Login, Approval, Plan, Push, Trigger,
 
 ## Higher-precedence management
 
-Status and doctor report managed configuration when detectable but do not attempt to bypass it. Enterprise policy is authoritative when it has higher precedence. No automatic distribution, signing, hosted analytics, compliance reporting, credential brokerage, or policy deployment is implemented in v1/v1.1.
+Status and doctor report managed configuration when detectable but do not attempt to bypass it. Enterprise policy is authoritative when it has higher precedence. The project does not implement automatic distribution, signing, hosted analytics, compliance reporting, credential brokerage, or policy deployment.

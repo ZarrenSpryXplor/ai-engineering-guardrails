@@ -11,7 +11,7 @@ Thanks for helping make agent-assisted engineering a little less exciting in the
 
 ## Development rules
 
-- Use Python 3.11+ and the standard library; do not add a runtime dependency without an explicit, reviewed need.
+- Use Python 3.11+ and the standard library for domain logic. Rich is the sole approved direct runtime dependency and stays confined to human CLI presentation; do not add another direct runtime dependency without an explicit, reviewed need.
 - Treat `ai_engineering_guardrails/_resources/` as canonical. Do not hand-edit `dist/` or `adapters/`; run the build instead.
 - Use temporary homes for installer tests. Never test against a real `~/.codex`, `~/.claude`, `~/.cursor`, or `~/.ai-guardrails` directory.
 - Do not add credential values, prompts, source excerpts from private repositories, command arguments, raw audit events, or vendor session data to tests, fixtures, logs, or documentation.
@@ -24,13 +24,14 @@ Run the narrow tests that cover your change, then the project checks from the re
 ```sh
 python tools/guardrails.py build
 python tools/guardrails.py validate
+python tools/guardrails.py docs audit --repo .
 python -m unittest discover -s tests -v
 python tools/guardrails.py build
 git diff --check
 git diff -- adapters dist
 ```
 
-The second build should leave generated output unchanged. Run package and temporary-home checks when changing package resources, installation, state, product adapters, or runtime behavior. State the observed commands, skipped optional validators, compatibility limits, and any documentation change in the pull request.
+The documentation audit is advisory. The second build should leave generated output unchanged. Run package and temporary-home checks when changing package resources, installation, state, product adapters, or runtime behavior. State the observed commands, skipped optional validators, compatibility limits, and any documentation change in the pull request.
 
 ## Review expectations
 

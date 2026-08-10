@@ -21,6 +21,7 @@ from . import (
     install,
     packs,
     policy,
+    presentation,
     routing,
     scan,
     state,
@@ -41,7 +42,7 @@ def add_product(parser: argparse.ArgumentParser, *, detect_by_default: bool = Fa
         "--product",
         choices=(*PRODUCTS, "all"),
         default=default,
-        help=f"product to manage (default: {default_help})",
+        help=f"product to inspect or manage (default: {default_help})",
     )
 
 
@@ -50,13 +51,17 @@ def add_home(parser: argparse.ArgumentParser) -> None:
 
 
 def add_mutation_flags(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--dry-run", action="store_true", help="print the change plan without writing")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview the change without writing managed configuration",
+    )
     parser.add_argument("--force", action="store_true", help="replace or remove modified managed content after backup")
 
 
 def add_no_color(parser: argparse.ArgumentParser) -> None:
-    """Accept the common explicit accessibility preference; output is unstyled today."""
-    parser.add_argument("--no-color", action="store_true", help="disable terminal colour (human output is currently unstyled)")
+    """Accept the common explicit accessibility preference."""
+    parser.add_argument("--no-color", action="store_true", help="disable terminal colour in human output")
 
 
 def _human_ascii_only() -> bool:
@@ -574,38 +579,11 @@ def _skills_audit(args: argparse.Namespace) -> bool:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
         return bool(result["audit_complete"]) and not any(item["level"] == "error" for item in result["findings"])
-    print("Skills audit")
-    print("  Estimated tokens use " + result["token_estimate_method"] + ".")
-    catalogue = result["catalogue"]
-    pressure = catalogue["estimated_catalogue_pressure"]
-    print(
-        f"  Catalogue ({catalogue['scope']}): {catalogue['skill_count']} skill(s), "
-        f"{catalogue['total_description_characters']} description characters; "
-        f"estimated pressure={pressure['level']} ({pressure['description_only_percent_of_reference']}% description-only reference)"
+    presentation.print_skills_audit(
+        result,
+        no_color=args.no_color,
+        ascii_only=_human_ascii_only(),
     )
-    exposure_key = "fresh_default" if "fresh_default" in catalogue else "selected_installation"
-    exposure = catalogue[exposure_key]
-    print(
-        f"  {'Fresh default exposure' if exposure_key == 'fresh_default' else 'Selected installation'}: "
-        f"{exposure['skill_count']} skill(s), {exposure['description_characters']} description characters; "
-        f"estimated pressure={exposure['estimated_pressure']['level']}"
-    )
-    print("  Catalogue pressure is an estimate; model context and other installed/plugin skills change the actual budget.")
-    print("  Tiers: " + ", ".join(f"{name}={count}" for name, count in catalogue["tier_counts"].items()))
-    if catalogue["longest_descriptions"]:
-        print(
-            "  Longest descriptions: "
-            + ", ".join(f"{item['name']}={item['characters']}" for item in catalogue["longest_descriptions"])
-        )
-    for skill in result["skills"]:
-        print(
-            f"  {skill['name']}: estimated tokens={skill['estimated_tokens']}; "
-            f"references={skill['reference_file_count']} ({skill['reference_estimated_tokens']} estimated tokens)"
-        )
-    for item in result["findings"]:
-        print(f"  {item['level']}: {item['id']}: {item['message']}")
-    if not result["audit_complete"]:
-        print("  Audit incomplete; no clean result is asserted.")
     return bool(result["audit_complete"]) and not any(item["level"] == "error" for item in result["findings"])
 
 
@@ -794,7 +772,8 @@ def _receipt(args: argparse.Namespace) -> None:
         print(("[G] Change summary" if _human_ascii_only() else "🛡 Change summary") if args.fun else "Change summary")
         print(f"  Repository          {receipt['repository_identifier_hash'][:12]}")
         print("  Products            " + ", ".join(receipt["products"]))
-        print(f"  Files changed       {receipt['files_modified_count']}")
+        files_changed = receipt["files_modified_count"]
+        print(f"  Files changed       {files_changed if files_changed is not None else 'unavailable'}")
         print(f"  Guardrails          {events['warnings']} warning(s), {events['denials']} denial(s) in {events['window']}")
         print(f"  Complexity          {receipt['complexity']['classification']}")
         print("  Routing             " + ", ".join(f"{name}={profile}" for name, profile in receipt["model_routing_profiles"].items()))
@@ -887,6 +866,8 @@ def create_parser() -> argparse.ArgumentParser:
     add_product(build_parser)
     validate_parser = sub.add_parser("validate", help="validate canonical and generated data")
     add_product(validate_parser)
+    validate_parser.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(validate_parser)
 
     install_parser = sub.add_parser("install", help="install into a selected user home")
     add_product(install_parser, detect_by_default=True)
@@ -912,6 +893,8 @@ def create_parser() -> argparse.ArgumentParser:
     add_home(status_parser)
     status_parser.add_argument("--show-routing", action="store_true")
     status_parser.add_argument("--repo", type=Path)
+    status_parser.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(status_parser)
 
     doctor_parser = sub.add_parser("doctor", help="check repository and installation consistency")
     add_product(doctor_parser)
@@ -944,6 +927,14 @@ def create_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--repo", type=Path, required=True)
     scan_parser.add_argument("--format", choices=("human", "json", "sarif", "junit"), default="human")
     scan_parser.add_argument("--output", type=Path)
+
+    docs_parser = sub.add_parser("docs", help="run advisory technical-writing checks")
+    docs_sub = docs_parser.add_subparsers(dest="docs_command", required=True)
+    docs_audit = docs_sub.add_parser("audit", help="audit Markdown clarity without rewriting text")
+    docs_scope = docs_audit.add_mutually_exclusive_group()
+    docs_scope.add_argument("--repo", type=Path)
+    docs_scope.add_argument("--path", type=Path)
+    docs_audit.add_argument("--format", choices=("human", "json"), default="human")
 
     packs_parser = sub.add_parser("packs", help="list, detect, explain, or validate capability packs")
     packs_sub = packs_parser.add_subparsers(dest="packs_command", required=True)
@@ -1026,7 +1017,11 @@ def create_parser() -> argparse.ArgumentParser:
     task_establish = task_sub.add_parser("establish", help="explicitly establish the reviewed task contract as the local baseline")
     task_establish.add_argument("--repo", type=Path, default=Path.cwd())
     add_home(task_establish)
-    task_establish.add_argument("--dry-run", action="store_true")
+    task_establish.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview task provenance without writing installation state",
+    )
     task_establish.add_argument("--format", choices=("human", "json"), default="human")
     task_help = {
         "validate": "validate the task contract and evidence ledger without running checks",
@@ -1056,7 +1051,11 @@ def create_parser() -> argparse.ArgumentParser:
     component_trust.add_argument("--version-reference", default="local", help="operator-provided version or reference")
     component_trust.add_argument("--reviewed-by", default=None, help="reviewer label (defaults to the local account name)")
     component_trust.add_argument("--permission-tier", default="review-only", help="operator-provided review classification; it grants no authority")
-    component_trust.add_argument("--dry-run", action="store_true")
+    component_trust.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview the trust record without writing installation state",
+    )
     component_trust.add_argument("--format", choices=("human", "json"), default="human")
     component_list = component_sub.add_parser("list", help="list local component review records without mutation")
     add_home(component_list)
@@ -1064,7 +1063,11 @@ def create_parser() -> argparse.ArgumentParser:
     component_revoke = component_sub.add_parser("revoke", help="revoke a local component review record (mutates local state)")
     component_revoke.add_argument("digest")
     add_home(component_revoke)
-    component_revoke.add_argument("--dry-run", action="store_true")
+    component_revoke.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview revocation without writing installation state",
+    )
     component_revoke.add_argument("--format", choices=("human", "json"), default="human")
 
     skills_parser = sub.add_parser("skills", help="audit portable skill structure and estimated context size")
@@ -1072,6 +1075,7 @@ def create_parser() -> argparse.ArgumentParser:
     skills_audit = skills_sub.add_parser("audit")
     skills_audit.add_argument("--path", type=Path)
     skills_audit.add_argument("--format", choices=("human", "json"), default="human")
+    add_no_color(skills_audit)
 
     receipt_parser = sub.add_parser("receipt", help="emit a content-free local session receipt")
     add_home(receipt_parser)
@@ -1161,11 +1165,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             build.build(selected_products(args.product))
         elif args.command == "validate":
             output_root = repository_output_root()
-            build.validate(
-                selected_products(args.product),
-                require_current=output_root is not None,
-                output_root=output_root,
-            )
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = build.validate(
+                    selected_products(args.product),
+                    require_current=output_root is not None,
+                    output_root=output_root,
+                )
+            if args.format == "json":
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                presentation.print_validation(
+                    report,
+                    no_color=args.no_color,
+                    ascii_only=_human_ascii_only(),
+                )
         elif args.command == "install":
             if args.product == "visualstudio" and sys.platform != "win32":
                 raise GuardrailsError(
@@ -1184,9 +1197,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             install.uninstall(products, args.home, force=args.force, dry_run=args.dry_run)
         elif args.command == "status":
             products, _ = _resolve_consumer_products(args.product, args.home, "status")
-            install.status(
-                products, args.home, show_routing_details=args.show_routing, repo=args.repo
-            )
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = install.status(
+                    products, args.home, show_routing_details=args.show_routing, repo=args.repo
+                )
+            if args.format == "json":
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                presentation.print_status(
+                    report,
+                    no_color=args.no_color,
+                    ascii_only=_human_ascii_only(),
+                )
         elif args.command == "doctor":
             report = install.doctor(selected_products(args.product), args.home)
             if any(check["outcome"] == "fail" for check in report["checks"]):
@@ -1201,6 +1223,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             findings, _ = scan.run_scan(args.repo, args.format, args.output)
             if any(item.level == "error" for item in findings):
                 return 1
+        elif args.command == "docs":
+            scan.run_documentation_audit(args.repo, args.path, args.format)
         elif args.command == "packs":
             if args.packs_command == "list":
                 _packs_list()
