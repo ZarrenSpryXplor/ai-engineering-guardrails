@@ -162,6 +162,28 @@ class CliPresentationTests(unittest.TestCase):
         self.assertNotIn("\x1b[", plain.getvalue())
         self.assert_bounded_human_output(plain.getvalue())
 
+    def test_subcommand_help_is_never_coloured_by_argparse(self) -> None:
+        """Python 3.14 colours help natively and propagates that to subparsers."""
+        for arguments in (
+            ["--no-color", "install", "--help"],
+            ["--no-color", "docs", "audit", "--help"],
+        ):
+            with self.subTest(arguments=arguments):
+                plain = TtyBuffer()
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {"COLUMNS": "160", "TERM": "xterm-256color"},
+                        clear=True,
+                    ),
+                    contextlib.redirect_stdout(plain),
+                    self.assertRaises(SystemExit) as raised,
+                ):
+                    cli.main(arguments)
+                self.assertEqual(0, raised.exception.code)
+                self.assertNotIn("\x1b[", plain.getvalue())
+                self.assert_bounded_human_output(plain.getvalue())
+
     def test_validate_json_is_one_unstyled_document(self) -> None:
         with (
             mock.patch("ai_engineering_guardrails.cli.build.validate", return_value=self.validation_report),

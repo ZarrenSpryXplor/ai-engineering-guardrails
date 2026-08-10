@@ -2,9 +2,9 @@
 
 This is the documentation entry point for people operating, extending, or reviewing AI Engineering Workstation Guardrails. The root [README](../README.md) stays intentionally short; this directory owns the detail.
 
-## What's new in v1.2.0
+## What's new in v1.2
 
-Version 1.2.0 adds an offline assurance layer without turning the workstation into a paperwork theme park:
+The v1.2 line adds an offline assurance layer and a single presentation layer for human CLI output:
 
 | New area | Start here |
 | --- | --- |
@@ -15,8 +15,9 @@ Version 1.2.0 adds an offline assurance layer without turning the workstation in
 | Static component inspection and digest-bound trust records | [Evidence and assurance](evidence-and-assurance.md#component-and-instruction-trust) |
 | Smaller default skill catalogue and skill-efficiency audit | [Skills catalogue](skills.md#how-skills-become-available) |
 | Optional manual guidance probes | [Evidence and assurance](evidence-and-assurance.md#skill-efficiency-and-guidance-probes) |
+| Rich human CLI output, and `--format json` for `validate` and `status` | [Quick user guide](user-guide.md#day-to-day-use) |
 
-The complete release summary lives in the [changelog](../CHANGELOG.md#120---2026-08-09), so the details have one home instead of breeding in six documents.
+The [changelog](../CHANGELOG.md) records the per-version summary, so the details have one home instead of six.
 
 ```mermaid
 flowchart TD
@@ -40,7 +41,7 @@ flowchart TD
 | Engineer enabling status, receipts, or demo mode | [Terminal UX](terminal-ux.md) | [compatibility](compatibility.md#terminal-ux-capability-verification-2026-08-09) |
 | Engineer delegating bounded tasks | [Routing and cost](routing-and-cost.md) | [skills catalogue](skills.md) |
 | Maintainer reviewing policy, task evidence, or a local component | [Evidence and assurance](evidence-and-assurance.md) | [policy authoring](policy-authoring.md), [operations](operations.md) |
-| Contributor changing behavior or generated output | [Policy authoring](policy-authoring.md) | [Architecture](architecture.md), [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Contributor changing behaviour or generated output | [Policy authoring](policy-authoring.md) | [Architecture](architecture.md), [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | Release maintainer | [Releasing to PyPI](releasing.md) | [operations](operations.md#release-checklist), [changelog](../CHANGELOG.md), [security policy](../SECURITY.md) |
 | Security or platform reviewer | [Threat model](threat-model.md) | [architecture](architecture.md), [compatibility](compatibility.md) |
 | Enterprise or Spacelift reviewer | [Enterprise output](enterprise.md) | [Spacelift](spacelift.md) |
@@ -58,6 +59,8 @@ flowchart TD
 - [Policy authoring](policy-authoring.md): how maintainers safely extend canonical policy, skills, packs, or command rules.
 - [Evidence and assurance](evidence-and-assurance.md): policy evidence lifecycle, task contracts, imported report limits, component trust, skill audits, and guidance probes.
 - [Threat model](threat-model.md): assumptions, non-goals, limitations, and operational mitigations.
+- [Enterprise output](enterprise.md): reviewable Codex, Claude Code, Cursor, and Spacelift administrator examples that the installer never deploys.
+- [Spacelift](spacelift.md): dated surface compatibility, read-only local enforcement, and Rego v1 policy examples.
 - [Releasing to PyPI](releasing.md): Trusted Publishing setup, protected-environment approval, release-tag checks, and first-release procedure.
 
 For reporting and contribution expectations, see the repository-level [security policy](../SECURITY.md), [contribution guide](../CONTRIBUTING.md), [code of conduct](../CODE_OF_CONDUCT.md), and [changelog](../CHANGELOG.md).

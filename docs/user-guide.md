@@ -54,7 +54,7 @@ Work normally. Skills are short, on-demand procedures rather than another giant 
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
-Default behavior:
+Default behaviour:
 
 - local source edits, builds, tests, lint, rendering, validation, and plans are available;
 - remote infrastructure changes, production changes, publication, credential reads, and destructive operations are denied;
@@ -124,7 +124,7 @@ ai-guardrails complexity --repo . --write-snapshot
 ai-guardrails receipt --repo . --product all --compact
 ```
 
-Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behavior, and removal.
+Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behaviour, and removal.
 
 ## Ansible
 

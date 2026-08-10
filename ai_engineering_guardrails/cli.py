@@ -42,6 +42,11 @@ class RichArgumentParser(argparse.ArgumentParser):
             "formatter_class",
             lambda prog: argparse.HelpFormatter(prog, max_help_position=24, width=78),
         )
+        if sys.version_info >= (3, 14):
+            # Python 3.14 colours help itself, and `add_parser` propagates that
+            # choice to subparsers. Keep the formatter plain so `--no-color`,
+            # `NO_COLOR`, and the presentation layer remain the only styling owner.
+            kwargs["color"] = False
         super().__init__(*args, **kwargs)
 
     def _print_message(self, message: str, file: Any | None = None) -> None:

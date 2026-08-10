@@ -12,6 +12,11 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 ### Changed
 
 - Rich presentation now covers all human-facing CLI help, errors, reports, and operation logs with an 80-column ceiling and folded exact values. Machine formats and pasteable setup payloads remain plain.
+- Hosted test and release validation now use pinned OPA 1.19.0 semantic Rego execution instead of accepting a structural-only skip.
+
+### Fixed
+
+- Help output no longer emits terminal colour that `--no-color` and `NO_COLOR` cannot suppress on Python 3.14, where `argparse` colours help itself and propagates that choice to every subcommand parser.
 
 ## [1.2.2] - 2026-08-09
 

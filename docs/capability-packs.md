@@ -33,7 +33,7 @@ Use repeatable `--pack ID` selections for deliberately reduced policy/skill inst
 
 ## Toolchain preservation
 
-Language packs inspect repository tooling first, prefer checked-in wrappers and pinned versions, preserve the dependency manager and lockfile, avoid unrelated upgrades, use project-local environments and binaries, retain compiler/linter/analyser settings, and run affected-module/workspace/project tests before broad suites. They deny publication and machine-global installation. Database migration generation is distinct from execution.
+Language packs inspect repository tooling first, prefer checked-in wrappers and pinned versions, preserve the dependency manager and lockfile, avoid unrelated upgrades, use project-local environments and binaries, retain compiler/linter/analyzer settings, and run affected-module/workspace/project tests before broad suites. They deny publication and machine-global installation. Database migration generation is distinct from execution.
 
 ## Infrastructure treatment
 
@@ -47,4 +47,4 @@ Ansible detection uses distinctive configuration and metadata rather than generi
 
 ## Adding a pack
 
-Add a directory under the relevant category, declare markers and referenced files, use existing operation/matching strategies, add positive and nearby-safe counterexamples, and add offline fixtures. Abstract Python only if three concrete pack needs establish the same stable behavior. Run pack validation, explain detection, full build/validation/tests, and scan. See [policy authoring](policy-authoring.md) for schemas and examples.
+Add a directory under the relevant category, declare markers and referenced files, use existing operation/matching strategies, add positive and nearby-safe counterexamples, and add offline fixtures. Abstract Python only if three concrete pack needs establish the same stable behaviour. Run pack validation, explain detection, full build/validation/tests, and scan. See [policy authoring](policy-authoring.md) for schemas and examples.

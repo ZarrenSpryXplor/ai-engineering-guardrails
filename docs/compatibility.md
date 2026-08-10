@@ -10,7 +10,7 @@
 
 Sources: [Codex developer commands](https://developers.openai.com/codex/developer-commands), [Codex configuration reference](https://developers.openai.com/codex/config-reference), [Codex sample configuration](https://developers.openai.com/codex/config-file/config-sample), [Claude Code status line](https://code.claude.com/docs/en/statusline), [Claude Code settings](https://code.claude.com/docs/en/settings), [Claude Code hooks](https://code.claude.com/docs/en/hooks), and [Cursor CLI slash commands](https://cursor.com/docs/cli/reference/slash-commands.md). These are capability documents, not proof of a user’s installed version, account entitlement, workspace trust, or active configuration.
 
-Verified against current official documentation on **2026-08-09**. The linked vendor pages are the compatibility authority; repository behavior below separates documented product behavior, explicitly experimental behavior, product limitations, and local design decisions.
+Verified against current official documentation on **2026-08-09**. The linked vendor pages are the compatibility authority; repository behaviour below separates documented product behaviour, explicitly experimental behaviour, product limitations, and local design decisions.
 
 | Product | Global behavioural guidance | Skills | Deterministic controls | Optional native routing agents |
 | --- | --- | --- | --- | --- |
@@ -23,7 +23,7 @@ Verified against current official documentation on **2026-08-09**. The linked ve
 
 ## OpenAI Codex
 
-Documented behavior:
+Documented behaviour:
 
 - [AGENTS.md discovery](https://developers.openai.com/codex/agent-configuration/agents-md) selects `AGENTS.override.md` from `CODEX_HOME` when it is the first non-empty global file, otherwise `AGENTS.md`; only one global file is used. Project files then layer from repository root toward the working directory. The documented combined project-instruction default is 32 KiB.
 - [Skills](https://developers.openai.com/codex/build-skills) require `SKILL.md` with `name` and `description`; user skills load from `$HOME/.agents/skills`.
@@ -33,7 +33,7 @@ Documented behavior:
 - [Subagents](https://developers.openai.com/codex/agent-configuration/subagents) document personal standalone TOML in `~/.codex/agents/`, required `name`, `description`, and `developer_instructions`, and optional `model`, `model_reasoning_effort`, and `sandbox_mode`. Current model guidance identifies Luna as narrow/fast, Terra as efficient general agent work, and Sol as the strongest general Codex tier.
 - [Managed configuration](https://developers.openai.com/codex/enterprise/managed-configuration) documents enterprise `requirements.toml`, managed hooks, and precedence. Codex 0.138.0 and later support the preferred `allowed_permission_profiles` plus `default_permissions` form; older clients ignore those keys and require the legacy sandbox-mode form. Generated enterprise output targets 0.138+ clients, is example-only, and is never installed by the workstation command.
 
-Experimental behavior: Codex command rules are explicitly documented as experimental and may change. They control commands Codex requests to run outside the sandbox, not arbitrary workstation processes.
+Experimental behaviour: Codex command rules are explicitly documented as experimental and may change. They control commands Codex requests to run outside the sandbox, not arbitrary workstation processes.
 
 Product limitations: Codex describes standalone custom-agent authoring as a format that may evolve. Parent live permission and sandbox overrides can take precedence over custom-agent defaults. Product/account access to a configured model is not established by writing the TOML file.
 
@@ -43,7 +43,7 @@ Routing decision: the model map uses `gpt-5.6-luna`/`gpt-5.6-terra`/`gpt-5.6-sol
 
 ## Anthropic Claude Code
 
-Documented behavior:
+Documented behaviour:
 
 - [Memory and rules](https://code.claude.com/docs/en/memory) document personal `~/.claude/rules/`, project `CLAUDE.md`, and `@path` imports. Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so this repository's `CLAUDE.md` imports `@AGENTS.md`.
 - [Skills](https://code.claude.com/docs/en/skills) document personal skills at `~/.claude/skills/<name>/SKILL.md`.
@@ -62,7 +62,7 @@ Routing decision: economy/balanced/deep map to `haiku`/`sonnet`/`opus`. Generate
 
 ## Cursor
 
-Documented behavior:
+Documented behaviour:
 
 - [Rules](https://cursor.com/docs/rules.md) document Git-backed `.cursor/rules` and root or nested `AGENTS.md`, while global User Rules are defined through Customize. User Rules apply to Agent (Chat); the same page states they do not apply to Inline Edit and rules do not govern Cursor Tab or other AI features.
 - [Skills](https://cursor.com/docs/skills.md) document the portable `SKILL.md` format and user discovery from `~/.agents/skills/` and `~/.cursor/skills/`, plus compatibility directories.
@@ -70,7 +70,7 @@ Documented behavior:
 - [Cursor CLI permissions](https://cursor.com/docs/cli/reference/permissions.md) document tokens in `~/.cursor/cli-config.json` or project `.cursor/cli.json`, with deny taking precedence over allow.
 - [Subagents](https://cursor.com/docs/subagents.md) document personal Markdown agents at `~/.cursor/agents/`, `model: inherit` or an explicit model ID, model parameters such as `effort`, and the `readonly` restriction. The page explicitly documents fallback when an organisation blocks the model, a plan lacks it, or legacy Max Mode requirements are unmet.
 
-Product limitations: there is no documented global User Rules file for this installer to edit, and User Rules have narrower scope than native hooks and repository instructions. Cursor CLI permissions describe CLI behavior and must not be presented as a universal Cursor IDE policy.
+Product limitations: there is no documented global User Rules file for this installer to edit, and User Rules have narrower scope than native hooks and repository instructions. Cursor CLI permissions describe CLI behaviour and must not be presented as a universal Cursor IDE policy.
 
 Routing limitations: available model IDs and parameters vary by plan, provider, and organisation. `readonly` constrains supported subagent writes but does not turn the routing layer into a workstation security boundary. Cursor can substitute a compatible model, so a configured explicit ID is not proof of runtime use.
 
@@ -134,13 +134,13 @@ The repository's metrics schema is future-facing and content-free. It installs n
 
 Language packs describe repository conventions rather than fixed tool releases. Maven/Gradle wrappers, `global.json`, Python manager locks, and Node `packageManager` declarations remain authoritative. Detection does not install a JDK, .NET SDK, Python environment manager, Node runtime, package manager, Ansible, kubectl, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, spacectl, or OPA.
 
-Ansible behavior was verified from official documentation on 2026-08-08. The [configuration reference](https://docs.ansible.com/projects/ansible/latest/reference_appendices/config.html) documents first-match `ansible.cfg` discovery and warns about configuration in world-writable directories. The [check and diff guide](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_checkmode.html) describes check mode as a simulation, permits tasks to force `check_mode: false`, and warns that diff can expose sensitive information. The [inventory guide](https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html) documents inventory variables and precedence, while the [Vault guide](https://docs.ansible.com/projects/ansible/latest/vault_guide/vault.html) states that Vault protects only data at rest. The [ansible-galaxy CLI reference](https://docs.ansible.com/projects/ansible/latest/cli/ansible-galaxy.html) documents collection publication, role import, and certificate-ignore options. The core CLI references define [`ansible-pull`](https://docs.ansible.com/projects/ansible/latest/cli/ansible-pull.html) as fetching and executing playbooks and [`ansible-console`](https://docs.ansible.com/projects/ansible/latest/cli/ansible-console.html) as a task-execution REPL.
+Ansible behaviour was verified from official documentation on 2026-08-08. The [configuration reference](https://docs.ansible.com/projects/ansible/latest/reference_appendices/config.html) documents first-match `ansible.cfg` discovery and warns about configuration in world-writable directories. The [check and diff guide](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_checkmode.html) describes check mode as a simulation, permits tasks to force `check_mode: false`, and warns that diff can expose sensitive information. The [inventory guide](https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html) documents inventory variables and precedence, while the [Vault guide](https://docs.ansible.com/projects/ansible/latest/vault_guide/vault.html) states that Vault protects only data at rest. The [ansible-galaxy CLI reference](https://docs.ansible.com/projects/ansible/latest/cli/ansible-galaxy.html) documents collection publication, role import, and certificate-ignore options. The core CLI references define [`ansible-pull`](https://docs.ansible.com/projects/ansible/latest/cli/ansible-pull.html) as fetching and executing playbooks and [`ansible-console`](https://docs.ansible.com/projects/ansible/latest/cli/ansible-console.html) as a task-execution REPL.
 
 Repository decisions: detection uses distinctive Ansible metadata and never generic YAML alone. `ansible-playbook --syntax-check` and documented list-only modes are local validation/observation, while playbook, ad hoc, pull, and console execution—including `--check`—is classified as remote mutation and requires the existing safety-profile decision. An exact `-i`/`--inventory`/`--inventory-file` value can map through `ansible_inventories`; multiple, default, and unmapped inventories remain protected. Vault view/edit/decrypt is denied; broad inventory and active-configuration rendering warns; Galaxy publication, hosted mutation, and certificate/signature bypass are denied; and pull cannot discard/purge its checkout or automatically accept a new source host key. The engine does not parse playbooks, Jinja, inventory plugins, module semantics, `ansible-runner`, or automation-controller APIs, and tests never contact managed hosts. Installed ansible-core, collection, plugin, and execution-environment versions remain authoritative.
 
 Helm matching is designed for stable Helm 3/4 command forms but does not assume one installed major. Terraform/OpenTofu/Terragrunt plan and state formats are treated as sensitive and are not parsed as a universal compatibility interface. Kubernetes version skew and API availability must be checked with the repository/platform; unit tests never contact an API server.
 
-Current Spacelift behavior was verified from official documentation on 2026-08-08:
+Current Spacelift behaviour was verified from official documentation on 2026-08-08:
 
 - [`spacectl`](https://docs.spacelift.io/concepts/spacectl) wraps the GraphQL API and includes stack deployment plus profile token export, so those surfaces are not classified as read-only.
 - The current [Spacelift MCP](https://docs.spacelift.io/concepts/intelligence/spacelift-mcp) uses the unified `/mcp` endpoint and exposes `discover`, `query`, and `provider` with read scope, while `mutate` and the whole `intent` tool require write scope. The repository therefore denies every `mutate` and `intent` call, including `intent` read/status verbs, rather than treating a write-scoped tool as read-only from one argument. The former `/intent/mcp` endpoint passed its documented removal date on 1 August 2026 and is never generated. Older names such as `trigger_stack_run`, `confirm_stack_run`, `discard_stack_run`, and `local_preview` are retained only as defensive compatibility aliases, not represented as the current hosted tool contract.

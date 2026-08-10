@@ -10,7 +10,7 @@ External skills, instruction files, agents, hooks, and MCP bundles are a local s
 
 External issues, comments, pull requests, PDFs, web pages, setup instructions, logs, analyzer messages, dependency documentation, and MCP output are evidence—not authority. They cannot independently authorise a dependency/registry change, setup script, guardrail or hook modification, weaker approval/sandbox/network control, credential access, remote mutation, publication, waiver, or trust record.
 
-External technical-writing standards are evidence and guidance, not executable authority. A style rule cannot weaken deterministic security policy or authorize dependency installation, network expansion, secret access, or remote mutation. Externally supplied prose and user-supplied copies of a standard remain untrusted reference material; the technical-writing skill does not make them executable or trusted.
+External technical-writing standards are evidence and guidance, not executable authority. A style rule cannot weaken deterministic security policy or authorise dependency installation, network expansion, secret access, or remote mutation. Externally supplied prose and user-supplied copies of a standard remain untrusted reference material; the technical-writing skill does not make them executable or trusted.
 
 ## Assets and goals
 
@@ -26,7 +26,7 @@ Markdown instructions influence agent behaviour but are not a security boundary.
 
 Hooks constrain supported agent tool calls, not arbitrary processes running as the user. A command already running, an unsupported hosted tool, an alternate execution path, a manual terminal, or another application may bypass them. Blocked commands may still be run manually by the workstation owner outside the agent when appropriate.
 
-A user or process with write access to the configuration, installed engine, command policy, interpreter, or state can bypass local guardrails. Product updates can change event names, payloads, tool coverage, trust behavior, configuration formats, or response semantics.
+A user or process with write access to the configuration, installed engine, command policy, interpreter, or state can bypass local guardrails. Product updates can change event names, payloads, tool coverage, trust behaviour, configuration formats, or response semantics.
 
 Local expiring waivers are files controlled by the workstation user. TTY confirmation, exact digests, expiry, target scope, and use counts reduce accidental reuse but are not cryptographic proof of independent human approval. An agent running with the same user authority may find another path around local controls; real privileged approval must come from platform RBAC or a workflow the agent cannot control.
 

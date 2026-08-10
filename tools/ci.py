@@ -263,6 +263,13 @@ def run_validation() -> int:
     ):
         print("error: validation output was not the expected JSON report", file=sys.stderr)
         return 1
+    if result.returncode == 0 and isinstance(spacelift, dict) and spacelift.get("outcome") == "skipped":
+        print(
+            "error: CI validation requires OPA semantic Rego execution; "
+            "install OPA before running tools/ci.py validate",
+            file=sys.stderr,
+        )
+        return 1
     checks = [
         ("Repository validation", "Passed" if result.returncode == 0 else "Failed"),
         (
