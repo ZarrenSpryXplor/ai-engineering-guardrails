@@ -4,6 +4,8 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+## [1.3.0] - 2026-08-10
+
 ### Added
 
 - A specialist `workstation-technical-writing` skill provides ASD-STE100-informed guidance without redistributing the standard or claiming formal compliance.
@@ -17,6 +19,7 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 ### Fixed
 
 - Help output no longer emits terminal colour that `--no-color` and `NO_COLOR` cannot suppress on Python 3.14, where `argparse` colours help itself and propagates that choice to every subcommand parser.
+- Mixed `diff-installed` reports retain selected products with no managed paths, and synthetic demos use ASCII-safe separators on legacy terminals.
 
 ## [1.2.2] - 2026-08-09
 
