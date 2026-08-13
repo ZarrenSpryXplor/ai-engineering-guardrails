@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "architecture-diagramming",
+  "type": "shared",
+  "catalogue_tier": "specialist",
+  "description": "Standards-informed architecture diagramming for software and cloud systems with editable Mermaid and diagrams.net source.",
+  "file_detectors": [],
+  "directory_detectors": [],
+  "explicit_exclusions": [],
+  "dependent_packs": [],
+  "conflicting_packs": [],
+  "policy_fragments": [],
+  "skills": [
+    "skills/workstation-architecture-diagramming/SKILL.md"
+  ],
+  "command_policy_fragments": [],
+  "verification_definitions": [],
+  "routing_additions": [],
+  "compatibility_notes": [
+    "Guidance is standards-informed and does not establish formal notation conformance, certification, or vendor endorsement.",
+    "No standards text, vendor icon packs, diagram templates, or executable validators are bundled."
+  ]
+}

@@ -154,6 +154,17 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("ai_engineering_guardrails/_resources/policy/manifest.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/enforcement/command-policy.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/packs/languages/python/pack.json", names)
+                for relative in (
+                    "pack.json",
+                    "skills/workstation-architecture-diagramming/SKILL.md",
+                    "skills/workstation-architecture-diagramming/references/standards-and-notation.md",
+                    "skills/workstation-architecture-diagramming/references/diagrams-net.md",
+                ):
+                    self.assertIn(
+                        "ai_engineering_guardrails/_resources/packs/shared/architecture-diagramming/"
+                        + relative,
+                        names,
+                    )
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/vscode.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/visualstudio.json", names)
                 self.assertIn("ai_engineering_guardrails/_resources/routing/model-maps/jetbrains.json", names)
@@ -201,6 +212,22 @@ class PackagingTests(unittest.TestCase):
             with tarfile.open(sdist) as archive:
                 names = archive.getnames()
                 self.assertTrue(any(name.endswith("ai_engineering_guardrails/_resources/policy/manifest.json") for name in names))
+                for relative in (
+                    "pack.json",
+                    "skills/workstation-architecture-diagramming/SKILL.md",
+                    "skills/workstation-architecture-diagramming/references/standards-and-notation.md",
+                    "skills/workstation-architecture-diagramming/references/diagrams-net.md",
+                ):
+                    self.assertTrue(
+                        any(
+                            name.endswith(
+                                "ai_engineering_guardrails/_resources/packs/shared/architecture-diagramming/"
+                                + relative
+                            )
+                            for name in names
+                        ),
+                        relative,
+                    )
                 self.assertTrue(any(name.endswith("/LICENSE") for name in names))
                 self.assertTrue(any(name.endswith("docs/terminal-ux.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))

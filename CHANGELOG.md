@@ -4,6 +4,12 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+## [1.4.0] - 2026-08-14
+
+### Added
+
+- A specialist `workstation-architecture-diagramming` skill provides standards-informed software and cloud diagram guidance with Mermaid and diagrams.net source, without claiming formal conformance or bundling vendor assets.
+
 ## [1.3.1] - 2026-08-10
 
 ### Fixed

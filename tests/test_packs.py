@@ -174,7 +174,7 @@ class PackDetectionTests(unittest.TestCase):
 class PackValidationTests(unittest.TestCase):
     def test_all_packs_validate(self) -> None:
         count, examples = packs.validate_packs()
-        self.assertEqual(23, count)
+        self.assertEqual(24, count)
         self.assertGreater(examples, 375)
 
     def test_pack_types_define_small_catalogue_tiers_and_contextual_defaults(self) -> None:
@@ -182,12 +182,22 @@ class PackValidationTests(unittest.TestCase):
         tiers = {identifier: packs.catalogue_tier(pack) for identifier, pack in available.items()}
 
         self.assertEqual(10, sum(tier == "contextual" for tier in tiers.values()))
-        self.assertEqual(13, sum(tier == "specialist" for tier in tiers.values()))
+        self.assertEqual(14, sum(tier == "specialist" for tier in tiers.values()))
+        self.assertEqual("specialist", tiers["architecture-diagramming"])
         self.assertEqual("specialist", tiers["technical-writing"])
         self.assertEqual(set(available), set(packs.default_pack_ids(available)))
         skill_defaults = set(packs.default_skill_pack_ids(available))
         self.assertTrue({"python", "node", "java", "dotnet", "dependency-management"}.issubset(skill_defaults))
-        self.assertTrue({"kubernetes", "terraform", "spacelift", "source-control-cicd", "technical-writing"}.isdisjoint(skill_defaults))
+        self.assertTrue(
+            {
+                "architecture-diagramming",
+                "kubernetes",
+                "terraform",
+                "spacelift",
+                "source-control-cicd",
+                "technical-writing",
+            }.isdisjoint(skill_defaults)
+        )
 
     def test_explicit_catalogue_tier_is_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
