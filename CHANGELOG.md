@@ -4,6 +4,13 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+## [1.3.1] - 2026-08-10
+
+### Fixed
+
+- Corrected the package version after the v1.3.0 tag retained version `1.2.2`.
+- Finalised the 1.3.0 changelog section while preserving an empty `Unreleased` section.
+
 ## [1.3.0] - 2026-08-10
 
 ### Added
