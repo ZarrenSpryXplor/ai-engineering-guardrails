@@ -1,14 +1,11 @@
-# AI engineering workstation guardrails
+# AI Engineering Guardrails
 
+[![PyPI version](https://img.shields.io/pypi/v/ai-engineering-guardrails.svg)](https://pypi.org/project/ai-engineering-guardrails/)
 [![Tests](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml)
 
-Give AI coding agents a seatbelt, not a committee meeting. This is a local, vendor-neutral guardrails kit for OpenAI Codex, Claude Code, Cursor, GitHub Copilot in VS Code and Visual Studio, and JetBrains AI Assistant/Copilot.
+AI Engineering Guardrails is a local, vendor-neutral toolkit for applying consistent guidance, skills and narrow checks across OpenAI Codex, Claude Code, Cursor, GitHub Copilot in VS Code and Visual Studio, and JetBrains AI Assistant/Copilot.
 
-It turns one canonical policy into product-appropriate guidance, skills, hooks, and optional agent roles. The goal is boringly useful: inspect first, preserve user work, avoid secrets and destructive operations, verify changes, and say what happened.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ZarrenSpryXplor/ai-engineering-guardrails/main/assets/ai_comic_screen_only_corrected.png" width="720" alt="A comic about an AI agent denying over-engineering before a stack of resource monitors catches fire.">
-</p>
+It renders one canonical policy for each supported product. Its deliberately limited aim is to help agents inspect first, preserve user work, avoid secrets and destructive operations, verify changes, and report what happened. Think of it as a seatbelt, not a committee meeting.
 
 ## The short version
 
@@ -20,6 +17,10 @@ It turns one canonical policy into product-appropriate guidance, skills, hooks, 
 - Optional routing and terminal UX—both off unless you explicitly enable them.
 
 This is defence in depth, not a replacement for product approvals, sandboxing, operating-system permissions, branch protection, cloud IAM, Kubernetes RBAC, or a human release decision.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ZarrenSpryXplor/ai-engineering-guardrails/main/assets/ai_comic_screen_only_corrected.png" width="720" alt="A comic about an AI agent denying over-engineering before a stack of resource monitors catches fire.">
+</p>
 
 ## Start here
 
