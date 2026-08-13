@@ -4,6 +4,10 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+### Changed
+
+- Updated the maintained documentation to remove stale release labels, clarify operator procedures and audit limits, and align contributor verification with repository checks.
+
 ## [1.4.0] - 2026-08-14
 
 ### Added

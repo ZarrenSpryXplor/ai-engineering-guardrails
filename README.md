@@ -5,7 +5,7 @@
 
 AI Engineering Guardrails is a local, vendor-neutral toolkit for applying consistent guidance, skills and narrow checks across OpenAI Codex, Claude Code, Cursor, GitHub Copilot in VS Code and Visual Studio, and JetBrains AI Assistant/Copilot.
 
-It renders one canonical policy for each supported product. Its deliberately limited aim is to help agents inspect first, preserve user work, avoid secrets and destructive operations, verify changes, and report what happened. Think of it as a seatbelt, not a committee meeting.
+It renders one canonical policy for each supported product. It helps agents inspect first, preserve user work, avoid secrets and destructive operations, verify changes, and report outcomes.
 
 ## The short version
 
@@ -52,7 +52,7 @@ pipx install 'git+https://github.com/ZarrenSpryXplor/ai-engineering-guardrails.g
 
 The package is published on [PyPI](https://pypi.org/project/ai-engineering-guardrails/) through Trusted Publishing. Maintainers should follow the [release guide](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/releasing.md) for protected approvals, version/tag checks, and provenance.
 
-## Optional extras
+## Optional features
 
 **Terminal visibility** is opt-in. Claude Code can use a managed local status line; Codex uses its native `/statusline` fields; Cursor CLI keeps its documented `/status-indicators` control.
 
@@ -72,7 +72,7 @@ ai-guardrails routing set balanced --product codex --dry-run
 ai-guardrails routing set balanced --product codex
 ```
 
-**Assurance tools** stay local and offline. They inspect metadata, repository state, supplied reports, and bounded component files; they do not run analyzers, execute downloaded instructions, or award a magical “all bugs gone” sticker.
+**Assurance tools** stay local and offline. They inspect metadata, repository state, supplied reports, and bounded component files. They do not run analyzers, execute downloaded instructions, or prove that a system has no defects.
 
 ```sh
 ai-guardrails policy audit
@@ -96,6 +96,7 @@ The [operator documentation hub](https://github.com/ZarrenSpryXplor/ai-engineeri
 | Audit policy evidence, use a task contract, or inspect an external skill/instruction | [Evidence and assurance](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/evidence-and-assurance.md) |
 | Delegate bounded work safely | [Routing and cost](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/routing-and-cost.md) |
 | Use or extend language and infrastructure support | [Capability packs](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/capability-packs.md) and [skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md) |
+| Create or review software and cloud architecture diagrams | [Skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md#delivery-operations-and-cross-stack-work) and [architecture](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/architecture.md) |
 | Write or review substantive technical documentation | [Technical writing](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/technical-writing.md) and [skills catalogue](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/skills.md) |
 | Change canonical policy or understand the design | [Policy authoring](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/policy-authoring.md) and [architecture](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/architecture.md) |
 | Review threat boundaries and enterprise examples | [Threat model](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/threat-model.md), [enterprise output](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/enterprise.md), and [Spacelift](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/spacelift.md) |

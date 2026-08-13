@@ -1,6 +1,6 @@
 # Skills catalogue
 
-Skills are short, on-demand procedures for a bounded kind of work. They are not a second global policy, a command runner, or a permission grant. They tell a compatible agent how to investigate, change, verify, and report work safely; deterministic hooks and product-native approvals remain separate controls.
+Skills are short, on-demand procedures for a bounded work category. They are not a second global policy, a command runner, or a permission grant. They tell a compatible agent how to investigate, change, verify, and report work safely. Deterministic hooks and product-native approvals remain separate controls.
 
 The distribution contains 30 portable skills: six core workstation skills and one skill for each of 24 capability packs. Canonical pack type supplies the default catalogue tier: the six base skills are **core**, language/shared pack skills are normally **contextual**, and infrastructure/delivery/operations skills are **specialist**. A cross-cutting pack can explicitly remain specialist when default exposure would waste catalogue budget. The canonical `SKILL.md` files under `ai_engineering_guardrails/_resources/` remain authoritative.
 

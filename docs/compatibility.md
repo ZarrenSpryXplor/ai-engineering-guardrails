@@ -150,9 +150,9 @@ Current Spacelift behaviour was verified from official documentation on 2026-08-
 
 Spacelift policy examples are configuration-driven and structural validation is always local. Semantic evaluation runs only when an existing `opa` executable is available; otherwise validation reports that it was not performed. Availability of a tool, API field, organisation feature, plan, space, label, stack, or permission is never inferred from checked-in configuration.
 
-## v1.1 command and schema references
+## Command and schema references
 
-The v1.1 packs use stable command categories verified from official project/vendor references, but they do not pin or install the tools. Exact flags remain subject to the repository's required version and must be verified locally.
+The capability packs use stable command categories verified from official project or vendor references, but they do not pin or install the tools. Exact flags remain subject to the repository's required version and must be verified locally.
 
 | Area | Official compatibility references | Repository limitation/design |
 | --- | --- | --- |

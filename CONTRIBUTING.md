@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping make agent-assisted engineering a little less exciting in the bad way.
+Thank you for helping maintain AI Engineering Guardrails.
 
 ## Before opening a change
 
@@ -24,8 +24,12 @@ Run the narrow tests that cover your change, then the project checks from the re
 ```sh
 python tools/guardrails.py build
 python tools/guardrails.py validate
+python tools/guardrails.py policy audit
+python tools/guardrails.py skills audit
 python tools/guardrails.py docs audit --repo .
 python -m unittest discover -s tests -v
+python -m compileall ai_engineering_guardrails tools enforcement
+python tools/guardrails.py scan --repo . --format human
 python tools/guardrails.py build
 git diff --check
 git diff -- adapters dist

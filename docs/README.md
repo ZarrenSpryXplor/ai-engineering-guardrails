@@ -1,23 +1,12 @@
 # Operator documentation
 
-This is the documentation entry point for people operating, extending, or reviewing AI Engineering Workstation Guardrails. The root [README](../README.md) stays intentionally short; this directory owns the detail.
+This is the documentation entry point for people who operate, extend, or review AI Engineering Guardrails. The root [README](../README.md) gives the first-run workflow. This directory contains the detailed procedures and design information.
 
-## What's new in v1.2
+## Documentation status
 
-The v1.2 line adds an offline assurance layer and a single presentation layer for human CLI output:
+These documents describe the current `main` branch. If you use a released package, run `ai-guardrails --version` and read the documentation from the matching `v<version>` tag. Instructions on `main` can describe features that an older installation does not contain.
 
-| New area | Start here |
-| --- | --- |
-| Opt-in status lines, activity summaries, receipts, complexity signals, and demo mode | [Terminal UX](terminal-ux.md) |
-| Policy evidence metadata and review dates | [Evidence and assurance](evidence-and-assurance.md#maintainer-workflow) |
-| Task contracts, safe halts, and evidence-bound receipts | [Evidence and assurance](evidence-and-assurance.md#task-contracts-and-imported-reports) |
-| Local SARIF, Cobertura, and JUnit comparison | [Operations](operations.md#evidence-task-contracts-and-component-review) |
-| Static component inspection and digest-bound trust records | [Evidence and assurance](evidence-and-assurance.md#component-and-instruction-trust) |
-| Smaller default skill catalogue and skill-efficiency audit | [Skills catalogue](skills.md#how-skills-become-available) |
-| Optional manual guidance probes | [Evidence and assurance](evidence-and-assurance.md#skill-efficiency-and-guidance-probes) |
-| Rich human CLI output, and `--format json` for `validate` and `status` | [Quick user guide](user-guide.md#day-to-day-use) |
-
-The [changelog](../CHANGELOG.md) records the per-version summary, so the details have one home instead of six.
+The [changelog](../CHANGELOG.md) is the release summary. Dated compatibility sections preserve the date of their source review. Change a verification date only after you review the linked authoritative sources.
 
 ```mermaid
 flowchart TD
@@ -38,6 +27,7 @@ flowchart TD
 | Engineer installing the guardrails | [Quick user guide](user-guide.md) | [Operations](operations.md), [compatibility](compatibility.md) |
 | Engineer using installed guardrails day to day | [Quick user guide](user-guide.md#day-to-day-use) | [skills catalogue](skills.md), [capability packs](capability-packs.md) |
 | Engineer writing or reviewing technical documentation | [Technical writing](technical-writing.md) | [skills catalogue](skills.md), [operations](operations.md#documentation-audit) |
+| Engineer creating or reviewing architecture diagrams | [Skills catalogue](skills.md#delivery-operations-and-cross-stack-work) | [architecture](architecture.md), [capability packs](capability-packs.md) |
 | Engineer enabling status, receipts, or demo mode | [Terminal UX](terminal-ux.md) | [compatibility](compatibility.md#terminal-ux-capability-verification-2026-08-09) |
 | Engineer delegating bounded tasks | [Routing and cost](routing-and-cost.md) | [skills catalogue](skills.md) |
 | Maintainer reviewing policy, task evidence, or a local component | [Evidence and assurance](evidence-and-assurance.md) | [policy authoring](policy-authoring.md), [operations](operations.md) |
@@ -53,7 +43,7 @@ flowchart TD
 - [Compatibility](compatibility.md): dated vendor capability evidence, supported formats, version boundaries, and product limitations.
 - [Terminal UX](terminal-ux.md): opt-in status-line profiles, activity, complexity signals, compact receipts, demo mode, privacy, and removal.
 - [Routing and cost](routing-and-cost.md): profile selection, role use, escalation, native product boundaries, and measurement limits.
-- [Capability packs](capability-packs.md) and [skills catalogue](skills.md): on-demand stack support and portable workflows.
+- [Capability packs](capability-packs.md) and [skills catalogue](skills.md): on-demand stack support, technical writing, architecture diagramming, and other portable workflows.
 - [Technical writing](technical-writing.md): ASD-STE100-informed guidance, applicability, provenance, and advisory documentation checks.
 - [Architecture](architecture.md): canonical resources, build, installation, enforcement, and ownership boundaries.
 - [Policy authoring](policy-authoring.md): how maintainers safely extend canonical policy, skills, packs, or command rules.

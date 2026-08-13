@@ -1,6 +1,6 @@
 # Policy authoring
 
-Execution-efficiency task routing is not behavioural policy. Canonical authoring data is shipped under `ai_engineering_guardrails/_resources/`; this document omits that prefix below for readability. Author model tiers, profiles, escalation, and subagent roles under `routing/` as described in [routing and measurement](routing-and-cost.md); do not put vendor model IDs in policy fragments.
+Execution-efficiency task routing is not behavioural policy. Canonical authoring data is shipped under `ai_engineering_guardrails/_resources/`; this document omits that prefix below for readability. Author model tiers, profiles, escalation, and subagent roles under `routing/` as described in [routing and cost](routing-and-cost.md); do not put vendor model IDs in policy fragments.
 
 ## Attach evidence metadata, not duplicate prose
 
@@ -143,7 +143,12 @@ Adding a pack must not change global policy generation. Product adapters consume
 ```sh
 python tools/guardrails.py build
 python tools/guardrails.py validate
+python tools/guardrails.py policy audit
+python tools/guardrails.py skills audit
+python tools/guardrails.py docs audit --repo .
 python -m unittest discover -s tests -v
+python -m compileall ai_engineering_guardrails tools enforcement
+python tools/guardrails.py scan --repo . --format human
 python tools/guardrails.py build
 git diff --check
 git diff
