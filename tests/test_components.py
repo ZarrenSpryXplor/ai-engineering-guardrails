@@ -460,8 +460,8 @@ class ComponentTests(unittest.TestCase):
         result = components.skills_audit()
 
         self.assertTrue(result["audit_complete"])
-        self.assertEqual(29, result["catalogue"]["skill_count"])
-        self.assertEqual({"core": 6, "contextual": 10, "specialist": 13}, result["catalogue"]["tier_counts"])
+        self.assertEqual(30, result["catalogue"]["skill_count"])
+        self.assertEqual({"core": 6, "contextual": 10, "specialist": 14}, result["catalogue"]["tier_counts"])
         self.assertEqual("estimate", result["catalogue"]["estimated_catalogue_pressure"]["label"])
         self.assertIn("other installed and plugin skills", result["catalogue"]["estimated_catalogue_pressure"]["limitation"])
         self.assertEqual(16, result["catalogue"]["fresh_default"]["skill_count"])
@@ -487,6 +487,21 @@ class ComponentTests(unittest.TestCase):
         self.assertLess(technical["description_characters"], components.load_thresholds()["skills"]["description_characters"])
         self.assertFalse(
             any("workstation-technical-writing" in item["skills"] for item in result["catalogue"]["routing_overlap_warnings"])
+        )
+        architecture = next(
+            item for item in result["skills"]
+            if item["name"] == "workstation-architecture-diagramming"
+        )
+        self.assertEqual("specialist", architecture["catalogue_tier"])
+        self.assertLess(
+            architecture["description_characters"],
+            components.load_thresholds()["skills"]["description_characters"],
+        )
+        self.assertFalse(
+            any(
+                "workstation-architecture-diagramming" in item["skills"]
+                for item in result["catalogue"]["routing_overlap_warnings"]
+            )
         )
 
     def test_skill_catalogue_reports_generic_and_overlapping_routing_descriptions(self) -> None:

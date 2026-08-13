@@ -94,17 +94,19 @@ Positive examples should cover supported wrappers and meaningful flag orderings.
 
 ## Add a capability pack
 
-Use a pack when guidance is specific to a language, build ecosystem, infrastructure tool, or cross-stack concern and should not be permanently resident in global instructions. Create `packs/<type>/<id>/` with:
+Use a pack when guidance is specific to a language, build ecosystem, infrastructure tool, or cross-stack concern and should not be permanently resident in global instructions. Every `packs/<type>/<id>/` directory needs `pack.json`. Add other surfaces only when the capability needs them:
 
-- `pack.json` containing stable markers, exclusions, dependencies/conflicts, and references;
-- concise `policy.md`;
-- `verification.json`, `routing.json`, and `command-policy.json`;
-- one or more portable `skills/workstation-*/SKILL.md` files;
-- positive and negative local fixtures under `tests/fixtures/`.
+- add file or directory detectors for marker-based repository discovery;
+- add concise `policy.md` only for on-demand behavioural guidance;
+- add `verification.json` only for capability-specific verification hints;
+- add `routing.json` only for a distinct routing task;
+- add command or structured-tool policy only for deterministic enforcement;
+- add a portable `skills/workstation-*/SKILL.md` when an on-demand agent procedure is useful; and
+- add local positive and negative fixtures for detectors or deterministic rules that need evidence.
 
-Detectors should match authoritative manifests, wrappers, locks, and configuration, not ordinary source extensions alone. Add evidence-based monorepository fixtures and prove that build output, dependency caches, vendor trees, and configured generated paths are ignored. Never execute a detector or contact a network.
+A markerless shared specialist pack can contain only its manifest and portable skill. For packs with detectors, match authoritative manifests, wrappers, locks, and configuration, not ordinary source extensions alone. Add evidence-based monorepository fixtures when detection exists, and prove that build output, dependency caches, vendor trees, and configured generated paths are ignored. Never execute a detector or contact a network.
 
-Add pack command rules with an `operation_class` and both dangerous and nearby-safe examples:
+When deterministic enforcement is needed, add pack command rules with an `operation_class` and both dangerous and nearby-safe examples:
 
 ```json
 {
