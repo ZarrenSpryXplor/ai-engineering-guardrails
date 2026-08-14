@@ -48,6 +48,7 @@ FOLLOW_EXTERNAL_OVER_LOCAL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 EXTERNAL_AUTHORITY_MATCHERS = (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE)
+SAFE_GIT_CONFIGURATION = ("-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null")
 
 
 def locally_negated(text: str, position: int) -> bool:
@@ -89,7 +90,7 @@ class Finding:
 def _repository_files(repo: Path) -> list[Path]:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             capture_output=True,
             check=False,
             timeout=15,
@@ -482,7 +483,7 @@ def _generated_stale(repo: Path) -> list[Finding]:
 def _changed_repository_paths(repo: Path) -> list[Path]:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
             capture_output=True,
             check=False,
             timeout=15,
@@ -790,7 +791,7 @@ def validate_spacelift_policy_structure(root: Path) -> None:
 def changed_file_count(repo: Path) -> int:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain=v1", "-z"],
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "status", "--porcelain=v1", "-z"],
             capture_output=True,
             check=False,
             timeout=10,
