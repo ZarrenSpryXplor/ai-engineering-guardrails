@@ -2,7 +2,7 @@
 
 Use `workstation-architecture-diagramming` to create, update, review, or standardize software and cloud architecture diagrams. Use [technical writing](technical-writing.md) for prose-only architecture documents.
 
-The skill is specialist and is not part of the fresh default catalogue. Select `--skill-catalogue all`, or select the `architecture-diagramming` pack explicitly for a deliberately reduced installation. Product discovery and activation remain product-controlled.
+The skill is specialist and is not part of the fresh default catalogue. On an existing default installation, use `ai-guardrails install --skill-catalogue all` to expose it without reducing the installed deterministic packs. Use `--pack architecture-diagramming` only when you intend to replace the selected pack set with a deliberately reduced policy-and-skill installation. Product discovery and activation remain product-controlled.
 
 ## Define the view
 

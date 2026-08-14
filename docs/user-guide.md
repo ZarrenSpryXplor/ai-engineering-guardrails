@@ -91,7 +91,7 @@ ai-guardrails docs audit --path README.md
 
 See [technical writing](technical-writing.md) for scope, exclusions, and the standard provenance boundary.
 
-For software or cloud architecture diagrams, use `workstation-architecture-diagramming`. The skill produces or edits reviewable Mermaid and diagrams.net source and does not claim formal conformance to C4, UML, cloud-provider, or accessibility standards. It is a specialist skill, so select `--skill-catalogue all` or the `architecture-diagramming` pack when you need it. See [architecture diagramming](architecture-diagramming.md) for its workflow and the [skills catalogue](skills.md#delivery-operations-and-cross-stack-work) for its scope.
+For software or cloud architecture diagrams, use `workstation-architecture-diagramming`. The skill produces or edits reviewable Mermaid and diagrams.net source and does not claim formal conformance to C4, UML, cloud-provider, or accessibility standards. It is a specialist skill. On an existing default installation, use `ai-guardrails install --skill-catalogue all` to expose it without reducing deterministic pack enforcement. Use `--pack architecture-diagramming` only for an intentionally reduced policy-and-skill installation. See [architecture diagramming](architecture-diagramming.md) for its workflow and the [skills catalogue](skills.md#delivery-operations-and-cross-stack-work) for its scope.
 
 ## Optional routing
 
