@@ -1,7 +1,9 @@
 # AI Engineering Guardrails
 
-[![PyPI version](https://img.shields.io/pypi/v/ai-engineering-guardrails.svg)](https://pypi.org/project/ai-engineering-guardrails/)
+[![PyPI version](https://img.shields.io/pypi/v/ai-engineering-guardrails?cacheSeconds=300)](https://pypi.org/project/ai-engineering-guardrails/)
+[![Python requirement](https://img.shields.io/badge/python-%3E%3D3.11-blue)](https://pypi.org/project/ai-engineering-guardrails/)
 [![Tests](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/actions/workflows/tests.yml)
+[![License](https://img.shields.io/pypi/l/ai-engineering-guardrails?cacheSeconds=300)](https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/LICENSE)
 
 AI Engineering Guardrails is a local, vendor-neutral toolkit for applying consistent guidance, skills and narrow checks across OpenAI Codex, Claude Code, Cursor, GitHub Copilot in VS Code and Visual Studio, and JetBrains AI Assistant/Copilot.
 
