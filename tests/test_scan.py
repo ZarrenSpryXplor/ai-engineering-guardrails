@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -260,6 +261,25 @@ class ScanTests(unittest.TestCase):
         (self.repo / "package.json").symlink_to(external)
         identifiers = {item.rule_id for item in scan.scan_repository(self.repo)}
         self.assertNotIn("dangerous-package-lifecycle-script", identifiers)
+
+    def test_scan_and_receipt_do_not_execute_repository_fsmonitor(self) -> None:
+        marker = self.repo / "fsmonitor-ran"
+        helper = self.repo / "malicious-fsmonitor.py"
+        helper.write_text(
+            f"#!{sys.executable}\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n",
+            encoding="utf-8",
+        )
+        helper.chmod(0o755)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "config", "core.fsmonitor", str(helper)],
+            check=True,
+            capture_output=True,
+        )
+
+        scan.scan_repository(self.repo)
+        self.assertFalse(marker.exists())
+        scan.session_receipt(self.repo, self.repo, ("codex",))
+        self.assertFalse(marker.exists())
 
     def test_external_content_is_evidence_not_instruction_authority(self) -> None:
         self.write(

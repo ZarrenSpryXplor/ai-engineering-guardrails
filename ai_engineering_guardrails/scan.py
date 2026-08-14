@@ -53,6 +53,7 @@ FOLLOW_EXTERNAL_OVER_LOCAL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 EXTERNAL_AUTHORITY_MATCHERS = (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE)
+SAFE_GIT_CONFIGURATION = ("-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null")
 MARKDOWN_LINK_RE = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 MARKDOWN_URL_RE = re.compile(r"(?:https?://|mailto:)[^\s)>]+", re.IGNORECASE)
 MARKDOWN_INLINE_CODE_RE = re.compile(r"`+[^`]*`+")
@@ -99,7 +100,7 @@ class Finding:
 def _repository_files(repo: Path) -> list[Path]:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             capture_output=True,
             check=False,
             timeout=15,
@@ -492,7 +493,7 @@ def _generated_stale(repo: Path) -> list[Finding]:
 def _changed_repository_paths(repo: Path) -> list[Path]:
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
             capture_output=True,
             check=False,
             timeout=15,
@@ -958,6 +959,19 @@ def validate_spacelift_policy_structure(root: Path) -> None:
     missing = sorted(name for name in required if not (root / name).is_dir())
     if missing:
         raise GuardrailsError(f"Spacelift policy example directory is missing: {missing[0]}")
+
+
+def changed_file_count(repo: Path) -> int:
+    try:
+        result = subprocess.run(
+            ["git", *SAFE_GIT_CONFIGURATION, "-C", str(repo), "status", "--porcelain=v1", "-z"],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return 0
+    return len([entry for entry in result.stdout.split(b"\0") if entry]) if result.returncode == 0 else 0
 
 
 def session_receipt(
