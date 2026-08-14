@@ -6,14 +6,18 @@ Execution-efficiency task routing is not behavioural policy. Canonical authoring
 
 Always-loaded behavioural fragments remain concise Markdown. Their rationale, evidence source IDs, confidence, review dates, polarity, scope, and fixture identifiers live once in `evidence/registry.json`; do not paste that metadata into each fragment. Scope uses the registry's small canonical vocabulary so the audit can reject an unbounded or unknown lifecycle boundary. The registry is local metadata only: validation and `ai-guardrails policy audit` never fetch its URLs or ask a model to judge prose.
 
-When adding or changing a high-level fragment, add its matching stable ID and metadata record in the same change. Use a bounded scope, an explicit rationale, source IDs where they genuinely help, and the fixture IDs that prove deterministic relationships. Review dates are review prompts, not an automatic rule deletion mechanism. The normal lifecycle is:
+When adding or changing a high-level fragment, add its matching stable ID and metadata record in the same change. Use a bounded scope, an explicit rationale, source IDs where they genuinely help, and the fixture IDs that prove deterministic relationships. Review dates are review prompts, not an automatic rule deletion mechanism.
+
+This current-state lifecycle view is for policy maintainers. It shows the required traceability and review loop for one high-level policy change.
 
 ```mermaid
 flowchart LR
-  Author[Change canonical policy] --> Evidence[Add rationale, evidence IDs, dates, fixtures]
-  Evidence --> Build[build and validate]
-  Build --> Audit[policy audit]
-  Audit --> Review[Periodic human review]
+  author["Change canonical policy"] -->|records traceability in| evidence["Rationale, evidence IDs, dates, and fixtures"]
+  evidence -->|supplies declared inputs to| build["Build and validate"]
+  build -->|precedes| audit["Policy audit"]
+  audit -->|provides findings for| review["Human review"]
+  review -->|change required| author
+  review -->|review metadata refreshed| evidence
 ```
 
 Run `ai-guardrails policy evidence <POLICY_ID>` to inspect one record. `policy audit` returns a non-zero result for structural mistakes such as missing IDs, bad dates, unknown sources, or broken traceability; an overdue review is reported distinctly and does not by itself break ordinary installation.

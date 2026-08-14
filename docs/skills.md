@@ -77,6 +77,8 @@ Use `ai-guardrails packs detect --repo .` to see which packs have evidence in a 
 | `workstation-architecture-diagramming` | Visual software and cloud architecture models with evidence-based C4-informed, UML-informed, ERD, Mermaid, and diagrams.net source. |
 | `workstation-technical-writing` | Prose-only READMEs, runbooks, procedures, architecture documents, troubleshooting, and CLI/help text with ASD-STE100-informed clarity. |
 
+See [architecture diagramming](architecture-diagramming.md) for view selection, source ownership, repository conventions, and validation levels.
+
 ## Skills, packs, rules, and routing are different things
 
 | Thing | Purpose | What it does not do |

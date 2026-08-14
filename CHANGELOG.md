@@ -7,6 +7,7 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 ### Changed
 
 - Updated the maintained documentation to remove stale release labels, clarify operator procedures and audit limits, and align contributor verification with repository checks.
+- Audited repository architecture diagrams, removed duplicate views, corrected the task-assurance flow, and added a dedicated diagramming guide and installation sequence.
 
 ## [1.4.0] - 2026-08-14
 
