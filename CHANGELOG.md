@@ -4,10 +4,16 @@ All notable user-facing changes are recorded here. This project follows [Keep a 
 
 ## Unreleased
 
+## [1.4.1] - 2026-08-14
+
 ### Changed
 
 - Updated the maintained documentation to remove stale release labels, clarify operator procedures and audit limits, and align contributor verification with repository checks.
 - Audited repository architecture diagrams, removed duplicate views, corrected the task-assurance flow, and added a dedicated diagramming guide and installation sequence.
+
+### Fixed
+
+- Corrected the PyPI version badge cache behaviour and added Python-requirement and MIT-license badges with package-page-safe targets.
 
 ## [1.4.0] - 2026-08-14
 
