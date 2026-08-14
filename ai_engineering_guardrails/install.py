@@ -2365,6 +2365,7 @@ def status(
     source = state.source_digest(overlay_digest)
     _, target_mapping = _target_mapping_status(home)
     result: dict[str, Any] = {
+        "schema_version": 1,
         "home": str(home),
         "products": {},
         "safety_profile": None,
@@ -2373,6 +2374,7 @@ def status(
         "target_mapping": target_mapping,
         "credential_capability_detected": bool(_credential_indicators()),
         "credential_classes": _credential_indicators(),
+        "publication_policy": "denied",
     }
     for product in products:
         product_data = installed_state.get("products", {}).get(product)
@@ -2498,6 +2500,7 @@ def status(
             if show_routing_details and isinstance(installed_state.get("products", {}).get(product), Mapping):
                 overrides = installed_state["products"][product].get("model_overrides", {})
                 models = routing.resolved_models(product, routing.load_config(), {product: overrides})
+                product_result["model_mappings"] = models
                 print("  model mappings: " + ", ".join(f"{tier}={model}" for tier, model in models.items()))
                 print("  selected models may be unavailable; product fallback may apply; main-session model unchanged")
         if product == "cursor":

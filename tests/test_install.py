@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
-from ai_engineering_guardrails import build, install as installer, packs, state
+from ai_engineering_guardrails import build, cli, install as installer, packs, state
 from ai_engineering_guardrails.util import PRODUCTS, ROOT, GuardrailsError, home_path, path_within
 
 
@@ -463,6 +463,8 @@ class InstallTests(unittest.TestCase):
         self.assertTrue((self.home / ".agents/skills/workstation-dependency-management/SKILL.md").is_file())
         self.assertFalse((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").exists())
         self.assertFalse((self.home / ".agents/skills/workstation-spacelift/SKILL.md").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-architecture-diagramming/SKILL.md").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-technical-writing/SKILL.md").exists())
 
         runtime = self.home / ".ai-guardrails/runtime" / installed["runtime_digest"]
         policy_data = json.loads((runtime / "command-policy.json").read_text(encoding="utf-8"))
@@ -479,6 +481,8 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(set(packs.default_pack_ids()), set(expanded["installed_skill_packs"]))
         self.assertEqual(initial_policy_digest, expanded["policy_digest"])
         self.assertTrue((self.home / ".agents/skills/workstation-kubernetes/SKILL.md").is_file())
+        self.assertTrue((self.home / ".agents/skills/workstation-architecture-diagramming/SKILL.md").is_file())
+        self.assertTrue((self.home / ".agents/skills/workstation-technical-writing/SKILL.md").is_file())
 
         self.install(("codex",), skill_catalogue="contextual")
         reduced = self.read_state()["products"]["codex"]
@@ -486,6 +490,34 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(set(packs.default_skill_pack_ids()), set(reduced["installed_skill_packs"]))
         self.assertEqual(initial_policy_digest, reduced["policy_digest"])
         self.assertFalse((self.home / ".agents/skills/workstation-kubernetes").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-architecture-diagramming").exists())
+        self.assertFalse((self.home / ".agents/skills/workstation-technical-writing").exists())
+
+    def test_explicit_architecture_diagramming_pack_installs_its_skill(self) -> None:
+        output = io.StringIO()
+        with (
+            mock.patch.dict(os.environ, {"CODEX_HOME": ""}, clear=False),
+            contextlib.redirect_stdout(output),
+        ):
+            result = cli.main(
+                [
+                    "install",
+                    "--product",
+                    "codex",
+                    "--home",
+                    str(self.home),
+                    "--pack",
+                    "architecture-diagramming",
+                ]
+            )
+
+        self.assertEqual(0, result, output.getvalue())
+        self.assertTrue(
+            (self.home / ".agents/skills/workstation-architecture-diagramming/SKILL.md").is_file()
+        )
+        installed = self.read_state()["products"]["codex"]
+        self.assertEqual(["architecture-diagramming"], installed["installed_packs"])
+        self.assertEqual(["architecture-diagramming"], installed["installed_skill_packs"])
 
     def test_unmanaged_skill_collision_refused_then_force_backed_up(self) -> None:
         collision = self.home / ".agents/skills/workstation-safe-change"

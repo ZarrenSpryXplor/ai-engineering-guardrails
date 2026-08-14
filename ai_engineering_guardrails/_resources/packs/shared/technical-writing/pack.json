@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "technical-writing",
+  "type": "shared",
+  "catalogue_tier": "specialist",
+  "description": "ASD-STE100-informed technical-writing guidance for substantive technical documentation.",
+  "file_detectors": [],
+  "directory_detectors": [],
+  "explicit_exclusions": [],
+  "dependent_packs": [],
+  "conflicting_packs": [],
+  "policy_fragments": [],
+  "skills": ["skills/workstation-technical-writing/SKILL.md"],
+  "command_policy_fragments": [],
+  "verification_definitions": [],
+  "routing_additions": [],
+  "compatibility_notes": ["Project guidance is ASD-STE100-informed and does not establish formal compliance."]
+}

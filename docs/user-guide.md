@@ -22,7 +22,7 @@ pipx install .
 pipx install ./dist/ai_engineering_guardrails-<version>-py3-none-any.whl
 ```
 
-No pack, profile, model, cloud login, or target mapping is required. Installation does not contact remote services.
+No pack, profile, model, cloud login, or target mapping is required. The `ai-guardrails install` command itself does not contact remote services.
 
 ## Cursor: one manual step
 
@@ -38,23 +38,24 @@ VS Code Copilot gets a native user instruction file and a **Preview** `PreToolUs
 
 Visual Studio gets `~/copilot-instructions.md` (the documented `%USERPROFILE%\copilot-instructions.md` on Windows). Skills require Visual Studio 18.5+; custom agents require 18.4+ and are user-selectable roles. Hooks and subagents are unsupported, so native approvals remain in charge.
 
-JetBrains intentionally needs a couple of manual confirmations:
+JetBrains requires these manual configuration steps:
 
-```sh
-ai-guardrails jetbrains print-chat-instructions
-ai-guardrails jetbrains export-project-rules --repo . --dry-run
-ai-guardrails jetbrains export-project-rules --repo .
-```
+1. Run `ai-guardrails jetbrains print-chat-instructions`.
+2. Paste the complete output in **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions**.
+3. Run `ai-guardrails jetbrains export-project-rules --repo . --dry-run` and review the target path.
+4. Run `ai-guardrails jetbrains export-project-rules --repo .`.
+5. Open **Settings > Tools > AI Assistant > Rules** and set the exported rule to **Always**.
+6. Register `~/.agents/skills` under **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**.
 
-Paste the first command's output in **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions**. After exporting, open **Settings > Tools > AI Assistant > Rules** and confirm the rule is **Always**. Register `~/.agents/skills` under **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**. The installer does not change JetBrains operation modes, approvals, MCP settings, or plugins. Copilot custom agents in JetBrains are Preview/manual, and no JetBrains hook is installed.
+The installer does not change JetBrains operation modes, approvals, MCP settings, or plugins. Copilot custom agents in JetBrains are Preview and require manual configuration. This project does not install a JetBrains hook.
 
 ## Day-to-day use
 
-Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Twelve specialist infrastructure, delivery, and operations skills remain packaged; `install --skill-catalogue all` exposes the complete 28-skill catalogue and `--skill-catalogue contextual` explicitly restores the smaller managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
+Skills are short, on-demand procedures. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Fourteen specialist infrastructure, delivery, operations, and cross-cutting skills remain packaged. `install --skill-catalogue all` exposes the complete 30-skill catalogue. `--skill-catalogue contextual` restores the smaller 16-skill managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
-Default behavior:
+Default behaviour:
 
 - local source edits, builds, tests, lint, rendering, validation, and plans are available;
 - remote infrastructure changes, production changes, publication, credential reads, and destructive operations are denied;
@@ -66,6 +67,31 @@ See what is active:
 ```sh
 ai-guardrails status --repo .
 ```
+
+Human-facing help, progress, reports, and errors use one Rich presentation layer. Comparable records use tables, summaries use compact panels, and exact paths or identifiers fold instead of disappearing behind an ellipsis. Output follows the current terminal width but never exceeds 80 columns.
+
+Put `--no-color` before the command to disable colour everywhere, or use the common `NO_COLOR` environment variable. Commands that already expose the option also accept it after the command. JSON, SARIF, and JUnit formats remain plain and deterministic for scripts:
+
+```sh
+ai-guardrails --no-color doctor
+ai-guardrails validate --format json
+ai-guardrails status --repo . --format json
+ai-guardrails skills audit --format json
+ai-guardrails effective --format human
+```
+
+`effective` keeps its historical JSON default; select `--format human` for the Rich view. Machine formats never include Rich styling. Pasteable setup or instruction content and exact interactive confirmation prompts also stay plain so their text remains exact.
+
+For substantive technical prose, use `workstation-technical-writing`. Its ASD-STE100-informed guidance preserves technical terms and facts without claiming formal compliance. The optional offline audit is advisory:
+
+```sh
+ai-guardrails docs audit --repo .
+ai-guardrails docs audit --path README.md
+```
+
+See [technical writing](technical-writing.md) for scope, exclusions, and the standard provenance boundary.
+
+For software or cloud architecture diagrams, use `workstation-architecture-diagramming`. The skill produces or edits reviewable Mermaid and diagrams.net source and does not claim formal conformance to C4, UML, cloud-provider, or accessibility standards. It is a specialist skill. On an existing default installation, use `ai-guardrails install --skill-catalogue all` to expose it without reducing deterministic pack enforcement. Use `--pack architecture-diagramming` only for an intentionally reduced policy-and-skill installation. See [architecture diagramming](architecture-diagramming.md) for its workflow and the [skills catalogue](skills.md#delivery-operations-and-cross-stack-work) for its scope.
 
 ## Optional routing
 
@@ -101,7 +127,7 @@ ai-guardrails complexity --repo . --write-snapshot
 ai-guardrails receipt --repo . --product all --compact
 ```
 
-Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behavior, and removal.
+Claude receives the managed command-based line and requires workspace trust. Codex receives an explicit marker-owned native `tui.status_line` edit that preserves unrelated `config.toml` text; `ai-guardrails statusline print-codex-setup` prints the same reviewable native-field recommendation. Cursor uses the user-controlled `/status-indicators` title feature; it has no documented programmable usage bar. `ai-guardrails demo --scenario all` is entirely synthetic and executes none of the operations it displays. The [terminal UX guide](terminal-ux.md) covers profiles, activation limits, cache behaviour, and removal.
 
 ## Ansible
 
@@ -166,7 +192,7 @@ ai-guardrails uninstall
 pipx uninstall ai-engineering-guardrails
 ```
 
-The first command removes only recorded managed product content; the last removes the pipx application. User-modified managed files are retained unless `--force` is explicit.
+The dry run previews removal without writing. The next command removes only recorded managed product content, and the last removes the pipx application. User-modified managed files are retained unless `--force` is explicit.
 
 ## Troubleshoot
 

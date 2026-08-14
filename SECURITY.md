@@ -16,7 +16,7 @@ You should receive an acknowledgement within seven calendar days. If the report 
 
 ## Scope
 
-The project accepts reports about its packaged Python code, canonical resources, generated adapter output, installation/update/uninstall behavior, CI configuration, and published documentation. Product-native behavior, vendor account security, cloud configuration, and arbitrary third-party skills are outside this repository's direct control, but reports that show this project misrepresents or unsafely configures them are welcome.
+The project accepts reports about its packaged Python code, canonical resources, generated adapter output, installation/update/uninstall behaviour, CI configuration, and published documentation. Product-native behaviour, vendor account security, cloud configuration, and arbitrary third-party skills are outside this repository's direct control, but reports that show this project misrepresents or unsafely configures them are welcome.
 
 This project intentionally has bounded enforcement coverage. A report should distinguish a genuine bypass of a documented control from a limitation already stated in the [threat model](docs/threat-model.md).
 

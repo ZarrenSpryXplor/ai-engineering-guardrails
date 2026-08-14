@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import contextlib
+import io
 import json
 import tempfile
 import tomllib
@@ -29,12 +31,64 @@ class ValidationTests(unittest.TestCase):
                     tomllib.loads(text)
 
     def test_full_validation_without_optional_executables(self) -> None:
-        with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
-            build.validate(check_codex=True)
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            report = build.validate(check_codex=True)
+
+        spacelift = next(check for check in report["checks"] if check["id"] == "spacelift-rego")
+        self.assertEqual("skipped", spacelift["outcome"])
+        self.assertIn("opa executable not available", spacelift["detail"])
 
     def test_codex_check_skips_when_unavailable(self) -> None:
         with mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=None):
             self.assertIn("skipped", build.validate_codex_rules())
+
+    def test_spacelift_semantic_tests_run_per_policy_with_shared_fixture(self) -> None:
+        executable = "/synthetic/opa"
+        completed = mock.Mock(returncode=0)
+        root = RESOURCE_ROOT / "platform-policies/spacelift"
+        fixture = root / "fixtures/guardrails.json"
+        policy_directories = sorted(path.parent for path in root.glob("*/guardrails.rego"))
+
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=executable),
+            mock.patch("ai_engineering_guardrails.build.subprocess.run", return_value=completed) as run,
+        ):
+            self.assertEqual("passed", build.validate_spacelift_policies())
+
+        self.assertEqual(
+            [
+                mock.call(
+                    [executable, "test", str(fixture), str(policy_directory)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+                for policy_directory in policy_directories
+            ],
+            run.call_args_list,
+        )
+        self.assertEqual(
+            {"approval", "login", "notification", "plan", "push", "trigger"},
+            {path.name for path in policy_directories},
+        )
+
+    def test_spacelift_semantic_tests_stop_and_report_the_failing_policy(self) -> None:
+        executable = "/synthetic/opa"
+        with (
+            mock.patch("ai_engineering_guardrails.build.shutil.which", return_value=executable),
+            mock.patch(
+                "ai_engineering_guardrails.build.subprocess.run",
+                return_value=mock.Mock(returncode=1),
+            ) as run,
+            self.assertRaisesRegex(GuardrailsError, r"failed for approval; run /synthetic/opa test"),
+        ):
+            build.validate_spacelift_policies()
+
+        self.assertEqual(1, run.call_count)
 
     def test_selected_home_guard_rejects_posix_and_windows_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -188,8 +242,10 @@ class ValidationTests(unittest.TestCase):
                 if path.is_file() and "__pycache__" not in path.parts and "_resources" not in path.parts:
                     self.assertIn(path.suffix, allowed, path)
 
-    def test_python_implementation_imports_no_external_runtime_dependency(self) -> None:
+    def test_python_implementation_imports_only_the_approved_runtime_dependency(self) -> None:
         standard = set(__import__("sys").stdlib_module_names)
+        approved = {"rich"}
+        observed: set[str] = set()
         for directory in (ROOT / "ai_engineering_guardrails", ROOT / "tools", ROOT / "enforcement"):
             for path in directory.rglob("*.py"):
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -198,10 +254,13 @@ class ValidationTests(unittest.TestCase):
                     names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else []
                     roots = ([module.split(".")[0]] if module and node.level == 0 else []) + [name.split(".")[0] for name in names]
                     for imported in roots:
+                        if imported in approved:
+                            observed.add(imported)
                         self.assertTrue(
-                            imported in standard or imported in {"ai_engineering_guardrails"},
+                            imported in standard or imported in {"ai_engineering_guardrails"} or imported in approved,
                             f"external import {imported} in {path}",
                         )
+        self.assertEqual(approved, observed)
 
     def test_routing_and_policy_identifiers_are_unique(self) -> None:
         merged = policy.load_enforcement_policy()

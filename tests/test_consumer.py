@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -83,14 +84,15 @@ class ConsumerJourneyTests(unittest.TestCase):
         self.assertIn("Model/subagent routing: disabled; primary model unchanged", preview)
         self.assertIn("Denied operation classes: destructive, sensitive-read, publish", preview)
         self.assertIn("Managed block", preview)
-        self.assertIn(str(self.home / ".codex/AGENTS.md"), preview)
-        self.assertIn(str(self.home / ".cursor/hooks.json"), preview)
-        self.assertIn(str(self.home / state.STATE_RELATIVE), preview)
+        compact_preview = re.sub(r"[\s|]", "", preview)
+        self.assertIn(str(self.home / ".codex/AGENTS.md"), compact_preview)
+        self.assertIn(str(self.home / ".cursor/hooks.json"), compact_preview)
+        self.assertIn(str(self.home / state.STATE_RELATIVE), compact_preview)
         self.assertIn("Skills to install", preview)
         self.assertIn("workstation-java", preview)
         self.assertIn("Agents to install: none", preview)
         self.assertIn("Backups planned for", preview)
-        self.assertIn(str(self.home / ".cursor/hooks.json"), preview)
+        self.assertIn(str(self.home / ".cursor/hooks.json"), compact_preview)
         self.assertIn("Left unchanged: primary model", preview)
         self.assertIn("Manual step after install", preview)
         self.assertIn("print-cursor-rules", preview)
@@ -135,13 +137,15 @@ class ConsumerJourneyTests(unittest.TestCase):
 
         result, status_output, errors = self.run_cli(["status", "--home", str(self.home)])
         self.assertEqual(0, result, errors)
-        self.assertIn("codex: state: installed", status_output)
-        self.assertIn("cursor: state: installed", status_output)
-        self.assertNotIn("claude:", status_output)
-        self.assertIn("manual step outstanding", status_output)
+        self.assertIn("AI Guardrails Status", status_output)
+        self.assertIn("codex", status_output)
+        self.assertIn("cursor", status_output)
+        self.assertNotIn("claude", status_output)
+        self.assertIn("paste the generated User Rules", status_output)
         self.assertNotIn("User Rules installed", status_output)
-        self.assertIn("routing: configured (none)", status_output)
-        self.assertIn("active safety profile: infrastructure-observe", status_output)
+        self.assertIn("infrastructure-observe", status_output)
+        self.assertIn("Package publication", status_output)
+        self.assertIn("denied", status_output)
 
         runtime_record = next(
             record
@@ -221,7 +225,7 @@ class ConsumerJourneyTests(unittest.TestCase):
 
         self.assertEqual(0, result, errors)
         self.assertEqual(before, self.snapshot())
-        self.assertIn("Global skill catalogue: 22 pack skill(s), plus six core skills", output)
+        self.assertIn("Global skill catalogue: 24 pack skill(s), plus six core skills", output)
 
     def test_no_detected_product_reports_explicit_command_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

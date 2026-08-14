@@ -4,7 +4,7 @@ Capability packs keep stack-specific material out of always-loaded global policy
 
 ## Supported packs
 
-Language packs cover Java with Maven/Gradle, .NET, Python, and Node/JavaScript/TypeScript. Infrastructure packs cover Ansible, Kubernetes, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, Spacelift, and Azure. Delivery/operations/shared packs cover containers/OCI, GitHub/Azure DevOps source control and CI/CD, databases and migrations, observability, API/schema compatibility, secrets/PKI, dependency management, package publication, and sensitive output.
+Language packs cover Java with Maven/Gradle, .NET, Python, and Node/JavaScript/TypeScript. Infrastructure packs cover Ansible, Kubernetes, Helm, Kustomize, Terraform, OpenTofu, Terragrunt, Spacelift, and Azure. Delivery/operations/shared packs cover containers/OCI, GitHub/Azure DevOps source control and CI/CD, databases and migrations, observability, API/schema compatibility, secrets/PKI, dependency management, package publication, sensitive output, technical writing, and architecture diagramming.
 
 This list is not universal protection for every adjacent CLI, cloud provider, controller, package plugin, database framework, or MCP server. Unknown tools must be assessed and added explicitly.
 
@@ -25,7 +25,7 @@ Optional `.ai-guardrails.json` can explicitly enable/disable packs, resolve pack
 
 A pack uses only the files it needs: `pack.json`, concise `policy.md` or references, command/structured-tool policy, verification/routing data, a distinct portable skill, and synthetic fixtures. `pack.json` declares stable ID/type, description, detectors/exclusions, dependencies/conflicts, and referenced files. Its optional dependency-manifest/lockfile classifications must reference existing file detectors; task assurance consumes that shared package knowledge without adding ecosystem parsers.
 
-Fresh default installation compiles all stable deterministic pack enforcement while globally exposing only contextual language/shared pack skills. This keeps the established safety policy and ordinary development guidance without filling the global skill catalogue with specialist infrastructure, delivery, and operations procedures. Pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not itself change an installation.
+Fresh default installation compiles all stable deterministic pack enforcement while globally exposing only contextual language/shared pack skills. This keeps the established safety policy and ordinary development guidance without filling the global skill catalogue with specialist infrastructure, delivery, operations, and cross-cutting procedures. Pack prose never becomes permanently resident global policy. Repository detection explains current relevance but does not itself change an installation.
 
 Each current pack contributes a distinct `workstation-…` skill. The [skills catalogue](skills.md) is the authoritative reader-friendly index for all language, infrastructure, delivery, operations, and shared skills, including their use boundaries. Product discovery controls whether and when an installed skill is available to an agent; a detected pack or copied directory is not a permission grant or proof of activation.
 
@@ -33,7 +33,7 @@ Use repeatable `--pack ID` selections for deliberately reduced policy/skill inst
 
 ## Toolchain preservation
 
-Language packs inspect repository tooling first, prefer checked-in wrappers and pinned versions, preserve the dependency manager and lockfile, avoid unrelated upgrades, use project-local environments and binaries, retain compiler/linter/analyser settings, and run affected-module/workspace/project tests before broad suites. They deny publication and machine-global installation. Database migration generation is distinct from execution.
+Language packs inspect repository tooling first, prefer checked-in wrappers and pinned versions, preserve the dependency manager and lockfile, avoid unrelated upgrades, use project-local environments and binaries, retain compiler/linter/analyzer settings, and run affected-module/workspace/project tests before broad suites. They deny publication and machine-global installation. Database migration generation is distinct from execution.
 
 ## Infrastructure treatment
 
@@ -47,4 +47,4 @@ Ansible detection uses distinctive configuration and metadata rather than generi
 
 ## Adding a pack
 
-Add a directory under the relevant category, declare markers and referenced files, use existing operation/matching strategies, add positive and nearby-safe counterexamples, and add offline fixtures. Abstract Python only if three concrete pack needs establish the same stable behavior. Run pack validation, explain detection, full build/validation/tests, and scan. See [policy authoring](policy-authoring.md) for schemas and examples.
+Add a directory under the relevant category, declare markers and referenced files, use existing operation/matching strategies, add positive and nearby-safe counterexamples, and add offline fixtures. Abstract Python only if three concrete pack needs establish the same stable behaviour. Run pack validation, explain detection, full build/validation/tests, and scan. See [policy authoring](policy-authoring.md) for schemas and examples.

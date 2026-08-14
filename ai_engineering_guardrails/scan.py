@@ -16,6 +16,11 @@ from .util import GuardrailsError, atomic_write, home_path, json_bytes, read_jso
 
 
 MAX_SCAN_BYTES = 2_000_000
+DOC_PROCEDURAL_SENTENCE_WORD_THRESHOLD = 45
+DOC_FILLER_PHRASES = (
+    "it is important to note that",
+    "please note that",
+)
 IGNORED_PARTS = {
     ".git",
     ".idea",
@@ -49,6 +54,11 @@ FOLLOW_EXTERNAL_OVER_LOCAL_RE = re.compile(
 )
 EXTERNAL_AUTHORITY_MATCHERS = (EXTERNAL_AUTHORITY_RE, FOLLOW_EXTERNAL_OVER_LOCAL_RE)
 SAFE_GIT_CONFIGURATION = ("-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null")
+MARKDOWN_LINK_RE = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+MARKDOWN_URL_RE = re.compile(r"(?:https?://|mailto:)[^\s)>]+", re.IGNORECASE)
+MARKDOWN_INLINE_CODE_RE = re.compile(r"`+[^`]*`+")
+MARKDOWN_QUOTE_RE = re.compile(r'"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’')
+PROCEDURAL_STEP_RE = re.compile(r"^\s*\d+[.)]\s+(?P<text>.+)$")
 
 
 def locally_negated(text: str, position: int) -> bool:
@@ -648,6 +658,169 @@ def scan_repository(repo: Path) -> list[Finding]:
     return sorted(findings, key=lambda item: (item.level, item.path, item.line, item.rule_id))
 
 
+def _documentation_scope(repo: Path | None, selected_path: Path | None) -> tuple[Path, list[Path]]:
+    if repo is not None and selected_path is not None:
+        raise GuardrailsError("docs audit accepts either --repo or --path, not both")
+    if selected_path is not None:
+        expanded = selected_path.expanduser()
+        if expanded.is_symlink():
+            raise GuardrailsError("documentation path must not be a symbolic link")
+        try:
+            target = expanded.resolve(strict=True)
+        except OSError as exc:
+            raise GuardrailsError(f"documentation path cannot be resolved: {selected_path}: {exc}") from exc
+        if target.is_symlink() or not target.is_file() or target.suffix.lower() != ".md":
+            raise GuardrailsError("documentation path must be a regular Markdown file")
+        current = Path.cwd().resolve(strict=False)
+        try:
+            target.relative_to(current)
+            root = current
+        except ValueError:
+            root = target.parent
+        return root, [target]
+
+    selected_repo = repo or Path.cwd()
+    try:
+        root = selected_repo.expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise GuardrailsError(f"repository path cannot be resolved: {selected_repo}: {exc}") from exc
+    if not root.is_dir():
+        raise GuardrailsError(f"repository path is not a directory: {root}")
+    files = []
+    for path in _repository_files(root):
+        relative = path.relative_to(root)
+        if path.suffix.lower() != ".md":
+            continue
+        if len(relative.parts) == 1 or relative.parts[0] in {"docs", "release"}:
+            files.append(path)
+    return root, sorted(files)
+
+
+def _markdown_prose_lines(text: str) -> list[tuple[int, str, str]]:
+    """Return physical Markdown prose lines while excluding non-prose syntax."""
+    result: list[tuple[int, str, str]] = []
+    fence: str | None = None
+    for line_number, raw in enumerate(text.splitlines(), 1):
+        stripped = raw.lstrip()
+        fence_match = re.match(r"^(`{3,}|~{3,})", stripped)
+        if fence_match:
+            marker = fence_match.group(1)[0]
+            fence = None if fence == marker else marker if fence is None else fence
+            continue
+        if fence is not None or not stripped or raw.startswith(("    ", "\t")):
+            continue
+        if stripped.startswith(("#", ">", "<!--")) or re.fullmatch(r"[-*_]{3,}", stripped):
+            continue
+        if stripped.startswith("|") or ("|" in stripped and re.fullmatch(r"[| :\-]+", stripped)):
+            continue
+        prose = MARKDOWN_INLINE_CODE_RE.sub(" ", raw)
+        prose = MARKDOWN_LINK_RE.sub(lambda match: match.group(1), prose)
+        prose = MARKDOWN_URL_RE.sub(" ", prose)
+        prose = MARKDOWN_QUOTE_RE.sub(" ", prose)
+        prose = re.sub(r"<[^>]+>", " ", prose)
+        prose = re.sub(r"[*_~]", "", prose)
+        result.append((line_number, raw, " ".join(prose.split())))
+    return result
+
+
+def _documentation_findings(root: Path, path: Path, text: str) -> list[Finding]:
+    findings: list[Finding] = []
+    for line_number, raw, prose in _markdown_prose_lines(text):
+        step = PROCEDURAL_STEP_RE.match(prose)
+        if step is not None:
+            for sentence in re.split(r"(?<=[.!?])\s+", step.group("text")):
+                word_count = len(re.findall(r"\b[\w]+(?:[-'][\w]+)*\b", sentence))
+                if word_count > DOC_PROCEDURAL_SENTENCE_WORD_THRESHOLD:
+                    findings.append(
+                        _finding(
+                            "DOC001",
+                            "review",
+                            root,
+                            path,
+                            line_number,
+                            f"Procedural sentence has {word_count} words; review the {DOC_PROCEDURAL_SENTENCE_WORD_THRESHOLD}-word advisory threshold.",
+                            "Sentence length is a project clarity heuristic, not an ASD-STE100 compliance rule.",
+                        )
+                    )
+                    break
+        lowered = prose.casefold()
+        phrase = next((value for value in DOC_FILLER_PHRASES if value in lowered), None)
+        if phrase is not None:
+            findings.append(
+                _finding(
+                    "DOC002",
+                    "info",
+                    root,
+                    path,
+                    line_number,
+                    f"Review the filler phrase {phrase!r}; state the fact or caution directly when possible.",
+                    "Only a small transparent phrase list is checked; quoted text, headings, links, and code are excluded.",
+                )
+            )
+    return findings
+
+
+def audit_documentation(repo: Path | None = None, selected_path: Path | None = None) -> tuple[Path, list[Finding], int]:
+    """Run bounded advisory clarity checks against Markdown documentation."""
+    root, files = _documentation_scope(repo, selected_path)
+    findings: list[Finding] = []
+    audited_files = 0
+    for path in files:
+        text = _text(path)
+        if text is None:
+            continue
+        audited_files += 1
+        findings.extend(_documentation_findings(root, path, text))
+    return root, sorted(findings, key=lambda item: (item.path, item.line, item.rule_id)), audited_files
+
+
+def render_documentation_audit(root: Path, findings: Sequence[Finding], audited_files: int, output_format: str) -> bytes:
+    summary = {
+        "review": sum(item.level == "review" for item in findings),
+        "info": sum(item.level == "info" for item in findings),
+    }
+    if output_format == "json":
+        return json_bytes(
+            {
+                "schema_version": 1,
+                "scope": str(root.resolve(strict=False)),
+                "audited_files": audited_files,
+                "advisory": True,
+                "formal_asd_ste100_compliance_assessed": False,
+                "checks": {
+                    "DOC001": f"numbered procedural sentence above {DOC_PROCEDURAL_SENTENCE_WORD_THRESHOLD} words",
+                    "DOC002": f"known filler phrases: {', '.join(DOC_FILLER_PHRASES)}",
+                },
+                "summary": summary,
+                "findings": [item.as_dict() for item in findings],
+            }
+        )
+    if output_format != "human":
+        raise GuardrailsError(f"unsupported docs audit output format: {output_format}")
+    lines = [
+        f"documentation audit: {root.resolve(strict=False)}",
+        "scope: advisory project clarity checks; not an ASD-STE100 compliance assessment",
+        f"audited Markdown files: {audited_files}",
+    ]
+    if not findings:
+        lines.append("no technical-writing findings")
+    for item in findings:
+        lines.append(f"{item.level}: {item.rule_id}: {item.path}:{item.line}: {item.message}")
+    lines.append(f"summary: {summary['review']} review, {summary['info']} info")
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def run_documentation_audit(
+    repo: Path | None = None,
+    selected_path: Path | None = None,
+    output_format: str = "human",
+) -> tuple[list[Finding], bytes]:
+    root, findings, audited_files = audit_documentation(repo, selected_path)
+    rendered = render_documentation_audit(root, findings, audited_files, output_format)
+    print(rendered.decode("utf-8"), end="")
+    return findings, rendered
+
+
 def _json_report(repo: Path, findings: Sequence[Finding]) -> bytes:
     return json_bytes(
         {
@@ -814,6 +987,7 @@ def session_receipt(
     installed = state.load_state(selected_home)
     policy_digest = installed.get("policy_digest") or "unknown"
     summary = terminal_ux.audit_summary(selected_home, window=None)
+    complexity_result = complexity.analyse(repo)
     # Hooks do not comprehensively record allowed operations.  Do not turn that
     # absence into a deceptively precise zero in a receipt.
     counts = {"warned": summary["warnings"], "denied": summary["denials"]}
@@ -821,12 +995,16 @@ def session_receipt(
         "schema_version": 2,
         "repository_identifier_hash": sha256(str(repo.resolve(strict=False)).encode("utf-8")),
         "products": list(products),
-        "files_modified_count": changed_file_count(repo),
+        "files_modified_count": (
+            complexity_result.get("files_changed")
+            if complexity_result.get("available")
+            else None
+        ),
         "risk_classes": sorted({identifier for _, identifier, _ in _changed_risk_matches(repo)}),
         "decision_counts": counts,
         "allowed_operation_count": "unavailable; supported hooks do not comprehensively record allowed operations",
         "guardrail_events": summary,
-        "complexity": complexity.analyse(repo),
+        "complexity": complexity_result,
         "verification_outcomes": [],
         "model_routing_profiles": {
             product: installed.get("products", {}).get(product, {}).get("routing_profile", "none")

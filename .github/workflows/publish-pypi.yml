@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  OPA_VERSION: "1.19.0"
+
 concurrency:
   group: publish-pypi-${{ github.event.release.tag_name }}
   cancel-in-progress: false
@@ -32,6 +35,11 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements-ci.txt
+
+      - name: Set up Open Policy Agent
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: ${{ env.OPA_VERSION }}
 
       - name: Install exact CI tooling
         run: python -m pip install --requirement requirements-ci.txt

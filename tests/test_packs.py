@@ -165,16 +165,16 @@ class PackDetectionTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, cli.main(["packs", "explain", "--repo", str(FIXTURES / "maven-single")]))
-        text = output.getvalue()
-        self.assertIn("java: on-demand policy: policy.md: Java capability policy", text)
-        self.assertIn("java: verification: java-targeted-test (test; affected-module-first)", text)
-        self.assertIn("java: routing hints: java-implementation -> balanced/medium (write)", text)
+        text = " ".join(output.getvalue().replace("|", " ").split())
+        self.assertIn("java On-demand policy policy.md: Java capability policy", text)
+        self.assertIn("java Verification java-targeted-test (test; affected-module-first)", text)
+        self.assertIn("java Routing hints java-implementation -> balanced/medium (write)", text)
 
 
 class PackValidationTests(unittest.TestCase):
     def test_all_packs_validate(self) -> None:
         count, examples = packs.validate_packs()
-        self.assertEqual(22, count)
+        self.assertEqual(24, count)
         self.assertGreater(examples, 375)
 
     def test_pack_types_define_small_catalogue_tiers_and_contextual_defaults(self) -> None:
@@ -182,11 +182,33 @@ class PackValidationTests(unittest.TestCase):
         tiers = {identifier: packs.catalogue_tier(pack) for identifier, pack in available.items()}
 
         self.assertEqual(10, sum(tier == "contextual" for tier in tiers.values()))
-        self.assertEqual(12, sum(tier == "specialist" for tier in tiers.values()))
+        self.assertEqual(14, sum(tier == "specialist" for tier in tiers.values()))
+        self.assertEqual("specialist", tiers["architecture-diagramming"])
+        self.assertEqual("specialist", tiers["technical-writing"])
         self.assertEqual(set(available), set(packs.default_pack_ids(available)))
         skill_defaults = set(packs.default_skill_pack_ids(available))
         self.assertTrue({"python", "node", "java", "dotnet", "dependency-management"}.issubset(skill_defaults))
-        self.assertTrue({"kubernetes", "terraform", "spacelift", "source-control-cicd"}.isdisjoint(skill_defaults))
+        self.assertTrue(
+            {
+                "architecture-diagramming",
+                "kubernetes",
+                "terraform",
+                "spacelift",
+                "source-control-cicd",
+                "technical-writing",
+            }.isdisjoint(skill_defaults)
+        )
+
+    def test_explicit_catalogue_tier_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "shared/technical-writing"
+            shutil.copytree(RESOURCE_ROOT / "packs/shared/technical-writing", destination)
+            config = json.loads((destination / "pack.json").read_text(encoding="utf-8"))
+            config["catalogue_tier"] = "always"
+            (destination / "pack.json").write_text(json.dumps(config), encoding="utf-8")
+
+            with self.assertRaisesRegex(GuardrailsError, "catalogue_tier"):
+                packs.load_pack(destination / "pack.json")
 
     def test_dependency_patterns_are_classified_by_existing_capability_packs(self) -> None:
         available = packs.load_packs()

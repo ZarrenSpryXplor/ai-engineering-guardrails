@@ -44,6 +44,18 @@
       "limitations": "A single self-reported case study, used only as context for a maintainability principle."
     },
     {
+      "id": "asd-ste100-issue-9",
+      "title": "ASD-STE100 Simplified Technical English — Standard for Technical Documentation, Issue 9",
+      "url": "https://www.asd-ste100.org/",
+      "publication_date": "2025-01-15",
+      "evidence_type": "official-standard-source",
+      "relevance": "Supports concise controlled-English guidance for technical documentation and establishes the ownership, trademark, and software-certification boundary.",
+      "confidence": 100,
+      "last_reviewed": "2026-08-10",
+      "review_after": "2027-08-10",
+      "limitations": "Public status and provenance only. The standard and controlled dictionary are not redistributed, and this record does not make the project a compliance checker or create a runtime network dependency."
+    },
+    {
       "id": "project-design-decision",
       "title": "AI Engineering Guardrails architecture and threat model",
       "url": "https://github.com/ZarrenSpryXplor/ai-engineering-guardrails/blob/main/docs/architecture.md",
@@ -169,8 +181,8 @@
       "id": "reporting",
       "polarity": "positive-guidance",
       "scope": "always-loaded-behavioural-policy",
-      "evidence_source_ids": ["project-design-decision"],
-      "rationale": "Clear reporting distinguishes observed outcomes, limitations, and unverified assumptions.",
+      "evidence_source_ids": ["asd-ste100-issue-9", "project-design-decision"],
+      "rationale": "Clear reporting and concise technical documentation distinguish observed outcomes, limitations, and unverified assumptions.",
       "confidence": 90,
       "introduced_date": "2026-08-09",
       "last_reviewed": "2026-08-09",

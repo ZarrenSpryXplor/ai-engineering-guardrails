@@ -35,13 +35,17 @@ Sign in to PyPI, open **Account settings → Publishing**, and add a Pending Tru
 
 For a project that already exists, add the same values from that project's **Publishing** page instead. A Pending Trusted Publisher can create the project on the first successful publication; it does **not** reserve the package name before then. PyPI and TestPyPI are separate services with separate publisher configuration and independently immutable uploaded versions.
 
+This current-state release flow is for maintainers and security reviewers. It shows the separation between the read-only build job and the identity-bearing publish job.
+
 ```mermaid
-flowchart TD
-  Release[Maintainer publishes GitHub Release] --> Build[Check out its tag and validate]
-  Build --> Artifact[One wheel + one source distribution artifact]
-  Artifact --> Approval[Protected pypi environment approval]
-  Approval --> OIDC[GitHub OIDC identity]
-  OIDC --> PyPI[PyPI publishes the exact artifact]
+flowchart LR
+  maintainer["Maintainer"] -->|publishes a GitHub Release for the exact tag| event["Release event"]
+  subgraph actions["GitHub Actions"]
+    event -->|starts| build["Build job: contents read"]
+    build -->|uploads one wheel and one source distribution| artifact["Validated artifact"]
+    artifact -->|downloads after protected-environment approval| publish["Publish job: id-token write"]
+  end
+  publish -->|uses GitHub OIDC Trusted Publishing| pypi["PyPI"]
 ```
 
 The build job has read-only repository permission and no OIDC publishing permission. The publish job neither checks out source nor builds packages; it downloads only the validated artifact, has `id-token: write`, and runs the official PyPA publisher. A duplicate version fails loudly—there is no `skip-existing` setting. The PyPA action produces PyPI publish attestations by default; this repository does not add custom signing code.

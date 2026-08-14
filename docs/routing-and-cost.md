@@ -28,6 +28,8 @@ It renders those inputs into the product's native custom-agent format and record
 
 ## How routing is rendered
 
+This current-state data-flow view is for operators and maintainers. It shows how selected routing data becomes static product-native role files; it does not show runtime task classification.
+
 ```mermaid
 flowchart LR
     subgraph sources["Canonical routing resources"]
@@ -44,14 +46,14 @@ flowchart LR
     installer["Preflight, backup, atomic write, and managed state"]
     native["Managed native role files or a reviewable manual bundle; activation unverified"]
 
-    roles --> validate
-    tasks --> validate
-    profile --> validate
-    maps --> validate
-    guidance --> validate
-    validate --> render
-    render --> installer
-    installer --> native
+    roles -->|input| validate
+    tasks -->|input| validate
+    profile -->|input| validate
+    maps -->|input| validate
+    guidance -->|input| validate
+    validate -->|provides checked inputs to| render
+    render -->|produces role files for| installer
+    installer -->|writes or stages| native
 ```
 
 Task classes are configuration data, not commands an engineer invokes. Each generated role has one fixed task class, which determines its tier and reasoning when the file is rendered. The renderer emits the resolved role model for Codex, Claude Code, and Cursor; it intentionally omits that field for VS Code, Visual Studio, and JetBrains so selection remains native to those products. Capability-pack routing hints shown by `packs explain` are advisory and do not dynamically modify an installed role.
@@ -109,10 +111,12 @@ After installation, start or reload the relevant product session and confirm the
 
 Do not delegate a task that the primary agent can complete with a few targeted reads or commands. Delegate when separate context, bounded high-volume output, specialist analysis, one isolated ordinary change, or independent verification materially improves the work.
 
+This decision flow is for a coordinating engineer or primary agent. It selects one bounded role or retains the work; it does not grant authority or select a model dynamically.
+
 ```mermaid
 flowchart TD
-    task["Engineering task"] --> primary["Primary agent"]
-    primary --> small{"Can a few targeted reads or commands finish it?"}
+    task["Engineering task"] -->|is coordinated by| primary["Primary agent"]
+    primary -->|checks scope| small{"Can a few targeted reads or commands finish it?"}
     small -->|Yes| local["Keep the work in the primary context"]
     small -->|No| need{"What bounded result is needed?"}
     need -->|Repository or documentation evidence| explorer["Explorer: read-only"]
@@ -121,11 +125,11 @@ flowchart TD
     need -->|Independent findings-first review| reviewer["Reviewer: read-only"]
     need -->|Acceptance and completion check| verifier["Verifier: read-only"]
     need -->|High risk or material ambiguity| highRisk["Retain or escalate to a deep-capable primary context"]
-    explorer --> handoff["Concise handoff to the primary agent"]
-    analyst --> handoff
-    implementer --> handoff
-    reviewer --> handoff
-    verifier --> handoff
+    explorer -->|returns evidence| handoff["Concise handoff to the primary agent"]
+    analyst -->|returns classified results| handoff
+    implementer -->|returns one bounded change| handoff
+    reviewer -->|returns findings| handoff
+    verifier -->|returns acceptance evidence| handoff
 ```
 
 The diagram shows products that delegate a role from a coordinating primary agent. On a selectable custom-agent surface such as VS Code or Visual Studio, the engineer may instead activate the role directly; the same scope, capability, escalation, and review boundaries still apply, but the role returns to the engineer rather than to a parent agent.

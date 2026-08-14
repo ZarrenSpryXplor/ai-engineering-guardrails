@@ -2,16 +2,18 @@
 
 Terminal UX is an optional local explainability layer. It displays product-native context or account information only where the product documents it, plus compact local guardrail and complexity signals. It is not telemetry: nothing is sent to a vendor or third party, no billing/account store is read, and no vendor session JSON is persisted.
 
+This current-state data-flow view is for operators. It shows which local inputs can reach each supported terminal surface.
+
 ```mermaid
 flowchart LR
-  C[Canonical profiles and thresholds] --> P[ai-guardrails CLI]
-  A[Redacted local audit events] --> S[Bounded aggregate cache]
-  G[Explicit complexity snapshot] --> S
-  P --> M[Managed Claude statusLine]
-  P --> N[Codex marker-owned native field configuration]
-  P --> U[Cursor /status-indicators guidance]
-  S --> M
-  M --> R[One local terminal line]
+  profiles["Canonical profiles and thresholds"] -->|configure| cli["ai-guardrails CLI"]
+  audit["Redacted local audit events"] -->|aggregate locally into| cache["Bounded aggregate cache"]
+  complexity["Explicit complexity snapshot"] -->|adds classification to| cache
+  cli -->|installs managed command for| claude["Claude statusLine"]
+  cli -->|writes marker-owned fields for| codex["Codex native status line"]
+  cli -->|prints manual setup for| cursor["Cursor /status-indicators"]
+  cache -->|supplies local counters to| claude
+  claude -->|renders| line["One local terminal line"]
 ```
 
 The cache contains only time bounds, content-free decision/rule/product aggregates, a complexity classification, and fixed schema metadata. It never contains prompts, source, commands, arguments, paths, repository names, raw events, vendor payloads, or credentials.
@@ -81,7 +83,7 @@ ai-guardrails receipt --repo . --product all --compact
 
 `complexity` reports deterministic repository-change observations from local Git data: changed files/lines, source/test/docs/generated/manifest/lockfile/CI/infrastructure paths, implementation languages, newly introduced languages, reliably extracted runtime dependencies, deleted tests, directory spread, and existing high-risk path classes. Every signal has a stable identifier, evidence, threshold, and reason. Its `clear`, `review`, and `high-change` classifications are review prompts, not a design-quality score or semantic verdict. `--write-snapshot` stores only aggregate values and a one-way repository identifier under the managed cache; it never executes repository scripts, fetches, contacts a remote, or runs a package manager.
 
-`receipt --compact` is a repository/change summary, not a claimed vendor session boundary. It combines the version-2 receipt schema with bounded recorded-history audit counts, routing state, complexity result, and known verification gaps. It deliberately marks allowed-operation counts unavailable because supported hooks do not record every allowed operation. Status-line and `activity` counters remain explicitly time-windowed.
+`receipt --compact` is a repository/change summary, not a claimed vendor session boundary. It combines the version-2 receipt schema with bounded recorded-history audit counts, routing state, complexity result, and known verification gaps. `files_modified_count` is `null` in JSON and `unavailable` in compact output when Git state cannot be established; a known clean repository remains `0`. It deliberately marks allowed-operation counts unavailable because supported hooks do not record every allowed operation. Status-line and `activity` counters remain explicitly time-windowed.
 
 ## Synthetic demonstration
 
