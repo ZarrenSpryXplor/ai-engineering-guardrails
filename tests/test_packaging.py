@@ -100,6 +100,7 @@ class PackagingTests(unittest.TestCase):
             "docs/README.md",
             "docs/releasing.md",
             "docs/evidence-and-assurance.md",
+            "docs/architecture-diagramming.md",
             "docs/technical-writing.md",
             "SECURITY.md",
             "CONTRIBUTING.md",
@@ -233,6 +234,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertTrue(any(name.endswith("docs/README.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/releasing.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/evidence-and-assurance.md") for name in names))
+                self.assertTrue(any(name.endswith("docs/architecture-diagramming.md") for name in names))
                 self.assertTrue(any(name.endswith("docs/technical-writing.md") for name in names))
                 for filename in (
                     "SECURITY.md",

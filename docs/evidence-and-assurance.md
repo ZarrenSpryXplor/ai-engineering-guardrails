@@ -2,17 +2,19 @@
 
 This project treats policy, task completion, and external instructions as claims that need bounded evidence—not as facts made true by an agent saying they are true. Everything here is local and offline: no model, vendor service, report uploader, or background collector is involved.
 
-## What this adds
+## Task assurance flow
+
+[Policy authoring](policy-authoring.md#attach-evidence-metadata-not-duplicate-prose) owns the policy-evidence lifecycle. This current-state flow is for maintainers who evaluate a bounded task completion claim. It shows the inputs to `task status` and `task receipt`; it does not show report generation or command execution.
 
 ```mermaid
 flowchart LR
-  Change[Policy or bounded task change] --> Metadata[Canonical rationale, evidence IDs, review dates]
-  Metadata --> Validate[Build and structural validation]
-  Validate --> Audit[Offline policy audit]
-  Reports[Repository-native SARIF, Cobertura, JUnit, or manual review] --> Contract[Task contract]
-  Contract --> Fresh{Fresh and bound to current repository state?}
-  Fresh -- yes --> Receipt[Evidence-bound task receipt]
-  Fresh -- no --> Halt[Safe halt with named evidence gap]
+  contract["Task contract (.ai-task.json)"] -->|declares scope and required evidence| evaluate["task status or task receipt"]
+  repository["Current Git state"] -->|binds repository scope| evaluate
+  ledger["Optional evidence ledger (.ai-task.evidence.json)"] -->|binds report digests and manual review IDs| evaluate
+  reports["Local SARIF, Cobertura, and JUnit reports"] -->|provide bounded results| evaluate
+  evaluate --> bound{"Contract, state, scope, and evidence valid?"}
+  bound -->|Yes| receipt["Evidence-bound task receipt"]
+  bound -->|No| halt["Safe halt: preserve work and name the gap"]
 ```
 
 One passing test run is useful but is not a permanent proof: policy, product behaviour, tool versions, and repository state can drift. Review dates make that uncertainty visible without automatically weakening or deleting a rule. Static complexity signals are likewise useful evidence of change surface, but they cannot establish behavioural compatibility or business correctness.

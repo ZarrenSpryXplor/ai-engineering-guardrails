@@ -10,7 +10,7 @@ This project uses a small set of ASD-STE100-informed principles to make agent-ge
 
 The skill is specialist and is not part of the fresh default catalogue. Select `--skill-catalogue all`, or select the `technical-writing` pack explicitly for a deliberately reduced installation. Product discovery and activation remain product-controlled.
 
-This milestone does not add repository preferred-term configuration or a controlled-dictionary engine. A canonical-term mapping can be considered later only if an existing configuration consumer establishes a concrete need.
+The current implementation does not provide repository preferred-term configuration or a controlled-dictionary engine. Add a canonical-term mapping only when an existing configuration consumer establishes a concrete need.
 
 ## Advisory audit
 
@@ -22,7 +22,21 @@ ai-guardrails docs audit --path README.md
 ai-guardrails docs audit --format json
 ```
 
-The initial checks cover numbered procedural sentences above a transparent 45-word review threshold and two explicit filler prefaces. They exclude code blocks, inline code, headings, block quotations, quoted text, and URLs. Findings use `review` or `info`; they are advisory and do not block installation or establish formal compliance.
+The checks cover numbered procedural sentences above a transparent 45-word review threshold and two explicit filler phrases. They exclude code blocks, inline code, headings, block quotations, quoted text, and URLs. Findings use `review` or `info`; they are advisory and do not block installation or establish formal compliance.
+
+The audit does not verify factual accuracy, command syntax, links, version currency, or product compatibility. A clean result therefore does not show that documentation is current.
+
+## Review technical currency
+
+Use repository and source evidence in addition to the advisory audit:
+
+1. Compare commands, options, defaults, and paths with the current CLI and installer.
+2. Compare counts, identifiers, and ownership claims with canonical resources and tests.
+3. Check relative links and heading anchors after changing document structure.
+4. Verify time-sensitive product claims against authoritative sources. Record the review date and preserve known limitations.
+5. Run `ai-guardrails docs audit --repo .` and review each finding in context.
+
+Do not change a dated verification claim unless you reviewed its linked sources. Do not infer current product behaviour from a local file or a successful installation command.
 
 ## Copyright and compliance boundary
 

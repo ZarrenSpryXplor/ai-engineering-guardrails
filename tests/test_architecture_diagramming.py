@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import stat
 import unittest
 from pathlib import Path
@@ -14,9 +15,46 @@ SKILL_ROOT = PACK_ROOT / "skills/workstation-architecture-diagramming"
 SKILL = SKILL_ROOT / "SKILL.md"
 STANDARDS = SKILL_ROOT / "references/standards-and-notation.md"
 DIAGRAMS_NET = SKILL_ROOT / "references/diagrams-net.md"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+DOCS_ROOT = REPOSITORY_ROOT / "docs"
+MERMAID_BLOCK_RE = re.compile(
+    r"^```mermaid[ \t]*\n(?P<body>.*?)^```[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 class ArchitectureDiagrammingTests(unittest.TestCase):
+    def test_maintained_documentation_diagrams_use_stable_directives_and_unique_source(self) -> None:
+        blocks: list[tuple[Path, str]] = []
+        documentation_paths = sorted(
+            (*REPOSITORY_ROOT.glob("*.md"), *DOCS_ROOT.rglob("*.md"))
+        )
+        for path in documentation_paths:
+            text = path.read_text(encoding="utf-8")
+            starts = len(re.findall(r"^```mermaid[ \t]*$", text, flags=re.MULTILINE))
+            matches = list(MERMAID_BLOCK_RE.finditer(text))
+            self.assertEqual(starts, len(matches), f"unclosed Mermaid block in {path}")
+            blocks.extend((path, match.group("body").strip()) for match in matches)
+
+        self.assertTrue(blocks)
+        sources: dict[str, list[str]] = {}
+        allowed_directive = re.compile(
+            r"^(?:flowchart (?:LR|RL|TB|TD)|sequenceDiagram|stateDiagram(?:-v2)?|erDiagram)$"
+        )
+        experimental = re.compile(
+            r"(?:^|\s)(?:architecture-beta|C4Context|C4Container|C4Component|C4Deployment|C4Dynamic)(?:\s|$)"
+        )
+        for path, body in blocks:
+            with self.subTest(path=path):
+                directive = next((line.strip() for line in body.splitlines() if line.strip()), "")
+                self.assertRegex(directive, allowed_directive)
+                self.assertIsNone(experimental.search(body))
+            normalized = "\n".join(line.rstrip() for line in body.splitlines())
+            sources.setdefault(normalized, []).append(path.relative_to(REPOSITORY_ROOT).as_posix())
+
+        duplicates = [paths for paths in sources.values() if len(paths) > 1]
+        self.assertEqual([], duplicates, f"duplicate Mermaid sources: {duplicates}")
+
     def test_skill_metadata_is_portable_concise_front_loaded_and_unique(self) -> None:
         raw = SKILL.read_text(encoding="utf-8")
         fields, body = policy.parse_skill(SKILL)

@@ -38,19 +38,20 @@ VS Code Copilot gets a native user instruction file and a **Preview** `PreToolUs
 
 Visual Studio gets `~/copilot-instructions.md` (the documented `%USERPROFILE%\copilot-instructions.md` on Windows). Skills require Visual Studio 18.5+; custom agents require 18.4+ and are user-selectable roles. Hooks and subagents are unsupported, so native approvals remain in charge.
 
-JetBrains intentionally needs a couple of manual confirmations:
+JetBrains requires these manual configuration steps:
 
-```sh
-ai-guardrails jetbrains print-chat-instructions
-ai-guardrails jetbrains export-project-rules --repo . --dry-run
-ai-guardrails jetbrains export-project-rules --repo .
-```
+1. Run `ai-guardrails jetbrains print-chat-instructions`.
+2. Paste the complete output in **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions**.
+3. Run `ai-guardrails jetbrains export-project-rules --repo . --dry-run` and review the target path.
+4. Run `ai-guardrails jetbrains export-project-rules --repo .`.
+5. Open **Settings > Tools > AI Assistant > Rules** and set the exported rule to **Always**.
+6. Register `~/.agents/skills` under **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**.
 
-Paste the first command's output in **Settings > Tools > AI Assistant > Prompt Library > General > Chat Instructions**. After exporting, open **Settings > Tools > AI Assistant > Rules** and confirm the rule is **Always**. Register `~/.agents/skills` under **Settings > Tools > AI Assistant > Skills > Manage Skill Directories**. The installer does not change JetBrains operation modes, approvals, MCP settings, or plugins. Copilot custom agents in JetBrains are Preview/manual, and no JetBrains hook is installed.
+The installer does not change JetBrains operation modes, approvals, MCP settings, or plugins. Copilot custom agents in JetBrains are Preview and require manual configuration. This project does not install a JetBrains hook.
 
 ## Day-to-day use
 
-Work normally. Skills are short, on-demand procedures rather than another giant always-loaded rulebook. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Fourteen specialist infrastructure, delivery, operations, and cross-cutting skills remain packaged; `install --skill-catalogue all` exposes the complete 30-skill catalogue and `--skill-catalogue contextual` explicitly restores the smaller 16-skill managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
+Skills are short, on-demand procedures. The default install keeps deterministic enforcement from all stable packs but exposes only six core skills plus ten contextual language/shared skills. Fourteen specialist infrastructure, delivery, operations, and cross-cutting skills remain packaged. `install --skill-catalogue all` exposes the complete 30-skill catalogue. `--skill-catalogue contextual` restores the smaller 16-skill managed set. See the [skills catalogue](skills.md) for exact names, tiers, and deliberately reduced `--pack ID` installations.
 
 Where the selected product supports explicit skill invocation, ask for a skill by its exact `workstation-…` name when you want a specific workflow—for example `workstation-code-review`, `workstation-python`, `workstation-kubernetes`, or `workstation-incident-analysis`. Product-specific discovery and invocation remain product-controlled, so an installed directory is not proof that every session activated a skill. `ai-guardrails packs detect --repo .` is a useful offline hint about which stack skills fit the repository; it does not run a tool or grant permission.
 
@@ -89,6 +90,8 @@ ai-guardrails docs audit --path README.md
 ```
 
 See [technical writing](technical-writing.md) for scope, exclusions, and the standard provenance boundary.
+
+For software or cloud architecture diagrams, use `workstation-architecture-diagramming`. The skill produces or edits reviewable Mermaid and diagrams.net source and does not claim formal conformance to C4, UML, cloud-provider, or accessibility standards. It is a specialist skill. On an existing default installation, use `ai-guardrails install --skill-catalogue all` to expose it without reducing deterministic pack enforcement. Use `--pack architecture-diagramming` only for an intentionally reduced policy-and-skill installation. See [architecture diagramming](architecture-diagramming.md) for its workflow and the [skills catalogue](skills.md#delivery-operations-and-cross-stack-work) for its scope.
 
 ## Optional routing
 

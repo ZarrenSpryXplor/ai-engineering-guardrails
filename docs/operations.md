@@ -138,7 +138,7 @@ ai-guardrails docs audit --path README.md
 ai-guardrails docs audit --format json
 ```
 
-The audit reuses the bounded static scanner and reads Markdown only. It reports advisory `review` and `info` findings for a small transparent set of clarity heuristics; it does not rewrite text, download ASD-STE100, block installation, or certify compliance. See [technical writing](technical-writing.md) for scope and limitations.
+The audit reuses the bounded static scanner and reads Markdown only. It reports advisory `review` and `info` findings for a small transparent set of clarity heuristics. It does not rewrite text, download ASD-STE100, block installation, or certify compliance. It also does not verify commands, links, version currency, product compatibility, or factual accuracy. Compare those claims with the current implementation, tests, canonical resources, and dated authoritative sources. See [technical writing](technical-writing.md) for scope and limitations.
 
 ## Evidence, task contracts, and component review
 
@@ -177,7 +177,7 @@ Suggested topics: `ai-agents`, `coding-agents`, `codex`, `claude-code`, `cursor`
 
 ## Release checklist
 
-This repository can prepare artifacts locally, but every public release remains a human-controlled GitHub and package-registry operation. Follow [Releasing to PyPI](releasing.md) for the exact Trusted Publisher, protected-environment, tag/version, and approval procedure. Before each release, a maintainer should:
+This repository can prepare artifacts locally, but every public release remains a human-controlled GitHub and package-registry operation. Follow [Releasing to PyPI](releasing.md) for the exact Trusted Publisher, protected-environment, tag/version, and approval procedure. Before each release:
 
 1. Enable GitHub private vulnerability reporting and confirm that the contact route in [SECURITY.md](../SECURITY.md) works.
 2. Protect `main` with a ruleset or branch-protection rule that requires at least one review, requires review from [CODEOWNERS](../.github/CODEOWNERS), prevents force pushes and deletion, and requires these current checks: `tests`, `Compatibility (Python 3.14)`, `Wheel smoke (ubuntu-latest)`, `Wheel smoke (macos-latest)`, and `Wheel smoke (windows-latest)`. Also require the current CodeQL analysis checks when CodeQL is enabled.

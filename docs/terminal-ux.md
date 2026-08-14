@@ -2,16 +2,18 @@
 
 Terminal UX is an optional local explainability layer. It displays product-native context or account information only where the product documents it, plus compact local guardrail and complexity signals. It is not telemetry: nothing is sent to a vendor or third party, no billing/account store is read, and no vendor session JSON is persisted.
 
+This current-state data-flow view is for operators. It shows which local inputs can reach each supported terminal surface.
+
 ```mermaid
 flowchart LR
-  C[Canonical profiles and thresholds] --> P[ai-guardrails CLI]
-  A[Redacted local audit events] --> S[Bounded aggregate cache]
-  G[Explicit complexity snapshot] --> S
-  P --> M[Managed Claude statusLine]
-  P --> N[Codex marker-owned native field configuration]
-  P --> U[Cursor /status-indicators guidance]
-  S --> M
-  M --> R[One local terminal line]
+  profiles["Canonical profiles and thresholds"] -->|configure| cli["ai-guardrails CLI"]
+  audit["Redacted local audit events"] -->|aggregate locally into| cache["Bounded aggregate cache"]
+  complexity["Explicit complexity snapshot"] -->|adds classification to| cache
+  cli -->|installs managed command for| claude["Claude statusLine"]
+  cli -->|writes marker-owned fields for| codex["Codex native status line"]
+  cli -->|prints manual setup for| cursor["Cursor /status-indicators"]
+  cache -->|supplies local counters to| claude
+  claude -->|renders| line["One local terminal line"]
 ```
 
 The cache contains only time bounds, content-free decision/rule/product aggregates, a complexity classification, and fixed schema metadata. It never contains prompts, source, commands, arguments, paths, repository names, raw events, vendor payloads, or credentials.
